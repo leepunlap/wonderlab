@@ -1,0 +1,26 @@
+{
+  "name": "wonderlab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wonder Lab: AI-guided, productive-failure block programming for the IITS lesson pages (front-end).",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "python3 test/run_tests.py"
+  },
+  "dependencies": {
+    "events": "3.3.0",
+    "scratch-audio": "2.0.268",
+    "scratch-blocks": "2.1.19"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  },
+  "wonderlab": {
+    "engine": {
+      "@scratch/scratch-vm": "15.2.0",
+      "@scratch/scratch-render": "15.2.0",
+      "@scratch/scratch-storage": "15.2.0"
+    }
+  }
+}

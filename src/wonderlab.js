@@ -1,0 +1,529 @@
+/*!
+ * Wonder Lab runtime — program model -> project.json -> VM + stage + read-only blocks.
+ * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+ * Engine: @scratch/scratch-vm, scratch-render, scratch-storage 15.2.0 (AGPL-3.0-only) + scratch-blocks 2.1.19
+ * (Apache-2.0, on Blockly 12). Also runs on the last BSD releases (scratch-vm 4.8.115 + scratch-blocks 1.3.0).
+ * Wonder Lab is not affiliated with, sponsored by or endorsed by the Scratch Foundation or MIT.
+ *
+ * Program model (what the AI edits through the server, never the browser):
+ *   {sprites: {<name>: {scripts: {<id>: [block, ...]}}}, stage: {scripts: {...}}}
+ * Block = compact JSON with real Scratch 3 opcodes (whitelist: opcodes.json), e.g.
+ *   {"op":"control_repeat","TIMES":10,"SUBSTACK":[{"op":"motion_changeyby","DY":-10}]}
+ *   reporter / menu arguments: 5 | "hi" | {"var":"分數"} | {"op":"operator_random","FROM":1,"TO":10} | "_mouse_"
+ */
+(function (global) {
+  'use strict';
+  var PRIM = { num: 4, pos: 5, whole: 6, int: 7, angle: 8, color: 9, text: 10 };
+  var MENU_DEFAULT = { obj_rm: '_random_', obj_m: '_mouse_', obj_me: '_edge_', clone: '_myself_', key: 'space', color_param: 'color' };
+  var EMPTY = function () { return { sprites: {}, stage: { scripts: {} } }; };
+  // Pen extension block text: the VM formats it from these messages (scratch-gui passes scratch-l10n). Copied from
+  // scratch-l10n 6.1.130 editor/extensions/zh-tw.json (AGPL-3.0-only); without them the pen blocks show in English.
+  var PEN_ZH = { 'pen.categoryName': '畫筆', 'pen.clear': '筆跡全部清除', 'pen.stamp': '蓋章', 'pen.penDown': '下筆', 'pen.penUp': '停筆',
+    'pen.setColor': '筆跡顏色設為 [COLOR]', 'pen.changeColorParam': '筆跡 [COLOR_PARAM] 改變 [VALUE]', 'pen.setColorParam': '筆跡 [COLOR_PARAM] 設為 [VALUE]',
+    'pen.changeSize': '筆跡寬度改變 [SIZE]', 'pen.setSize': '筆跡寬度設為 [SIZE]', 'pen.colorMenu.color': '顏色', 'pen.colorMenu.saturation': '彩度',
+    'pen.colorMenu.brightness': '亮度', 'pen.colorMenu.transparency': '透明度', 'pen.changeHue': '筆跡顏色改變 [HUE]', 'pen.setHue': '筆跡顏色設為 [HUE]',
+    'pen.changeShade': '筆跡亮度改變 [SHADE]', 'pen.setShade': '筆跡亮度設為 [SHADE]' };
+  // hats that wait for the student (a key, a click): such a program is not "finished" when no script is running
+  var WAIT_HATS = { event_whenkeypressed: 1, event_whenthisspriteclicked: 1, event_whenstageclicked: 1 };
+
+  function WonderLab(opts) {
+    this.spec = opts.spec;               // opcodes.json
+    this.lesson = opts.lesson;           // <slug>.json: stage + sprites + costume asset ids
+    this.assetBase = opts.assetBase;     // ABSOLUTE URL prefix for <assetId>.<ext> (the storage worker resolves relative URLs against itself)
+    this.mediaBase = opts.mediaBase;     // blocks media folder
+    this.el = opts.el;                   // {stage, blocks, tabs, monitors, ask}
+    this.program = EMPTY();
+    this.focus = null;
+    this.trace = null;
+    this.changed = {};
+    this.active = false;
+  }
+  WonderLab.empty = EMPTY;
+
+  /* ---------- compile: program model -> project.json ---------- */
+  WonderLab.prototype.compile = function (program) {
+    var spec = this.spec.opcodes, lesson = this.lesson, n = 0;
+    var vars = {}, lists = {}, bcasts = {}, exts = {};
+    function nid(p) { n += 1; return (p || 'b') + n.toString(36); }
+    function idFor(map, prefix, name) {
+      for (var k in map) if ((Array.isArray(map[k]) ? map[k][0] : map[k]) === name) return k;
+      var id = prefix + Object.keys(map).length;
+      map[id] = prefix === 'm' ? name : (prefix === 'l' ? [name, []] : [name, 0]);
+      return id;
+    }
+    function stack(arr, parent, T) {
+      var first = null, prev = null;
+      (arr || []).forEach(function (b) {
+        var id = block(b, prev || parent, T);
+        if (prev) T[prev].next = id; else first = id;
+        prev = id;
+      });
+      return first;
+    }
+    function block(b, parent, T) {
+      var def = spec[b.op]; if (!def) throw new Error('unknown opcode ' + b.op);
+      if (def.ext) exts[def.ext] = 1;
+      var id = nid(), blk = { opcode: b.op, next: null, parent: parent, inputs: {}, fields: {}, shadow: false, topLevel: false };
+      T[id] = blk;
+      Object.keys(def.inputs || {}).forEach(function (name) {
+        var type = def.inputs[name], v = b[name];
+        if (type === 'stack') { if (Array.isArray(v) && v.length) blk.inputs[name] = [2, stack(v, id, T)]; return; }
+        if (type === 'bool') { if (v && v.op) blk.inputs[name] = [2, block(v, id, T)]; return; }
+        if (type === 'broadcast') { var nm = String(v == null ? 'message1' : v); blk.inputs[name] = [1, [11, nm, idFor(bcasts, 'm', nm)]]; return; }
+        if (type.indexOf('menu:') === 0) {
+          var p = type.split(':'), mid = nid('m'), mv = (v == null || typeof v === 'object') ? MENU_DEFAULT[p[3]] || '' : String(v);
+          if (p[3] === 'costume' && (v == null || typeof v === 'object')) mv = lesson.sprites[0] ? lesson.sprites[0].costumes[0].name : '';
+          if (p[3] === 'backdrop' && (v == null || typeof v === 'object')) mv = lesson.stage.backdrops[0].name;
+          T[mid] = { opcode: p[1], next: null, parent: id, inputs: {}, fields: {}, shadow: true, topLevel: false };
+          T[mid].fields[p[2]] = [mv, null];
+          blk.inputs[name] = (v && v.op) ? [3, block(v, id, T), mid]
+            : (v && v['var'] != null) ? [3, [12, String(v['var']), idFor(vars, 'v', String(v['var']))], mid] : [1, mid];
+          return;
+        }
+        var code = PRIM[type], dflt = type === 'color' ? '#000000' : (type === 'text' ? '' : '0');
+        var shadowPrim = [code, dflt];
+        if (v && typeof v === 'object') {
+          if (v['var'] != null) blk.inputs[name] = [3, [12, String(v['var']), idFor(vars, 'v', String(v['var']))], shadowPrim];
+          else if (v.list != null) blk.inputs[name] = [3, [13, String(v.list), idFor(lists, 'l', String(v.list))], shadowPrim];
+          else if (v.op) blk.inputs[name] = [3, block(v, id, T), shadowPrim];
+          else blk.inputs[name] = [1, shadowPrim];
+        } else {
+          blk.inputs[name] = [1, [code, v == null ? dflt : String(v)]];
+        }
+      });
+      Object.keys(def.fields || {}).forEach(function (name) {
+        var ft = def.fields[name], v = b[name];
+        if (ft === 'var') blk.fields[name] = [String(v), idFor(vars, 'v', String(v))];
+        else if (ft === 'list') blk.fields[name] = [String(v), idFor(lists, 'l', String(v))];
+        else if (ft === 'broadcast') blk.fields[name] = [String(v), idFor(bcasts, 'm', String(v))];
+        else blk.fields[name] = [String(v == null ? (Array.isArray(ft) ? ft[0] : (ft === 'key' ? 'space' : '')) : v), null];
+      });
+      if (b.op === 'control_stop') blk.mutation = { tagName: 'mutation', children: [], hasnext: b.STOP_OPTION === 'other scripts in sprite' ? 'true' : 'false' };
+      return id;
+    }
+    function scripts(scr) {
+      var T = {}, y = 20;
+      Object.keys(scr || {}).forEach(function (sid) {
+        var first = stack(scr[sid], null, T);
+        if (!first) return;
+        T[first].topLevel = true; T[first].x = 20; T[first].y = y;
+        y += 60 + 40 * JSON.stringify(scr[sid]).split('"op"').length;
+      });
+      return T;
+    }
+    function costume(c) {
+      var o = { assetId: c.assetId, name: c.name, md5ext: c.assetId + '.' + c.ext, dataFormat: c.ext,
+                rotationCenterX: c.cx, rotationCenterY: c.cy };
+      if (c.ext !== 'svg') o.bitmapResolution = c.res || 1;
+      return o;
+    }
+    // A sound the lesson ships (build_wonder_lab.py content-hashes the built-in WAV library into a/). The VM
+    // needs name + assetId + md5ext + dataFormat to fetch it; scratch-audio rewrites rate/sampleCount from the
+    // decoded buffer, so the lesson's own numbers are only a starting point.
+    function sound(c) {
+      return { name: c.name, assetId: c.assetId, md5ext: c.md5ext || (c.assetId + '.' + (c.ext || 'wav')),
+               dataFormat: c.dataFormat || c.ext || 'wav', rate: c.rate || 0, sampleCount: c.sampleCount || 0,
+               format: c.format || null };
+    }
+    function soundsOf(t) { return ((t && t.sounds) || []).map(sound); }
+    var prog = program || EMPTY();
+    var stageBlocks = scripts(prog.stage && prog.stage.scripts);
+    var sprites = lesson.sprites.map(function (s, i) {
+      var p = (prog.sprites || {})[s.name] || {};
+      return { isStage: false, name: s.name, variables: {}, lists: {}, broadcasts: {}, blocks: scripts(p.scripts),
+               comments: {}, currentCostume: 0, costumes: s.costumes.map(costume), sounds: soundsOf(s), volume: 100,
+               layerOrder: i + 1, visible: s.visible !== false, x: s.x || 0, y: s.y || 0, size: s.size || 100,
+               direction: s.direction == null ? 90 : s.direction, draggable: false,
+               rotationStyle: s.rotationStyle || 'all around' };
+    });
+    var stage = { isStage: true, name: 'Stage', variables: vars, lists: lists, broadcasts: bcasts, blocks: stageBlocks,
+                  comments: {}, currentCostume: 0, costumes: lesson.stage.backdrops.map(costume), sounds: soundsOf(lesson.stage), volume: 100,
+                  layerOrder: 0, tempo: 60, videoTransparency: 50, videoState: 'off', textToSpeechLanguage: null };
+    // one visible monitor per stage variable and list, as the editor shows them (the program can hide them again)
+    var monitors = [], my = 5;
+    Object.keys(vars).forEach(function (id) {
+      monitors.push({ id: id, mode: 'default', opcode: 'data_variable', params: { VARIABLE: vars[id][0] }, spriteName: null, value: 0,
+        width: 0, height: 0, x: 5, y: my, visible: true, sliderMin: 0, sliderMax: 100, isDiscrete: true }); my += 27;
+    });
+    Object.keys(lists).forEach(function (id) {
+      monitors.push({ id: id, mode: 'list', opcode: 'data_listcontents', params: { LIST: lists[id][0] }, spriteName: null, value: [],
+        width: 0, height: 0, x: 5, y: my, visible: true }); my += 27;
+    });
+    return { targets: [stage].concat(sprites), monitors: monitors, extensions: Object.keys(exts),
+             meta: { semver: '3.0.0', vm: '0.2.0', agent: 'WonderLab' } };
+  };
+
+  /* ---------- engine ---------- */
+  function ctor(g, names) { if (typeof g === 'function') return g; for (var i = 0; i < names.length; i++) if (g && typeof g[names[i]] === 'function') return g[names[i]]; return null; }
+
+  WonderLab.prototype.boot = function () {
+    var self = this;
+    var VMC = ctor(global.VirtualMachine, ['default', 'VirtualMachine']);
+    var SC = ctor(global.ScratchStorage, ['ScratchStorage', 'default']);
+    var RC = ctor(global.ScratchRender, ['default', 'RenderWebGL']);
+    var vm = this.vm = new VMC();
+    if (vm.setLocale) try { var lp = vm.setLocale('zh-tw', PEN_ZH); if (lp && lp.catch) lp.catch(function () {}); } catch (e) {}
+    var storage = new SC(), AT = storage.AssetType, base = this.assetBase;
+    storage.addWebStore([AT.ImageVector, AT.ImageBitmap, AT.Sound], function (a) { return base + a.assetId + '.' + a.dataFormat; });
+    vm.attachStorage(storage);
+    // Sound: the upstream scratch-vm web bundle does not contain scratch-audio (the host supplies it), and
+    // loadSound() silently returns an unloaded sound without an engine: without this, 播放音效 does nothing.
+    // engine-<hash>/scratch-audio.js defines window.ScratchAudio (AudioEngine), built from scratch-audio 2.0.268.
+    var AC = ctor(global.ScratchAudio, ['AudioEngine', 'default']);
+    if (AC) {
+      try { this.audioEngine = new AC(); vm.attachAudioEngine(this.audioEngine); this.audio = true; }
+      catch (e) { if (global.console) console.warn('Wonder Lab audio engine', e); }
+    } else if (global.console) {
+      console.warn('Wonder Lab: scratch-audio.js not loaded — sound blocks will be silent');
+    }
+    // The VM requires a "V2 bitmap adapter" for any bitmap costume; only resize + dataURI decode are used.
+    vm.attachV2BitmapAdapter({
+      resize: function (img, w, h) { var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+        var g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, c.width, c.height); return c; },
+      convertDataURIToBinary: function (uri) { var b = atob(uri.split(',')[1]), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+    });
+    var canvas = this.canvas = document.createElement('canvas'); canvas.className = 'wl-canvas';
+    this.el.stage.insertBefore(canvas, this.el.stage.firstChild);
+    this.renderer = new RC(canvas);
+    vm.attachRenderer(this.renderer);
+    this.resize();
+    if (global.ResizeObserver) new global.ResizeObserver(function () { self.resize(); }).observe(this.el.stage);
+    else global.addEventListener('resize', function () { self.resize(); });
+
+    // blocks: scratch-blocks 2.x on Blockly 12 (global ScratchBlocks) or 1.x (global Blockly) — small API shim
+    var B = this.B = global.ScratchBlocks || global.Blockly, v2 = !!global.ScratchBlocks;
+    var textToDom = (B.utils && B.utils.xml && B.utils.xml.textToDom) || B.Xml.textToDom;
+    B.ScratchMsgs.setLocale('zh-tw');
+    var opts = { media: this.mediaBase, readOnly: true, scrollbars: true, trashcan: false, comments: false, sounds: true,
+      zoom: { controls: true, wheel: true, startScale: 0.7 }, grid: { spacing: 40, length: 2, colour: '#e8e2f4' } };
+    if (v2) { opts.theme = themeV2(B); opts.scratchTheme = 'classic'; this.defineV2(B, vm); }
+    this.ws = B.inject(this.el.blocks, opts);
+    function glow(id, on) { try { if (v2) B.glowStack(id, on); else self.ws.glowStack(id, on); } catch (e) {} }
+    vm.on('workspaceUpdate', function (d) {
+      try {
+        B.Xml.clearWorkspaceAndLoadFromXml(textToDom(d.xml), self.ws);
+        self.ws.cleanUp();
+        self.markChanged();
+      } catch (e) { if (global.console) console.error('Wonder Lab blocks', e); }
+    });
+    vm.on('SCRIPT_GLOW_ON', function (d) { glow(d.id, true); });
+    vm.on('SCRIPT_GLOW_OFF', function (d) { glow(d.id, false); });
+    vm.on('MONITORS_UPDATE', function (m) { self.drawMonitors(m); });
+    vm.runtime.on('SAY', function (target, type, text) {
+      if (self.trace && text) { var s = self.traceSprite(target.getName()); if (s.said.indexOf(text) < 0 && s.said.length < 6) s.said.push(String(text).slice(0, 40)); }
+    });
+    vm.runtime.on('QUESTION', function (q) { self.ask(q); });
+    // the run report's secs is wall clock until 停止 or the next turn: PROJECT_RUN_STOP is not an end (a program
+    // that waits for a key has no running thread between key presses)
+
+    function mouse(e, down) {
+      var r = canvas.getBoundingClientRect(); if (!r.width) return;
+      var d = { x: e.clientX - r.left, y: e.clientY - r.top, canvasWidth: r.width, canvasHeight: r.height };
+      if (down !== undefined) d.isDown = down;
+      vm.postIOData('mouse', d); self.pointerSeen = true;
+    }
+    // like the official editor: the pointer is tracked over the whole page (the VM clamps it to the stage), so
+    // "go to mouse-pointer" follows even outside the stage; on touch screens it follows a finger dragged on the stage
+    document.addEventListener('pointermove', function (e) { if (self.active) mouse(e); });
+    canvas.addEventListener('pointerdown', function (e) { mouse(e, true); if (canvas.setPointerCapture) try { canvas.setPointerCapture(e.pointerId); } catch (x) {} });
+    canvas.addEventListener('pointerup', function (e) { mouse(e, false); });
+    canvas.addEventListener('pointercancel', function (e) { mouse(e, false); });
+    function ui(e) { var t = e.target; return !!(t && t.closest && t.closest('button,a,[role=tab],.wl-mode')); }
+    document.addEventListener('keydown', function (e) {
+      if (!self.active || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (ui(e)) return;           // Space / Enter on a focused button (執行, 課堂教材 ...) presses that button
+      if (/^Arrow/.test(e.key) || e.key === ' ') e.preventDefault();
+      if (!e.repeat) self.key(e.key, true);
+    });
+    document.addEventListener('keyup', function (e) { if (self.active) self.key(e.key, false); });
+    vm.start();
+  };
+
+  function themeV2(B) {
+    // scratch-blocks 2.x colours a block by block style = category name; the host app supplies the theme
+    var P = { motion: ['#4C97FF', '#4280D7', '#3373CC'], looks: ['#9966FF', '#855CD6', '#774DCB'], sound: ['#CF63CF', '#C94FC9', '#BD42BD'],
+      event: ['#FFBF00', '#E6AC00', '#CC9900'], control: ['#FFAB19', '#EC9C13', '#CF8B17'], sensing: ['#5CB1D6', '#47A8D1', '#2E8EB8'],
+      operators: ['#59C059', '#46B946', '#389438'], data: ['#FF8C1A', '#FF8000', '#DB6E00'], data_lists: ['#FF661A', '#FF5500', '#E64D00'],
+      more: ['#FF6680', '#FF4D6A', '#FF3355'], pen: ['#0FBD8C', '#0DA57A', '#0B8E69'], textField: ['#FFFFFF', '#FFFFFF', '#D3D3D3'] };
+    var bs = {};
+    Object.keys(P).forEach(function (k) { bs[k] = { colourPrimary: P[k][0], colourSecondary: P[k][1], colourTertiary: P[k][2], colourQuaternary: P[k][2] }; });
+    return (B.Theme && B.Theme.defineTheme) ? B.Theme.defineTheme('wonderlab', { name: 'wonderlab', base: B.Themes && B.Themes.Classic, blockStyles: bs }) : undefined;
+  }
+
+  /* scratch-blocks 2.x leaves two things to the host (scratch-gui does them in lib/blocks.js and blocks.jsx):
+     the 8 "dynamic" menu shadows whose options come from the project, and extension blocks (pen) defined from the
+     VM's extension info. Without them: "Shadow block is missing an output connection" / "Invalid block definition". */
+  WonderLab.prototype.defineV2 = function (B, vm) {
+    var M = B.Msg || {};
+    function t(k, d) { return M[k] || d; }
+    var C = { motion: ['#4C97FF', '#4280D7', '#3373CC'], looks: ['#9966FF', '#855CD6', '#774DCB'],
+              control: ['#FFAB19', '#EC9C13', '#CF8B17'], sensing: ['#5CB1D6', '#47A8D1', '#2E8EB8'] };
+    var SND_C = ['#CF63CF', '#C94FC9', '#BD42BD'];      // the sound category (same trio as the theme)
+    function sprites() { return vm.runtime.targets.filter(function (x) { return x.isOriginal && !x.isStage; }).map(function (x) { return [x.getName(), x.getName()]; }); }
+    function costumes() { var e = vm.editingTarget; return e ? e.getCostumes().map(function (c) { return [c.name, c.name]; }) : [['', '']]; }
+    function backdrops() { var st = vm.runtime.getTargetForStage(); return st ? st.getCostumes().map(function (c) { return [c.name, c.name]; }) : [['', '']]; }
+    function menu(type, field, colors, start, fn) {
+      B.Blocks[type] = { init: function () {
+        this.jsonInit({ message0: '%1', args0: [{ type: 'field_dropdown', name: field,
+            options: function () { var o = start.concat(fn ? fn() : []); return o.length ? o : [['', '']]; } }],
+          inputsInline: true, output: 'String', colour: colors[1], colourSecondary: colors[1], colourTertiary: colors[2],
+          outputShape: B.OUTPUT_SHAPE_ROUND || 2 });
+      } };
+    }
+    var rnd = [t('MOTION_GOTO_RANDOM', '隨機位置'), '_random_'], mouse = [t('MOTION_GOTO_POINTER', '鼠標'), '_mouse_'];
+    menu('motion_goto_menu', 'TO', C.motion, [rnd, mouse], sprites);
+    menu('motion_glideto_menu', 'TO', C.motion, [rnd, mouse], sprites);
+    menu('motion_pointtowards_menu', 'TOWARDS', C.motion, [[t('MOTION_POINTTOWARDS_POINTER', '鼠標'), '_mouse_']], sprites);
+    menu('looks_costume', 'COSTUME', C.looks, [], costumes);
+    menu('looks_backdrops', 'BACKDROP', C.looks, [], backdrops);
+    menu('control_create_clone_of_menu', 'CLONE_OPTION', C.control, [[t('CONTROL_CREATECLONEOF_MYSELF', '自己'), '_myself_']], sprites);
+    // 「播放音效 <哪個音效>」: options come from the editing target's OWN sounds (scratch-gui's soundsMenu).
+    // The value is the sound NAME (sound_play looks a name up first, then a 1-based index).
+    menu('sound_sounds_menu', 'SOUND_MENU', SND_C, [], function () {
+      var e = vm.editingTarget; if (!e) return [];
+      return e.getSounds().map(function (s) { return [s.name, s.name]; });
+    });
+    menu('sensing_touchingobjectmenu', 'TOUCHINGOBJECTMENU', C.sensing, [[t('SENSING_TOUCHINGOBJECT_POINTER', '鼠標'), '_mouse_'], [t('SENSING_TOUCHINGOBJECT_EDGE', '邊緣'), '_edge_']], sprites);
+    menu('sensing_distancetomenu', 'DISTANCETOMENU', C.sensing, [[t('SENSING_DISTANCETO_POINTER', '鼠標'), '_mouse_']], sprites);
+    var defineJson = B.defineBlocksWithJsonArray || (B.common && B.common.defineBlocksWithJsonArray);
+    function ext(info) {
+      var arr = [].concat(info.menus || [], info.blocks || []).filter(function (b) { return b && b.json && !(b.info && b.info.isDynamic); }).map(function (b) { return b.json; });
+      if (arr.length && defineJson) defineJson(arr);
+    }
+    vm.on('EXTENSION_ADDED', ext);
+    vm.on('BLOCKSINFO_UPDATE', ext);
+  };
+
+  WonderLab.prototype.key = function (k, down) {
+    this.vm.postIOData('keyboard', { key: k, isDown: down });
+    if (down && this.trace && this.trace.keys.length < 30) this.trace.keys.push(k === ' ' ? 'space' : String(k).replace('Arrow', '').toLowerCase());
+  };
+
+  WonderLab.prototype.resize = function () {
+    var w = this.el.stage.clientWidth || 480;
+    this.renderer.resize(w, w * 0.75);
+  };
+
+  WonderLab.prototype.load = function (program) {
+    var self = this;
+    if (program) this.program = program;
+    this.stop();
+    var json = this.compile(this.program);
+    return this.vm.loadProject(json).then(function () {
+      self.watchColors();
+      var t = self.vm.runtime.targets.filter(function (x) { return !x.isStage && x.isOriginal; });
+      var want = self.focus && t.filter(function (x) { return x.getName() === self.focus; })[0];
+      self.vm.setEditingTarget((want || t[0] || self.vm.runtime.getTargetForStage()).id);
+      self.drawTabs();
+      self.centerPointer();
+      return json;
+    });
+  };
+
+  /** The VM has no pointer position until the first pointer event ("go to mouse-pointer" would send the sprite to NaN
+      and make it vanish): start at the centre of the stage. */
+  WonderLab.prototype.centerPointer = function () {
+    if (this.pointerSeen || !this.canvas) return;
+    var r = this.canvas.getBoundingClientRect(), w = r.width || 480, h = r.height || 360;
+    this.vm.postIOData('mouse', { x: w / 2, y: h / 2, canvasWidth: w, canvasHeight: h });
+  };
+
+  WonderLab.prototype.drawTabs = function () {
+    var self = this, box = this.el.tabs; if (!box) return;
+    box.innerHTML = '';
+    var prog = this.program || EMPTY();
+    this.vm.runtime.targets.filter(function (x) { return x.isOriginal; }).forEach(function (t) {
+      var b = document.createElement('button'); b.type = 'button';
+      var nm = t.isStage ? '舞台' : t.getName();
+      var p = t.isStage ? prog.stage : (prog.sprites || {})[nm], cnt = p ? Object.keys(p.scripts || {}).filter(function (k) { return (p.scripts[k] || []).length; }).length : 0;
+      b.textContent = nm + (cnt ? ' · ' + cnt : '');
+      b.className = 'wl-tab' + (self.vm.editingTarget === t ? ' on' : '') + (self.changedSprites && self.changedSprites[nm] ? ' new' : '');
+      b.setAttribute('aria-pressed', self.vm.editingTarget === t ? 'true' : 'false');
+      b.onclick = function () { self.focus = t.isStage ? null : nm; self.vm.setEditingTarget(t.id); self.drawTabs(); };
+      box.appendChild(b);
+    });
+  };
+
+  /** Outline the scripts the AI changed in the last turn (script order in the workspace = order in the program). */
+  WonderLab.prototype.markChanged = function () {
+    var t = this.vm.editingTarget; if (!t || !this.changedIds) return;
+    var p = t.isStage ? this.program.stage : (this.program.sprites || {})[t.getName()];
+    if (!p) return;
+    var ids = Object.keys(p.scripts || {}).filter(function (k) { return (p.scripts[k] || []).length; });
+    var tops = this.ws.getTopBlocks(true), key = (t.isStage ? '舞台' : t.getName()) + '/';
+    var self = this;
+    this.newTops = [];
+    tops.forEach(function (b, i) {
+      var root = b.getSvgRoot && b.getSvgRoot();
+      if (root && ids[i] && self.changedIds[key + ids[i]]) { root.classList.add('wl-new'); self.newTops.push(b.id); }
+    });
+  };
+
+  /** Bring the first script the AI changed into view in the blocks area (only scrolls when it is out of view). */
+  WonderLab.prototype.showNew = function () {
+    var ws = this.ws, ids = this.newTops || [], b = ws && ids.length && ws.getBlockById(ids[0]);
+    if (!b) return false;
+    try {
+      if (ws.scrollBoundsIntoView && b.getBoundingRectangle) ws.scrollBoundsIntoView(b.getBoundingRectangle());
+      else if (ws.centerOnBlock) ws.centerOnBlock(b.id);
+    } catch (e) { return false; }
+    return true;
+  };
+
+  WonderLab.prototype.drawMonitors = function (list) {
+    var box = this.el.monitors; if (!box || !list || !list.valueSeq) return;
+    var html = '';
+    list.valueSeq().forEach(function (m) {
+      if (!m.visible) return;
+      if (m.opcode === 'data_variable') html += '<div class="wl-mon"><span>' + esc(m.params.VARIABLE) + '</span><b>' + esc(String(m.value)) + '</b></div>';
+      else if (m.opcode === 'data_listcontents') {
+        var items = (m.value && m.value.toArray) ? m.value.toArray() : (m.value || []);
+        html += '<div class="wl-mon wl-list"><span>' + esc(m.params.LIST) + '（' + items.length + ' 項）</span><b>' +
+          esc(items.slice(0, 30).join('，') + (items.length > 30 ? '…' : '')) + '</b></div>';
+      }
+    });
+    box.innerHTML = html;
+  };
+
+  WonderLab.prototype.ask = function (q) {
+    var self = this, box = this.el.ask; if (!box) return;
+    if (q === null) { box.hidden = true; return; }
+    box.hidden = false;
+    box.querySelector('.wl-askq').textContent = q || '';
+    var inp = box.querySelector('input'); inp.value = ''; setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
+    box.onsubmit = function (e) {
+      e.preventDefault(); box.hidden = true;
+      if (self.trace && self.trace.answers.length < 5) self.trace.answers.push(inp.value.slice(0, 20));
+      self.vm.runtime.emit('ANSWER', inp.value);
+    };
+  };
+
+  /* ---------- run + observe ("run and look") ---------- */
+  WonderLab.prototype.run = function () {
+    var self = this;
+    this.stop();
+    this.centerPointer();
+    this.trace = { t0: Date.now(), sprites: {}, keys: [], answers: [], stoppedAt: null, idleAt: null, samples: 0 };
+    this.vm.greenFlag();
+    clearInterval(this._tick);
+    this._tick = setInterval(function () { self.sample(); }, 100);
+  };
+  WonderLab.prototype.stop = function () {
+    if (this.vm) this.vm.stopAll();
+    clearInterval(this._tick);
+    if (this.el.ask) this.el.ask.hidden = true;
+    if (this.trace && !this.trace.stoppedAt) this.trace.stoppedAt = Date.now();
+  };
+  WonderLab.prototype.traceSprite = function (name) {
+    var s = this.trace.sprites[name];
+    if (!s) s = this.trace.sprites[name] = { start: null, end: null, minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9, said: [], touched: {}, touchedColors: {}, edge: false, clones: 0, hidden: false };
+    return s;
+  };
+  function hex(rgb) { return '#' + [0, 1, 2].map(function (i) { var v = Math.max(0, Math.min(255, Math.round(+rgb[i] || 0))); return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+  function rgbOf(h) { var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(h || '')); return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null; }
+  /** First time (secs since 執行) a sprite touched a colour; at most 6 colours per sprite. */
+  WonderLab.prototype.noteColor = function (name, rgb) {
+    if (!this.trace || !name) return;
+    var s = this.traceSprite(name), h = hex(rgb);
+    if (!(h in s.touchedColors) && Object.keys(s.touchedColors).length < 6) s.touchedColors[h] = ((Date.now() - this.trace.t0) / 1000).toFixed(1);
+  };
+  /** A colour check that the program itself makes (e.g. 碰到顏色 in a forever loop) and that comes out true is recorded
+      too: the sampling below runs every 300 ms and can miss a sprite that bounces straight back off a wall. */
+  WonderLab.prototype.watchColors = function () {
+    var self = this, t = this.vm.runtime.targets[0], P = t && Object.getPrototypeOf(t);
+    if (!P || typeof P.isTouchingColor !== 'function' || P.__wlColors) return;
+    var orig = P.isTouchingColor;
+    P.isTouchingColor = function (rgb) {
+      var r = orig.apply(this, arguments);
+      if (r && self.trace && !this.isStage && this.sprite && rgb && rgb.length >= 3) self.noteColor(this.sprite.name, rgb);
+      return r;
+    };
+    P.__wlColors = true;
+  };
+  WonderLab.prototype.sample = function () {
+    var tr = this.trace, rt = this.vm.runtime; if (!tr) return;
+    tr.samples += 1;
+    var orig = rt.targets.filter(function (t) { return !t.isStage && t.isOriginal; }), self = this;
+    var colors = this._colors || (this._colors = (this.lesson.colors || []).map(function (h) { return [String(h).toLowerCase(), rgbOf(h)]; }).filter(function (c) { return c[1]; }));
+    orig.forEach(function (t) {
+      var s = self.traceSprite(t.getName()), x = Math.round(t.x) || 0, y = Math.round(t.y) || 0;
+      if (!s.start) s.start = [x, y];
+      // moves = samples (every 100 ms) in which the sprite stood somewhere new; pen_moves = the same with the pen down
+      if (s.end && (s.end[0] !== x || s.end[1] !== y)) {
+        s.moves = (s.moves || 0) + 1;
+        var pen = t.getCustomState && t.getCustomState('Scratch.pen');
+        if (pen && pen.penDown) s.penMoves = (s.penMoves || 0) + 1;
+      }
+      s.end = [x, y]; s.dir = Math.round(t.direction); s.size = Math.round(t.size); s.visible = t.visible;
+      if (!t.visible) s.hidden = true;
+      s.minX = Math.min(s.minX, x); s.maxX = Math.max(s.maxX, x); s.minY = Math.min(s.minY, y); s.maxY = Math.max(s.maxY, y);
+      if (Math.abs(x) >= 235 || Math.abs(y) >= 175) s.edge = true;
+      var cs = t.getCostumes(); s.costume = cs[t.currentCostume] ? cs[t.currentCostume].name : '';
+      s.costumeChanges = (s.costumeChanges || 0) + (s.lastCostume != null && s.lastCostume !== t.currentCostume ? 1 : 0); s.lastCostume = t.currentCostume;
+      s.clones = Math.max(s.clones, t.sprite.clones.length - 1);
+      if (tr.samples % 3 === 0) {
+        orig.forEach(function (o) {
+          if (o !== t && !s.touched[o.getName()] && t.visible && o.visible && t.isTouchingSprite(o.getName())) s.touched[o.getName()] = ((Date.now() - tr.t0) / 1000).toFixed(1);
+        });
+        if (t.visible && t.isTouchingColor) colors.forEach(function (c) { if (!(c[0] in s.touchedColors) && t.isTouchingColor(c[1])) self.noteColor(t.getName(), c[1]); });
+      }
+    });
+    if (rt.threads.length === 0 && tr.samples > 3 && !tr.idleAt) tr.idleAt = Date.now();
+    if (Date.now() - tr.t0 > 120000) clearInterval(this._tick);
+  };
+  /** Compact report the chat sends with the student's next message. */
+  WonderLab.prototype.report = function () {
+    var tr = this.trace; if (!tr) return null;
+    var rt = this.vm.runtime, out = { secs: +(((tr.stoppedAt || Date.now()) - tr.t0) / 1000).toFixed(1),
+      still_running: rt.threads.length > 0 && !tr.stoppedAt, ended_by_itself: !!tr.idleAt, keys: tr.keys.slice(0, 15), answers: tr.answers, sprites: {}, vars: {}, lists: {} };
+    // a key / click hat waits for the student: then the program did not "end by itself" when no script was running
+    out.hat_wait = waitsForInput(this.program);
+    if (out.hat_wait) out.ended_by_itself = false;
+    Object.keys(tr.sprites).forEach(function (n) {
+      var s = tr.sprites[n];
+      out.sprites[n] = { start: s.start, end: s.end, x_range: [s.minX, s.maxX], y_range: [s.minY, s.maxY], dir: s.dir, size: s.size,
+        visible_at_end: s.visible, was_hidden: s.hidden, reached_edge: s.edge, said: s.said, touched: s.touched, costume: s.costume,
+        costume_changes: s.costumeChanges || 0, max_clones: s.clones, touched_colors: s.touchedColors || {},
+        moves: s.moves || 0, pen_moves: s.penMoves || 0 };
+    });
+    var st = rt.getTargetForStage();
+    Object.keys(st.variables).forEach(function (k) {
+      var v = st.variables[k];
+      if (v.type === '') out.vars[v.name] = v.value;
+      else if (v.type === 'list') out.lists[v.name] = { length: v.value.length, first: v.value.slice(0, 12) };
+    });
+    out.backdrop = st.getCostumes()[st.currentCostume] ? st.getCostumes()[st.currentCostume].name : '';
+    return out;
+  };
+
+  /* ---------- AI turn: apply the server-validated program ---------- */
+  WonderLab.prototype.applyTurn = function (turn) {
+    var self = this;
+    this.changedIds = {}; this.changedSprites = {};
+    (turn.ops || []).forEach(function (o) {
+      if (o.sprite) { self.changedIds[o.sprite + '/' + o.id] = 1; self.changedSprites[o.sprite] = 1; }
+      if (o.sprite && o.sprite !== '舞台') self.focus = o.sprite;
+    });
+    if (turn.focus && this.lesson.sprites.some(function (s) { return s.name === turn.focus; })) this.focus = turn.focus;
+    // a whole program without ops (restore, undo): show a sprite that has scripts, not an empty one
+    var prog = turn.program || this.program;
+    if (!(turn.ops || []).length && prog) {
+      var has = function (n) { var sc = (((prog.sprites || {})[n]) || {}).scripts || {}; return Object.keys(sc).some(function (k) { return (sc[k] || []).length > 0; }); };
+      if (!this.focus || !has(this.focus)) { var f = this.lesson.sprites.filter(function (s) { return has(s.name); })[0]; if (f) this.focus = f.name; }
+    }
+    this.trace = null;
+    return this.load(prog);
+  };
+
+  WonderLab.prototype.exportJSON = function () { return this.compile(this.program); };
+
+  function waitsForInput(prog) {
+    var found = false;
+    function scan(scr) { Object.keys(scr || {}).forEach(function (k) { var a = scr[k]; if (a && a[0] && WAIT_HATS[a[0].op]) found = true; }); }
+    Object.keys((prog && prog.sprites) || {}).forEach(function (n) { scan((prog.sprites[n] || {}).scripts); });
+    scan(prog && prog.stage && prog.stage.scripts);
+    return found;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  global.WonderLab = WonderLab;
+})(window);

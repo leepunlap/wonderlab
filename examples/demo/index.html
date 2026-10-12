@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wonder Lab · runtime demo</title>
+<!-- Developer demo of the Wonder Lab runtime without the AI: paste a program (the JSON the server sends back), see the
+     blocks and run it. Serve the repository root (python3 -m http.server) and open /examples/demo/ after `npm run build`.
+     AGPL-3.0 (see LICENSE). The art in assets/ is original, simple SVG made for this demo. -->
+<style>
+  body{margin:0;font-family:system-ui,"Noto Sans TC",sans-serif;background:#f7f5fb;color:#2b2340}
+  .top{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#fff;border-bottom:1px solid #e7dcf6}
+  .top button{min-height:38px;border:1px solid #d9c9f3;background:#fff;border-radius:10px;padding:6px 14px;font:inherit;cursor:pointer}
+  .top .go{background:#2e9e5b;border-color:#2e9e5b;color:#fff;font-weight:700}
+  .grid{display:grid;grid-template-columns:minmax(280px,440px) minmax(0,1fr) 340px;gap:12px;padding:12px;height:calc(100vh - 82px);box-sizing:border-box}
+  .wl-stage{position:relative;width:100%;aspect-ratio:4/3;background:#fff;border:1px solid #e1d8f2;border-radius:12px;overflow:hidden}
+  .wl-canvas{display:block;width:100%!important;height:100%!important;touch-action:none}
+  .col{display:flex;flex-direction:column;min-height:0;gap:8px}
+  #blocks{flex:1;min-height:300px;border:1px solid #e1d8f2;border-radius:12px;background:#fff;overflow:hidden}
+  textarea{flex:1;font:12px/1.4 ui-monospace,monospace;border:1px solid #d9c9f3;border-radius:10px;padding:8px}
+  .tabs button{border:1px solid #d9cff0;background:#fff;border-radius:999px;padding:4px 10px;margin:0 4px 4px 0;font:inherit;font-size:13px}
+  .tabs button.on{background:#6a3fc0;color:#fff;border-color:#6a3fc0}
+  pre{font-size:11px;background:#fff;border:1px solid #eee;border-radius:8px;padding:6px;max-height:160px;overflow:auto;margin:0}
+</style>
+</head>
+<body>
+<div class="top"><b>Wonder Lab runtime demo</b><button class="go" id="run">執行</button><button id="stop">停止</button><button id="apply">套用程式</button><span id="st"></span></div>
+<div class="grid">
+  <div class="col"><div class="wl-stage" id="stage"><div class="wl-mons" id="mons"></div><form class="wl-ask" id="ask" hidden><p class="wl-askq"></p><input><button>OK</button></form></div><pre id="rep"></pre></div>
+  <div class="col"><div class="tabs" id="tabs"></div><div id="blocks"></div></div>
+  <div class="col"><textarea id="prog" spellcheck="false">{"sprites":{"小球":{"scripts":{"s1":[{"op":"event_whenflagclicked"},{"op":"control_forever","SUBSTACK":[{"op":"motion_changeyby","DY":-10}]}]}},"籃子":{"scripts":{"s1":[{"op":"event_whenkeypressed","KEY_OPTION":"right arrow"},{"op":"motion_changexby","DX":10}]}}},"stage":{"scripts":{}}}</textarea></div>
+</div>
+<script>
+(async function () {
+  const dist = new URL('../../dist/', location.href).href;
+  const eng = await (await fetch(dist + 'engine.json')).json();
+  for (const f of eng.scripts) await new Promise((ok, bad) => { const s = document.createElement('script'); s.src = dist + eng.engine + f; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+  const [spec, lesson] = await Promise.all([fetch(dist + eng.engine + 'opcodes.json').then(r => r.json()), fetch('demo-lesson.json').then(r => r.json())]);
+  const wl = window.WL = new WonderLab({ spec, lesson, assetBase: new URL('assets/', location.href).href, mediaBase: dist + eng.engine + 'media/',
+    el: { stage: document.getElementById('stage'), blocks: document.getElementById('blocks'), tabs: document.getElementById('tabs'),
+          monitors: document.getElementById('mons'), ask: document.getElementById('ask') } });
+  wl.boot(); wl.active = true;
+  const apply = () => wl.applyTurn({ program: JSON.parse(document.getElementById('prog').value), ops: [] });
+  await apply();
+  document.getElementById('st').textContent = 'engine ' + eng.engine;
+  document.getElementById('apply').onclick = apply;
+  document.getElementById('run').onclick = () => wl.run();
+  document.getElementById('stop').onclick = () => wl.stop();
+  setInterval(() => { const r = wl.report(); if (r) document.getElementById('rep').textContent = JSON.stringify(r, null, 1); }, 500);
+  window.DEMO_READY = true;
+})();
+</script>
+</body>
+</html>

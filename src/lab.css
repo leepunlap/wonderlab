@@ -1,0 +1,202 @@
+/*! Wonder Lab — lesson-page styles. AGPL-3.0 (see LICENSE). Matches the lesson site's purple AI pane. */
+.wl-ic{width:1.15em;height:1.15em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.2em}
+
+/* ---- toggle in the AI 學伴 pane ---- */
+.wl-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px;background:#f6f1ff;border-bottom:1px solid #ece4f8}
+.wl-mode button{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;min-height:44px;border:1px solid #d9c9f3;background:#fff;
+  color:#5a2ea0;border-radius:11px;padding:6px 8px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;line-height:1.2}
+.wl-mode button.on{background:#6a3fc0;border-color:#6a3fc0;color:#fff}
+.wl-mode button.soon,.wl-mode button[aria-disabled="true"]{cursor:not-allowed;color:#9a8fb3;background:#f4f1f9;border-style:dashed}
+.wl-mode button small{flex-basis:100%;font-size:10.5px;font-weight:600;opacity:.85;text-align:center}
+/* the status line under the toggle: why Wonder Lab is not available here (coming soon, hardware lesson, old browser) */
+.wl-note{margin:0;padding:6px 12px 8px;font-size:12.5px;line-height:1.5;color:#5b3fa8;background:#f6f1ff;border-bottom:1px solid #ece4f8}
+.wl-note[hidden]{display:none}
+.wl-left{grid-column:1/-1;font-size:12px;font-weight:700;color:#5b3fa8}
+.wl-left.out{color:#c0392b}
+.wl-left[hidden],body:not(.wl-labmode) .wl-left{display:none}
+/* lab chips in the conversation: the look of the Q&A suggestion chips (.sq), but their own class, so chat.js never sends
+   them as a question and never disables them when the Q&A is capped */
+.wl-chip{text-align:left;min-height:44px;border:1px solid #d9c9f3;background:#fff;color:#4b2a8a;border-radius:12px;padding:8px 11px;
+  font:inherit;font-size:13px;line-height:1.5;cursor:pointer}
+.wl-chip:hover{background:#f3edfd}
+/* iOS zooms into a text box whose font is under 16 px: on touch screens the AI 學伴 box is 16 px at every width */
+@media(pointer:coarse){#chat .chform textarea{font-size:16px}}
+
+/* ---- lab pane ---- */
+.wl-lab{display:flex;flex-direction:column;min-width:0;min-height:0;padding:10px 0 6px 12px;box-sizing:border-box}
+.wl-lab[hidden]{display:none}
+body.wl-labmode .layout>.wrap{display:none}
+.wl-bar{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.wl-bar button{display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;border:1px solid #d9c9f3;background:#fff;color:#3b1f78;border-radius:11px;
+  padding:6px 14px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.wl-bar button:disabled{opacity:.45;cursor:default}
+.wl-bar .wl-go{background:#2e9e5b;border-color:#2e9e5b;color:#fff}
+.wl-bar .wl-sp{flex:1}
+.wl-bar .wl-soon{opacity:1;color:#9a93ab;background:#f1eef6;border-style:dashed;font-weight:600;cursor:not-allowed}
+.wl-bar .wl-soon small{font-size:11px;font-weight:500}
+/* a short explanation that drops down from the toolbar for a few seconds (e.g. why Export sb3 is not available yet);
+   it overlays the stage top instead of pushing the stage down */
+.wl-barnote{position:absolute;top:calc(100% + 4px);right:0;z-index:6;max-width:min(440px,100%);box-sizing:border-box;margin:0;padding:8px 12px;
+  border-radius:10px;background:#f6f1ff;border:1px solid #d9c9f3;box-shadow:0 6px 18px rgba(60,30,110,.18);color:#4b2a8a;font-size:13px;line-height:1.55}
+.wl-barnote[hidden]{display:none}
+.wl-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(280px,440px) minmax(0,1fr);gap:12px}
+.wl-stagecol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.wl-stage{position:relative;width:100%;aspect-ratio:4/3;background:#fff;border:1px solid #e1d8f2;border-radius:12px;overflow:hidden}
+.wl-canvas{display:block;width:100%!important;height:100%!important;touch-action:none}
+.wl-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fbf9ff;color:#7b6f92;font-size:14px}
+.wl-loading[hidden]{display:none}
+.wl-mons{position:absolute;left:6px;top:6px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.wl-mon{background:#fff;border:1px solid #c9c2d6;border-radius:6px;font-size:12px;padding:2px 6px}
+.wl-mon b{margin-left:6px;background:#ff8c1a;color:#fff;border-radius:4px;padding:0 6px}
+.wl-list b{display:block;margin:2px 0 0;max-width:200px;max-height:72px;overflow:hidden;white-space:normal;word-break:break-all;background:#ff661a}
+.wl-ask{position:absolute;left:8px;right:8px;bottom:8px;background:#fff;border:2px solid #b9a6e0;border-radius:10px;padding:6px;display:flex;gap:6px;flex-wrap:wrap}
+.wl-ask[hidden]{display:none}
+.wl-ask p{margin:0;width:100%;font-size:13px}
+.wl-ask input{flex:1;min-width:0;font:inherit;font-size:16px;padding:6px;border:1px solid #d9c9f3;border-radius:8px}
+.wl-ask button{border:0;border-radius:8px;background:#7c4dc4;color:#fff;font:inherit;padding:0 12px;min-height:44px}
+.wl-pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.wl-pad button{display:flex;align-items:center;justify-content:center;min-height:44px;border:1px solid #d9cff0;background:#fff;color:#3b1f78;border-radius:10px;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.wl-pad button:active{background:#efe7fc}
+.wl-hint{margin:0;font-size:12px;color:#8a7fa3}
+.wl-pad[hidden],.wl-hint[hidden]{display:none}
+.wl-codecol{display:flex;flex-direction:column;min-height:0;min-width:0}
+.wl-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.wl-tab{min-height:44px;min-width:44px;border:1px solid #d9cff0;background:#fff;color:#3b1f78;border-radius:999px;padding:5px 14px;font:inherit;font-size:13px;cursor:pointer}
+.wl-tab.on{background:#6a3fc0;border-color:#6a3fc0;color:#fff}
+.wl-tab.new:not(.on){border-color:#f0b429;box-shadow:0 0 0 2px #fde9b0}
+.wl-bwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.wl-blocks{flex:1;min-height:260px;border:1px solid #e1d8f2;border-radius:12px;overflow:hidden;background:#fff;position:relative}
+.wl-blocks .wl-new>path:first-child,.wl-blocks .wl-new>.blocklyPath{filter:drop-shadow(0 0 3px #f0b429)}
+/* shown while the program has no scripts yet */
+.wl-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 64px 24px 24px;text-align:center;
+  font-size:14px;line-height:1.7;color:#8a7fa3;pointer-events:none}
+.wl-empty[hidden]{display:none}
+/* nothing to zoom yet: the zoom buttons wait until the first blocks (they would sit beside the hint) */
+.wl-noblocks .blocklyZoom{display:none}
+.wl-foot{margin:6px 0 0;font-size:11.5px;color:#9a8fb3}
+.wl-foot a{color:#7c4dc4;display:inline-flex;align-items:center;min-height:44px;padding:0 6px}
+.msg.wl-q{background:#fff8e6;border-color:#f1d98a}
+.wl-chbody[hidden]{display:none}
+/* the chat pane shows ONE body: the normal Q&A (#chbody) or the lab conversation (#wlbody) */
+body.wl-labmode #chbody,body:not(.wl-labmode) #wlbody{display:none!important}
+body.wl-labmode .chclose{min-width:44px;min-height:44px}
+
+@media(min-width:1100px){
+  .wl-lab{height:100%;overflow:hidden}
+  .wl-pad,.wl-hint{flex:none}
+  .wl-left{display:none}           /* the cap rows show the same numbers here */
+}
+@media(max-width:1099px){
+  .wl-lab{padding:10px 12px 90px}
+  .wl-body{grid-template-columns:1fr}
+  .wl-stage{max-width:min(100%,calc(45dvh * 4 / 3));margin:0 auto}
+  .wl-blocks{min-height:320px}
+  /* the blocks area runs below the screen here: the empty hint sits at its top, where it is seen (not under the FAB) */
+  .wl-empty{align-items:flex-start;padding-top:28px}
+  /* the toolbar stays on screen (under the lesson bar, lab.js sets --wl-top) while the student scrolls to the blocks */
+  .wl-bar{position:sticky;top:var(--wl-top,0px);z-index:5;background:#f4f7f6;padding:6px 0;margin:-6px 0 2px}
+  /* in lab mode the chat is a bottom drawer that ends just below the stage (lab.js sets --wl-dh) */
+  body.wl-labmode .chat.open{top:auto;height:var(--wl-dh,52dvh);min-height:240px;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(60,30,110,.25)}
+  body.wl-labmode.chatopen{overflow:auto}
+  /* keep the drawer for the conversation: compact head, class line + turns left only (no cap rows), no footnote */
+  body.wl-labmode .chat.open .chhead{padding:6px 12px}
+  body.wl-labmode .chat.open .chhead small,body.wl-labmode .chat.open .cprow,body.wl-labmode .chat.open .chnote{display:none}
+  body.wl-labmode .chat.open .chcaps{padding:4px 10px;border-bottom:0}
+  body.wl-labmode .chat.open .chcaps:not(:has(.cpclass:not([hidden]),.wl-left:not([hidden]))){display:none}
+  body.wl-labmode .chat.open .wl-mode{padding:6px 10px}
+  body.wl-labmode .chat.open .chform{padding:8px 10px}
+  body.wl-labmode .chat.open .chform textarea{height:44px;min-height:44px;padding:9px 10px}
+  body.wl-labmode .chat.open .cpclass{font-size:11.5px;padding:3px 8px;margin-bottom:2px}
+  body.wl-labmode .chat.open .wl-left{font-size:11.5px}
+}
+/* short screens (phones): the lesson bar gives its room to the stage and the conversation while the lab is open */
+@media(max-width:1099px) and (max-height:760px){
+  body.wl-labmode .lessonbar{display:none}
+  /* the drawer head shrinks to its close button, at the right end of the toggle row */
+  body.wl-labmode .chat.open .chhead{position:absolute;top:0;right:0;z-index:2;padding:6px 6px 0 0;background:none}
+  body.wl-labmode .chat.open .chhead .chico,body.wl-labmode .chat.open .chhead>div{display:none}
+  body.wl-labmode .chat.open .chclose{color:#6a3fc0}
+  body.wl-labmode .chat.open .wl-mode{padding-right:56px}
+}
+/* held sideways under 1100 px (iPad 10.2 at 1080 x 810, iPad 9.7 at 1024 x 768, a Chromebook at 125 %, a phone):
+   the AI 學伴 is a right pane, as on a laptop; the lab (stage above the blocks) fills the rest. lab.js side() matches this. */
+@media(max-width:1099px) and (orientation:landscape) and (min-width:900px),(max-width:1099px) and (orientation:landscape) and (max-height:500px){
+  body.wl-labmode{--wl-pw:min(340px,46vw)}
+  body.wl-labmode .chat.open{top:var(--wl-top,0px);right:0;bottom:0;left:auto;width:var(--wl-pw);height:auto;min-height:0;
+    border-radius:0;border:0;border-left:1px solid #e7dcf6;box-shadow:-6px 0 24px rgba(60,30,110,.12)}
+  body.wl-labmode.chatopen .wl-lab{margin-right:var(--wl-pw);padding-bottom:24px}
+  .wl-stage{max-width:min(100%,calc(46dvh * 4 / 3))}
+  .wl-blocks{min-height:240px}
+}
+@media(max-width:1099px) and (orientation:landscape) and (max-height:500px){
+  .wl-stage{max-width:min(100%,calc((100dvh - 84px) * 4 / 3))}
+}
+/* where the toolbar is narrow, the export label stacks: Export sb3 / coming soon / （待官方格式規範） (a tap explains in full) */
+@media(max-width:599px),(max-width:1099px) and (orientation:landscape) and (max-height:500px),(max-width:979px) and (orientation:landscape) and (min-width:900px){
+  .wl-bar .wl-soon{display:inline-grid;grid-template-columns:auto auto;column-gap:6px;row-gap:0;line-height:1.15;padding:4px 10px;text-align:left}
+  .wl-bar .wl-soon .wl-ic{grid-column:1;grid-row:1/4;align-self:center}
+  .wl-bar .wl-soon>span,.wl-bar .wl-soon>small{grid-column:2}
+  .wl-bar .wl-soon .wl-why{font-size:10.5px;margin-left:-.45em}
+}
+/* phones: one toolbar row (stop and undo show their icon only; the export label stacks) */
+@media(max-width:520px),(max-width:1099px) and (orientation:landscape) and (max-height:500px){
+  .wl-bar{gap:6px}
+  .wl-bar button{padding:6px 12px}
+  .wl-bar .wl-ionly span{display:none}
+  .wl-bar .wl-ionly{padding:6px 10px;justify-content:center}
+}
+
+/* ---- the full editor (dual mode, 2026-10-07): the editor (a frame) fills the left; the AI 學伴 stays right, a drawer
+   below 1280 px. Only with body.wl-studiomode (lab.js: Studio in the build, lab GET studio:true, screen >= 1024 px). ---- */
+.wl-studio{position:relative;min-width:0;min-height:0;box-sizing:border-box;padding:10px 0 10px 12px}
+.wl-studio[hidden]{display:none}
+.wl-studio.wl-park{position:fixed!important;left:-30000px!important;top:0;visibility:hidden;pointer-events:none}
+.wl-sframe{display:block;width:1px;min-width:100%;height:100%;border:1px solid #e1d8f2;border-radius:12px;background:#fff;box-sizing:border-box}
+.wl-sload{position:absolute;inset:10px 0 10px 12px;z-index:1;display:flex;align-items:center;justify-content:center;gap:10px;background:#fbf9ff;
+  border:1px solid #e1d8f2;border-radius:12px;color:#7b6f92;font-size:14px}
+.wl-sload[hidden]{display:none}
+.wl-sspin{width:18px;height:18px;border-radius:50%;border:2px solid #d9c9f3;border-top-color:#6a3fc0;animation:wl-sspin .8s linear infinite}
+@keyframes wl-sspin{to{transform:rotate(360deg)}}
+html.wl-studio-on,html.wl-studio-on body{height:100%}
+body.wl-labmode.wl-studiomode{display:flex;flex-direction:column;overflow:hidden;height:100%}
+body.wl-labmode.wl-studiomode .lessonbar{flex:none}
+body.wl-labmode.wl-studiomode .layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;align-items:stretch}
+body.wl-labmode.wl-studiomode .wl-studio{height:100%}
+body.wl-labmode.wl-studiomode .chat{display:flex;position:static;height:calc(100% - 20px);margin:10px 12px 10px 0;transform:none;visibility:visible}
+body.wl-labmode.wl-studiomode .chfab{display:none!important}
+/* the mode switch at the top of the pane, and the row above the box (請助教看看 / the animation setting) */
+.wl-smode{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px 2px;background:#f6f1ff}
+.wl-smode[hidden],.wl-smodehint[hidden],.wl-sacts[hidden]{display:none}
+.wl-smode.one{grid-template-columns:1fr}
+.wl-smode button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;border:1px solid #d9c9f3;background:#fff;color:#5a2ea0;
+  border-radius:11px;padding:6px 8px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;line-height:1.2}
+.wl-smode button[hidden]{display:none}
+.wl-smode button.on{background:#2f6f8f;border-color:#2f6f8f;color:#fff}
+.wl-smode button:focus-visible,.wl-tabtn:focus-visible{outline:2px solid #ffb000;outline-offset:2px}
+.wl-smodehint{margin:0;padding:4px 12px 8px;font-size:12px;line-height:1.5;color:#5b3fa8;background:#f6f1ff;border-bottom:1px solid #ece4f8}
+.wl-sacts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px 0}
+.wl-tabtn{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 14px;border-radius:11px;border:1px solid #2f6f8f;background:#e8f3f8;
+  color:#1f5670;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.wl-tabtn[hidden]{display:none}
+.wl-tabtn:disabled{opacity:.5;cursor:default}
+.wl-animsw{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:12.5px;color:#5b3fa8;cursor:pointer}
+.wl-animsw[hidden]{display:none}
+.wl-animsw input{width:18px;height:18px;margin:0;accent-color:#6a3fc0}
+body:not(.wl-labmode) .wl-smode,body:not(.wl-labmode) .wl-smodehint,body:not(.wl-labmode) .wl-sacts,body:not(.wl-studiomode) .wl-sacts{display:none}
+.sqs.wl-ta .wl-chip{border-color:#2f6f8f;color:#1f5670;background:#eef7fb}
+@media(max-width:1279px){
+  body.wl-labmode.wl-studiomode .layout{grid-template-columns:minmax(0,1fr)}
+  /* edge to edge: the editor gets the whole width (it is designed for 1024 px) */
+  body.wl-labmode.wl-studiomode .wl-studio{padding:0}
+  body.wl-labmode.wl-studiomode .wl-sframe{border:0;border-radius:0}
+  body.wl-labmode.wl-studiomode .wl-sload{inset:0;border-radius:0}
+  /* the pane is a drawer from the right, opened by 「AI 學伴」 on the editor's menu bar */
+  body.wl-labmode.wl-studiomode .chat,body.wl-labmode.wl-studiomode .chat.open{position:fixed;top:var(--wl-dtop,var(--wl-top,0px));right:0;bottom:0;left:auto;width:min(380px,92vw);
+    height:auto;min-height:0;margin:0;z-index:60;border-radius:16px 0 0 16px;border:1px solid #e7dcf6;box-shadow:-8px 0 30px rgba(60,30,110,.25)}
+  body.wl-labmode.wl-studiomode .chat{transform:translateX(105%);visibility:hidden;transition:transform .2s ease,visibility 0s linear .2s}
+  body.wl-labmode.wl-studiomode .chat.open{transform:none;visibility:visible;transition:transform .2s ease}
+  body.wl-labmode.wl-studiomode .chclose{display:inline-grid!important;place-items:center;min-width:44px;min-height:44px}
+  body.wl-labmode.wl-studiomode .chat.open .chhead small{display:block}
+}
+@media(prefers-reduced-motion:reduce){.wl-sspin{animation-duration:2.4s}body.wl-labmode.wl-studiomode .chat{transition:none}}

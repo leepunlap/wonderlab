@@ -1,0 +1,12 @@
+node_modules/
+dist/
+vendor/
+build/
+*.log
+__pycache__/
+# editing backups (e.g. lab.js.bak-20261007-audit) are not part of the source
+*.bak
+*.bak*
+*.orig
+*.rej
+*~

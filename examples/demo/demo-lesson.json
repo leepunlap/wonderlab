@@ -1,0 +1,55 @@
+{
+ "slug": "demo",
+ "title": "示範：接球",
+ "opening": "舞台上有一個球和一個籃子。你想球怎樣動？",
+ "stage": {
+  "backdrops": [
+   {
+    "name": "草地",
+    "assetId": "f1d1bfda1d53055f75eb273269da259b",
+    "ext": "svg",
+    "cx": 240,
+    "cy": 180,
+    "res": 1
+   }
+  ]
+ },
+ "sprites": [
+  {
+   "name": "小球",
+   "costumes": [
+    {
+     "name": "小球",
+     "assetId": "7748e21b385583f89a4fa268acccfd50",
+     "ext": "svg",
+     "cx": 20,
+     "cy": 20,
+     "res": 1
+    }
+   ],
+   "x": 72,
+   "y": 90,
+   "size": 100,
+   "direction": 90,
+   "visible": true
+  },
+  {
+   "name": "籃子",
+   "costumes": [
+    {
+     "name": "籃子",
+     "assetId": "dc493e959030672dfd1137798660c8af",
+     "ext": "svg",
+     "cx": 45,
+     "cy": 25,
+     "res": 1
+    }
+   ],
+   "x": 0,
+   "y": -130,
+   "size": 100,
+   "direction": 90,
+   "visible": true
+  }
+ ]
+}
