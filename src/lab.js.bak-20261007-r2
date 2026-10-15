@@ -1,0 +1,541 @@
+/*!
+ * Wonder Lab — lesson-page integration (toggle 「課堂教材｜Wonder Lab」, lab pane, lab chat, run / stop / undo).
+ * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+ * Icons: Lucide (ISC licence, https://lucide.dev). Wonder Lab is not affiliated with the Scratch Foundation or MIT.
+ *
+ * The lesson page only needs one tag:  <script src="../assets/lab/lab.js?v=…" defer></script>
+ * This file reads ./manifest.json (written by the build), injects the toggle into the AI 學伴 pane (#chat) and,
+ * for lessons whose status is "ready", a lab pane next to the lesson (main.wrap). The engine is prefetched when the
+ * browser is idle and started only on the first switch to Wonder Lab. In lab mode the chat form posts to
+ * /api/ai/lab/<data-ep>; chat.js keeps the normal Q&A mode. Nothing here edits chat.js: lab mode intercepts the form
+ * in the capture phase; lab chips have their own class (wl-chip, not chat.js's .sq) and stop their clicks, so chat.js never
+ * sends them as a question and never disables them when the Q&A is capped.
+ * ES5 on purpose: this file runs on every L4 page, also on old browsers that cannot run the lab itself.
+ */
+(function () {
+  'use strict';
+  var chat = document.getElementById('chat');
+  if (!chat || !/(^|\/)L4\/lessons\//.test(chat.getAttribute('data-ep') || '')) return;
+  var ep = chat.getAttribute('data-ep'), slug = ep.split('/').pop();
+  var me = document.currentScript && document.currentScript.src;
+  var BASE = me ? me.slice(0, me.lastIndexOf('/') + 1).replace(/\?.*$/, '') : new URL('../assets/lab/', location.href).href;
+  // the Q&A box as the page was built (chat.js changes the placeholder later, e.g. to a caps message)
+  var input0 = document.getElementById('chin'), send0 = document.getElementById('chsend');
+  var MAT_PH = (input0 && input0.getAttribute('placeholder')) || '輸入你的問題…', SEND_LABEL = send0 ? send0.textContent : '問';
+  var LAB_PH = '說說你的想法：你想角色怎樣做？', LAB_HEAD = '照你的想法砌積木，一起試、一起看';
+  var OLD = '這部裝置的瀏覽器太舊，請更新系統或改用其他裝置';
+  var NET = '連線不穩，按一下再試';
+  var BIG = '程式太大了。可以按「上一步」，或者請 AI 刪去一段不用的程式。';
+  var SLOW = 'AI 學伴想得太久了，請再送出一次。';
+  var DOWN = 'AI 學伴暫時連不上，請稍後再試。';
+  var EXPORT = '匯出 .sb3 coming soon：與 UCMake 的檔案格式相容性仍待官方格式規範。';
+
+  // Lucide icons (ISC, lucide-static 1.52.0): single colour, inherit currentColor
+  var ICO = {
+    "flask": "<path d=\"M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2\"/> <path d=\"M6.453 15h11.094\"/> <path d=\"M8.5 2h7\"/>",
+    "book": "<path d=\"M12 5v16\"/> <path d=\"M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z\"/>",
+    "play": "<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/>",
+    "stop": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/>",
+    "undo": "<path d=\"M9 14 4 9l5-5\"/> <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>",
+    "download": "<path d=\"M12 15V3\"/> <path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/> <path d=\"m7 10 5 5 5-5\"/>",
+    "up": "<path d=\"m5 12 7-7 7 7\"/> <path d=\"M12 19V5\"/>",
+    "down": "<path d=\"M12 5v14\"/> <path d=\"m19 12-7 7-7-7\"/>",
+    "left": "<path d=\"m12 19-7-7 7-7\"/> <path d=\"M19 12H5\"/>",
+    "right": "<path d=\"M5 12h14\"/> <path d=\"m12 5 7 7-7 7\"/>",
+    "space": "<path d=\"M22 17v1c0 .5-.5 1-1 1H3c-.5 0-1-.5-1-1v-1\"/>",
+    "plug": "<path d=\"M12 22v-5\"/> <path d=\"M15 8V2\"/> <path d=\"M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z\"/> <path d=\"M9 8V2\"/>"
+  };
+  function ic(n) {
+    return '<svg class="wl-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ICO[n] + '</svg>';
+  }
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function mq(q) { return !!(window.matchMedia && window.matchMedia(q).matches); }
+  function narrow() { return mq('(max-width:1099px)'); }
+  // held sideways under 1100 px (tablets from 900 px wide, phones): the AI 學伴 is a right pane (lab.css, same queries)
+  function side() { return mq('(max-width:1099px) and (orientation:landscape) and (min-width:900px), (max-width:1099px) and (orientation:landscape) and (max-height:500px)'); }
+  function noop() {}
+  function idle(fn) { if (window.requestIdleCallback) window.requestIdleCallback(fn, { timeout: 4000 }); else setTimeout(fn, 1500); }
+
+  // Wonder Lab needs a 2022+ browser (WebGL for the stage, ResizeObserver, ES2022 in the engine). Checked once.
+  var okBrowser = null;
+  function supported() {
+    if (okBrowser !== null) return okBrowser;
+    okBrowser = false;
+    try {
+      if (typeof [].findLast !== 'function' || typeof window.ResizeObserver !== 'function' || typeof window.Promise !== 'function') return false;
+      var c = document.createElement('canvas'), gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      if (!gl) return false;
+      var lose = gl.getExtension && gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+      okBrowser = true;
+    } catch (e) { okBrowser = false; }
+    return okBrowser;
+  }
+
+  fetch(BASE + 'manifest.json', { cache: 'no-cache', credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('manifest ' + r.status); return r.json(); })
+    .then(init).catch(function (e) { if (window.console) console.warn('Wonder Lab unavailable:', e); });
+
+  function init(man) {
+    var info = (man.lessons || {})[slug] || { status: 'soon' }, ready = info.status === 'ready';
+
+    // ---- the toggle (always shown on L4 pages) + a status line under it ----
+    // the toggle stays invisible (it keeps its room) until lab.css has loaded, or 3 s at most: no unstyled flash
+    var head = chat.querySelector('.chhead');
+    var bar = el('div', 'wl-mode'); bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', '模式');
+    bar.style.visibility = 'hidden';
+    var css = el('link'), shown = false, onShown = [];
+    function reveal() { if (!shown) { shown = true; bar.style.visibility = ''; onShown.splice(0).forEach(function (f) { f(); }); } }
+    function whenShown(f) { if (shown) f(); else onShown.push(f); }       // the toggle turns usable only once it is visible
+    css.rel = 'stylesheet'; css.onload = css.onerror = reveal; css.href = BASE + man.css; document.head.appendChild(css);
+    setTimeout(reveal, 3000);
+    var bMat = el('button', 'on', ic('book') + '<span>課堂教材</span>');
+    var bLab = el('button', '', ic('flask') + '<span>Wonder Lab</span>' + (ready ? '' : '<small>coming soon</small>'));
+    [bMat, bLab].forEach(function (b, i) { b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', i === 0 ? 'true' : 'false'); bar.appendChild(b); });
+    var note = el('p', 'wl-note'); note.setAttribute('role', 'status'); note.hidden = true;
+    if (head && head.parentNode) head.parentNode.insertBefore(bar, head.nextSibling); else chat.insertBefore(bar, chat.firstChild);
+    bar.parentNode.insertBefore(note, bar.nextSibling);
+    var noteT = null;
+    function tell(msg) {          // clear first, so a screen reader announces the same message again on a second tap
+      clearTimeout(noteT); note.textContent = ''; note.hidden = false;
+      noteT = setTimeout(function () { note.textContent = msg; }, 30);
+    }
+    function hush() { clearTimeout(noteT); note.hidden = true; note.textContent = ''; }
+    var setupDone = false;
+    // not available here: looks disabled (aria-disabled, so a tap still explains why) and never loads the engine
+    function soon(hw) {
+      var msg = hw ? '這一課要用 UC-Mind 主控板，Wonder Lab 版本 coming soon，請用課堂教材。' : 'Wonder Lab 版本 coming soon。';
+      bLab.disabled = false; bLab.setAttribute('aria-disabled', 'true'); bLab.classList.add('soon'); bLab.title = msg;
+      if (!bLab.querySelector('small')) bLab.insertAdjacentHTML('beforeend', '<small>coming soon</small>');
+      bLab.onclick = function () { tell(msg); };
+    }
+    bMat.onclick = function () { hush(); };
+    if (!ready) { soon(info.status === 'hw'); return; }
+
+    // The server decides whether the lab is open for this login (config lab_realms, e.g. teachers only before go-live);
+    // the same call returns this student's last program for the lesson. Only 401/403/404 mean "not here": a network
+    // error or a 5xx (service restarting, Wi-Fi blip) keeps the toggle usable and tries again.
+    var probing = false, tries = 0, retryT = null, wantLab = false, prefetched = false, pre = {};
+    bLab.disabled = true;
+    bLab.onclick = function () {                       // used until setup() replaces it
+      if (!supported()) { tell(OLD); return; }
+      wantLab = true; tell('正在連線 Wonder Lab…');
+      if (!probing) probe();
+    };
+    function probe() {
+      clearTimeout(retryT); probing = true;
+      fetch('/api/ai/lab/' + ep, { credentials: 'same-origin' })
+        .then(function (r) {
+          if (r.status === 401 || r.status === 403 || r.status === 404) return { soon: true };
+          if (!r.ok) throw new Error('lab ' + r.status);
+          return r.json();
+        })
+        .then(function (d) {
+          probing = false;
+          if (d && d.ok) whenShown(function () {
+            bLab.disabled = false; bLab.title = '';
+            setup(d);                                  // enters lab mode at once if the student asked for it
+            idle(prefetch);
+          });
+          else if (d && d.soon) { if (wantLab) hush(); wantLab = false; soon(false); }
+          else throw new Error('lab reply');
+        })
+        .catch(function () {
+          probing = false; whenShown(function () { bLab.disabled = false; }); bLab.title = NET;
+          if (wantLab) { wantLab = false; tell(NET); }
+          if (++tries <= 6) retryT = setTimeout(probe, Math.min(30000, 3000 * tries));
+        });
+    }
+    probe();
+
+    // download the engine into the HTTP cache while the student reads the lesson (one file at a time); boot() waits
+    // for a file that is still downloading instead of fetching it twice
+    function prefetch() {
+      if (prefetched || !supported()) return; prefetched = true;
+      var c = navigator.connection; if (c && c.saveData) return;
+      var eng = BASE + man.engine;
+      (man.scripts || []).reduce(function (p, f) {
+        return p.then(function () {
+          if (booting || wl) return;
+          pre[f] = fetch(eng + f, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(noop, noop);
+          return pre[f];
+        });
+      }, Promise.resolve());
+    }
+
+    var wl = null, booting = null;
+    function setup(last) {
+    if (setupDone) return; setupDone = true;
+
+    // ---- the lab pane (left, replaces the lesson while in lab mode) ----
+    var main = document.querySelector('.layout > main.wrap') || document.querySelector('main.wrap');
+    var lab = el('section', 'wl-lab'); lab.id = 'wllab'; lab.hidden = true; lab.setAttribute('aria-label', 'Wonder Lab');
+    var NS = (man.scripts || []).length || 5;
+    lab.innerHTML =
+      '<div class="wl-bar">' +
+        '<button type="button" class="wl-go" id="wlrun">' + ic('play') + '<span>執行</span></button>' +
+        '<button type="button" class="wl-ionly" id="wlstop" aria-label="停止" title="停止">' + ic('stop') + '<span>停止</span></button>' +
+        '<button type="button" class="wl-ionly" id="wlundo" disabled aria-label="上一步" title="回到 AI 上一次改動之前的程式">' + ic('undo') + '<span>上一步</span></button>' +
+        '<span class="wl-sp"></span>' +
+        '<button type="button" class="wl-soon" id="wlexport" aria-disabled="true" title="' + EXPORT + '">' + ic('download') +
+          '<span>Export sb3</span><small class="wl-cs">coming soon</small><small class="wl-why">（待官方格式規範）</small></button>' +
+        '<p class="wl-barnote" id="wlbarnote" hidden></p>' +
+      '</div>' +
+      '<div class="wl-body">' +
+        '<div class="wl-stagecol">' +
+          '<div class="wl-stage" id="wlstage"><div class="wl-mons" id="wlmons"></div>' +
+            '<form class="wl-ask" id="wlask" hidden><p class="wl-askq"></p><input maxlength="40" autocomplete="off" aria-label="回答"><button type="submit">確定</button></form>' +
+            '<div class="wl-loading" id="wlload">Wonder Lab 載入中… 0/' + NS + '</div></div>' +
+          '<div class="wl-pad" id="wlpad" aria-label="方向鍵" hidden>' +
+            '<button type="button" data-k="ArrowUp" aria-label="上">' + ic('up') + '</button>' +
+            '<button type="button" data-k="ArrowLeft" aria-label="左">' + ic('left') + '</button>' +
+            '<button type="button" data-k=" " aria-label="空白鍵">' + ic('space') + '</button>' +
+            '<button type="button" data-k="ArrowRight" aria-label="右">' + ic('right') + '</button>' +
+            '<button type="button" data-k="ArrowDown" aria-label="下">' + ic('down') + '</button></div>' +
+          '<p class="wl-hint" hidden>用鍵盤的方向鍵前，先點一下舞台。</p>' +
+        '</div>' +
+        '<div class="wl-codecol"><div class="wl-tabs" id="wltabs"></div>' +
+          '<div class="wl-bwrap"><div class="wl-blocks" id="wlblocks"></div>' +
+          '<div class="wl-empty" id="wlempty">還沒有積木。在右邊（平板：按「問 AI 學伴」）說說你的想法，AI 會照你說的砌出來。</div></div></div>' +
+      '</div>' +
+      '<p class="wl-foot">Wonder Lab · <a href="' + BASE + (man.source || 'SOURCE.html') + '" target="_blank" rel="noopener">開源授權／原始碼</a></p>';
+    if (main && main.parentNode) main.parentNode.insertBefore(lab, main.nextSibling); else document.body.appendChild(lab);
+
+    // ---- lab chat body (separate history from the normal Q&A) ----
+    var chbody = document.getElementById('chbody'), form = document.getElementById('chform'),
+        input = document.getElementById('chin'), send = document.getElementById('chsend'), fab = document.getElementById('chfab');
+    var body = el('div', 'chbody wl-chbody'); body.id = 'wlbody'; body.hidden = true; body.setAttribute('aria-live', 'polite');
+    if (chbody && chbody.parentNode) chbody.parentNode.insertBefore(body, chbody.nextSibling); else chat.appendChild(body);
+    var headSmall = head && head.querySelector('small'), headText = headSmall ? headSmall.textContent : '';
+    // turns left (the binding cap), shown in the narrow lab drawer where the cap rows are hidden
+    var capsBox = document.getElementById('chcaps'), leftEl = el('div', 'wl-left'); leftEl.hidden = true;
+    if (capsBox) capsBox.appendChild(leftEl);
+
+    var KEY = 'iits-lab:' + ep, MODEKEY = 'iits-mode:' + location.pathname;
+    var st = { hist: [], program: null, prev: null, note: null, sig: null, ran: false, report: null };
+    try { var s0 = JSON.parse(sessionStorage.getItem(KEY) || 'null'); if (s0 && typeof s0 === 'object') st = Object.assign(st, s0); } catch (e) {}
+    if (!Array.isArray(st.hist)) st.hist = [];
+
+    var labmode = false, busy = false, capsReason = '', closedReason = '', pendingSend = false, pollT = null;
+    // since the last turn: objective signals for learning analysis (kept across a reload)
+    var sig = (st.sig && typeof st.sig === 'object') ? { runs: +st.sig.runs || 0, stops: +st.sig.stops || 0, undo: +st.sig.undo || 0 } : { runs: 0, stops: 0, undo: 0 };
+    var ranSinceTurn = !!st.ran;
+    function save() {
+      try {
+        if (wl && ranSinceTurn && wl.trace) st.report = wl.report();
+        sessionStorage.setItem(KEY, JSON.stringify({ hist: st.hist.slice(-16), program: wl ? wl.program : st.program, prev: st.prev, note: st.note,
+          sig: sig, ran: ranSinceTurn, report: ranSinceTurn ? (st.report || null) : null }));
+      } catch (e) {}
+    }
+    window.addEventListener('pagehide', function () { save(); });
+    function add(cls, text) { var d = el('div', 'msg ' + cls); d.textContent = text; body.appendChild(d); body.scrollTop = body.scrollHeight; return d; }
+    st.hist.forEach(function (m) { if (m && typeof m.content === 'string') add(m.role === 'user' ? 'me' : 'bot', m.content); });
+    // a chip in the lab conversation: its own class (wl-chip, styled like the Q&A chips). chat.js only handles and only
+    // disables .sq buttons, so a lab chip is never sent as a question and still works while the Q&A is capped.
+    function chip(text, cls, fn) {
+      var c = el('div', 'sqs' + (cls ? ' ' + cls : '')), b = el('button', 'wl-chip');
+      b.type = 'button'; b.textContent = text; c.appendChild(b); body.appendChild(c); body.scrollTop = body.scrollHeight;
+      b.onclick = function (e) { e.stopPropagation(); c.remove(); fn(); };
+      return c;
+    }
+
+    var $ = function (id) { return document.getElementById(id); };
+    var undoBtn = $('wlundo');
+    undoBtn.disabled = !st.prev;
+    function hasScripts(p) {
+      if (!p) return false;
+      var n = 0; Object.keys(p.sprites || {}).forEach(function (k) { n += Object.keys((p.sprites[k] || {}).scripts || {}).length; });
+      return n + Object.keys((p.stage || {}).scripts || {}).length > 0;
+    }
+    function showEmpty() { $('wlempty').hidden = hasScripts(wl ? wl.program : st.program); }
+    showEmpty();
+    // the arrow pad and the keyboard hint: only for a lesson played with keys (lesson json "keys") or a program that reads keys
+    var lessonKeys = false;
+    function usesKeys(p) { try { return /"(event_whenkeypressed|sensing_keypressed)"/.test(JSON.stringify(p || {})); } catch (e) { return false; } }
+    function showPad() {
+      var on = lessonKeys || usesKeys(wl ? wl.program : st.program), pad = $('wlpad'), hint = lab.querySelector('.wl-hint');
+      if (pad.hidden === !on) return;
+      pad.hidden = hint.hidden = !on;
+      if (labmode) sizeDrawer();
+    }
+    function afterChange() { save(); showEmpty(); showPad(); }
+    // a status line under the toolbar (the chat pane's note says the same where the pane is on screen)
+    var barNote = $('wlbarnote'), barT = null;
+    function explain(msg) {
+      tell(msg);
+      var pane = getComputedStyle(chat).display !== 'none';
+      barNote.setAttribute('role', 'status');
+      if (pane) barNote.setAttribute('aria-hidden', 'true'); else barNote.removeAttribute('aria-hidden');
+      barNote.textContent = msg; barNote.hidden = false;
+      clearTimeout(barT);
+      barT = setTimeout(function () { barNote.hidden = true; if (note.textContent === msg) hush(); }, 10000);
+    }
+    function unexplain() { clearTimeout(barT); barNote.hidden = true; }
+    $('wlexport').onclick = function (ev) { explain(EXPORT); if (ev && ev.detail) this.blur(); };
+
+    function script(src) { return new Promise(function (ok, bad) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error('load ' + src)); }; document.head.appendChild(s); }); }
+    function getJSON(u) { return fetch(u, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
+    function boot() {
+      if (booting) return booting;
+      var eng = BASE + man.engine, t0 = Date.now(), n = 0, load = $('wlload');
+      load.hidden = false; load.textContent = 'Wonder Lab 載入中… 0/' + NS;
+      booting = man.scripts.reduce(function (p, f) {
+        return p.then(function () { return pre[f] || null; })
+          .then(function () { return script(eng + f); })
+          .then(function () { n += 1; load.textContent = 'Wonder Lab 載入中… ' + n + '/' + NS; });
+      }, Promise.resolve())
+        .then(function () { return Promise.all([getJSON(eng + 'opcodes.json'), getJSON(BASE + info.data)]); })
+        .then(function (r) {
+          wl = window.WL = new window.WonderLab({ spec: r[0], lesson: r[1], assetBase: new URL(man.assets || 'a/', BASE).href, mediaBase: eng + 'media/',
+            el: { stage: $('wlstage'), blocks: $('wlblocks'), tabs: $('wltabs'), monitors: $('wlmons'), ask: $('wlask') } });
+          wl.boot();
+          lessonKeys = !!r[1].keys;
+          // the blocks area changes size without a window resize (the right pane opens or closes, the pad shows)
+          if (window.ResizeObserver) new window.ResizeObserver(function () {
+            var B = window.ScratchBlocks || window.Blockly; try { B.svgResize(wl.ws); } catch (e) {}
+          }).observe($('wlblocks'));
+          return wl.load(st.program || window.WonderLab.empty()).then(function () {
+            load.hidden = true; window.WL_BOOT_MS = Date.now() - t0;
+            showEmpty(); showPad();
+            if (!st.hist.length) { add('bot', r[1].opening || '你想舞台上發生甚麼事？用你自己的說話講，我會照你說的砌積木。'); offerRestore(); }
+          });
+        })
+        .catch(function (e) { load.textContent = 'Wonder Lab 載入失敗，請重新整理頁面。'; booting = null; throw e; });
+      return booting;
+    }
+
+    // a program kept on the server (another tab / device): offer it, never load it silently
+    function offerRestore() {
+      Promise.resolve(last).then(function (d) {
+        if (!d || !d.ok || !d.program || !hasScripts(d.program)) return;
+        chip('載入你上次在這一課的程式' + (d.when ? '（' + d.when + '）' : ''), '', function () {
+          st.prev = wl.program; undoBtn.disabled = false;
+          wl.applyTurn({ program: d.program, ops: [] }).then(afterChange);
+          add('sys', '已載入上次的程式。按「上一步」可以回到空白。');
+        });
+      }).catch(noop);
+    }
+
+    // ---- narrow screens: the chat is a drawer that ends just below the stage (held sideways: a right pane) ----
+    function wlTop() { return parseFloat(document.body.style.getPropertyValue('--wl-top')) || 0; }
+    function sizeDrawer() {
+      var s = $('wlstage'); if (!s) return;
+      s.style.maxWidth = '';
+      // the lesson bar sticks to the top: the lab toolbar and the right pane start under it
+      var lb = document.querySelector('.lessonbar'), top = 0;
+      if (lb && narrow() && getComputedStyle(lb).display !== 'none') top = Math.round(lb.getBoundingClientRect().height);
+      document.body.style.setProperty('--wl-top', top + 'px');
+      if (!labmode || !narrow() || side()) return;
+      var r = s.getBoundingClientRect(); if (!r.height) return;
+      var room = window.innerHeight - r.bottom - 6;
+      if (room < 300) {          // a short phone: a slightly smaller stage, so the drawer keeps a few lines of conversation
+        var h = Math.max(150, window.innerHeight - r.top - 300 - 6);
+        if (h < r.height) { s.style.maxWidth = Math.round(h * 4 / 3) + 'px'; r = s.getBoundingClientRect(); room = window.innerHeight - r.bottom - 6; }
+      }
+      chat.style.setProperty('--wl-dh', Math.max(240, Math.round(room)) + 'px');
+    }
+    window.addEventListener('resize', function () { if (labmode) sizeDrawer(); });
+    if (fab) fab.addEventListener('click', function () { if (labmode) setTimeout(sizeDrawer, 0); });
+    function openPane() { chat.classList.add('open'); document.body.classList.add('chatopen'); parentFull(true); }
+    function closePane() { chat.classList.remove('open'); document.body.classList.remove('chatopen'); }
+    // scroll the page so that an element starts just under the sticky toolbar (narrow screens only)
+    function underBar(elm, onlyIfHidden) {
+      if (!narrow() || !elm) return;
+      try {
+        var b = lab.querySelector('.wl-bar').getBoundingClientRect(), r = elm.getBoundingClientRect(), top = wlTop() + b.height + 6;
+        if (onlyIfHidden && r.top >= top - 1 && r.bottom <= window.innerHeight + 1) return;
+        window.scrollBy(0, Math.round(r.top - top));
+      } catch (e) {}
+    }
+    var lookEl = null;
+    // after a change on a narrow screen: one tap shows the changed script. The drawer closes for it; the right pane stays,
+    // and there the chip is only offered when the blocks are below the screen (a phone held sideways).
+    function lookChip() {
+      if (lookEl && lookEl.parentNode) lookEl.remove();
+      if (side() && $('wlblocks').getBoundingClientRect().top < window.innerHeight - 100) return;
+      lookEl = chip('看看積木', 'wl-look', function () {
+        lookEl = null;
+        if (!side()) closePane();
+        setTimeout(function () { underBar(lab.querySelector('.wl-codecol')); if (wl && wl.showNew) wl.showNew(); }, 30);
+      });
+    }
+
+    // ---- mode switch ----
+    function parentFull(on) { try { if (window.parent !== window) window.parent.document.documentElement.classList.toggle('chatfull', on); } catch (e) {} }
+    function setMode(on) {
+      if (on && !supported()) { tell(OLD); return; }
+      labmode = on; hush();
+      document.body.classList.toggle('wl-labmode', on);
+      bMat.classList.toggle('on', !on); bLab.classList.toggle('on', on);
+      bMat.setAttribute('aria-selected', on ? 'false' : 'true'); bLab.setAttribute('aria-selected', on ? 'true' : 'false');
+      lab.hidden = !on; body.hidden = !on; if (chbody) chbody.hidden = on;
+      if (headSmall) headSmall.textContent = on ? LAB_HEAD : headText;
+      if (send) send.textContent = on ? '送出' : SEND_LABEL;
+      if (input && send) {
+        if (on) lockLab(busy);
+        else { input.placeholder = capsReason || MAT_PH; input.disabled = send.disabled = !!capsReason; }
+      }
+      try { sessionStorage.setItem(MODEKEY, on ? 'lab' : 'mat'); } catch (e) {}
+      if (narrow()) parentFull(on || chat.classList.contains('open'));
+      if (on) {
+        if (narrow()) { try { window.scrollTo(0, 0); } catch (e) {} }
+        if (side() && !chat.classList.contains('open')) openPane();      // held sideways: the AI 學伴 is the right pane
+        sizeDrawer();
+        checkCaps();
+        boot().then(function () {
+          wl.active = labmode; wl.resize(); var B = window.ScratchBlocks || window.Blockly; try { B.svgResize(wl.ws); } catch (e) {}
+          sizeDrawer();
+        }).catch(noop);
+      } else {
+        clearTimeout(pollT); unexplain();
+        if (wl) { wl.active = false; wl.stop(); }
+      }
+    }
+    bMat.onclick = function () { hush(); if (labmode) setMode(false); };
+    bLab.onclick = function () { setMode(true); };
+    // the chat sheet's close button (narrow screens) must not drop the full-screen frame while the lab is open
+    var closeBtn = chat.querySelector('.chclose');
+    if (closeBtn) closeBtn.addEventListener('click', function () { if (labmode && narrow()) setTimeout(function () { parentFull(true); }, 0); });
+
+    // ---- caps: the lab goes through the same /status gate as the chat (class time lifts the caps) ----
+    var CAPROWS = [['lesson_hour_left', '本課每小時'], ['lesson_day_left', '本課每天'], ['student_day_left', '今天全部課']];
+    function showLeft(s) {
+      var b = null;
+      if (s && s.ok && !s.in_class) CAPROWS.forEach(function (r) { var v = s[r[0]]; if (typeof v === 'number' && (!b || v < b[0])) b = [v, r[1]]; });
+      leftEl.hidden = !b;
+      if (b) { leftEl.textContent = 'Wonder Lab 剩 ' + Math.max(0, b[0]) + ' 次（' + b[1] + '）'; leftEl.className = 'wl-left' + (b[0] > 0 ? '' : ' out'); }
+    }
+    function poll() { clearTimeout(pollT); pollT = null; if (labmode && capsReason) pollT = setTimeout(checkCaps, 30000); }
+    function checkCaps() {
+      return getJSON('/api/ai/status/' + ep).then(function (s) {
+        capsReason = (s && s.ok && s.reason) || '';
+        showLeft(s);
+        if (!busy) lockLab(false);
+        poll();
+        return s;
+      }).catch(function () { if (!busy) lockLab(false); poll(); });
+    }
+    function refreshCaps() { try { document.dispatchEvent(new CustomEvent('iits:caps')); } catch (e) {} return checkCaps(); }
+    function lockLab(on, why) {
+      if (!input || !send || !labmode) return;
+      var stop = capsReason || closedReason;
+      input.disabled = send.disabled = !!on || !!stop;
+      input.placeholder = (on && why) || stop || LAB_PH;
+    }
+    // chat.js repaints the box for the Q&A (e.g. 「輸入你的問題…」 when a class starts): put the lab wording back
+    if (input && window.MutationObserver) new MutationObserver(function () {
+      if (labmode && !busy && !capsReason && !closedReason && !input.disabled && input.placeholder !== LAB_PH) input.placeholder = LAB_PH;
+    }).observe(input, { attributes: true, attributeFilter: ['placeholder', 'disabled'] });
+    // the class line changes (a class starts or ends): read the caps again at once
+    var clsLine = capsBox && capsBox.querySelector('.cpclass'), wasIn = clsLine ? clsLine.classList.contains('in') : false;
+    if (clsLine && window.MutationObserver) new MutationObserver(function () {
+      var now = clsLine.classList.contains('in'); if (now !== wasIn) { wasIn = now; if (labmode) checkCaps(); }
+    }).observe(clsLine, { attributes: true, attributeFilter: ['class'] });
+
+    // ---- one lab turn ----
+    function sendLab() {
+      if (!input) return;
+      var text = (input.value || '').trim();
+      if (!text || busy || input.disabled) return;
+      if (!wl) {                                 // still loading: keep the words and send them once the lab is ready
+        if (!pendingSend) { pendingSend = true; add('sys', 'Wonder Lab 載入中，載入好就會送出'); }
+        boot().then(function () { if (pendingSend) { pendingSend = false; sendLab(); } }, function () { pendingSend = false; });
+        return;
+      }
+      add('me', text); input.value = ''; unexplain();
+      var w = add('bot wait', '正在照你的想法砌積木…'); busy = true; lockLab(true);
+      var run = ranSinceTurn ? (wl.trace ? wl.report() : (st.report || null)) : null;
+      fetch('/api/ai/lab/' + ep, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, history: st.hist.slice(-8), program: wl.program, run: run, note: st.note, signals: sig }) })
+        .then(function (r) {
+          return r.json().then(function (d) {
+            if (!d || typeof d !== 'object') throw new Error('reply');
+            d._status = r.status; return d;
+          }).catch(function () {                 // not JSON (an HTML error page from the proxy)
+            return { ok: false, retry: true, _status: r.status, reason: r.status === 413 ? BIG : SLOW };
+          });
+        })
+        .then(function (d) {
+          w.remove(); busy = false;
+          if (!d.ok) {
+            var code = d._status, capped = code === 429 || code === 404;
+            if (code === 413) d.reason = BIG;
+            else if (code === 504) d.reason = SLOW;
+            add('sys', d.reason || 'AI 學伴暫時未能回答。');
+            if (!capped) input.value = text;     // keep the student's words to send again
+            if (code === 429 && d.reason) capsReason = d.reason;
+            if (code === 404) closedReason = d.reason || 'Wonder Lab 這一課即將推出。';
+            lockLab(false);
+            refreshCaps();
+            if (code === 429) setTimeout(checkCaps, 1000);
+            return;
+          }
+          st.hist.push({ role: 'user', content: text }, { role: 'assistant', content: ((d.say || '') + ' ' + (d.question || '')).trim() });
+          if (d.say) add('bot', d.say);
+          if (d.question) add('bot wl-q', d.question);
+          if (d.masked) add('sys', '提醒：個人資料（名字、電話等）不要在網上分享，已幫你遮蓋。');
+          var changed = (d.ops || []).length > 0;
+          if (changed) { st.prev = wl.program; undoBtn.disabled = false; }
+          ranSinceTurn = false; st.note = null; st.report = null; sig = { runs: 0, stops: 0, undo: 0 };
+          return wl.applyTurn(d).then(function () {
+            afterChange();
+            if (changed) {
+              if (narrow()) lookChip();
+              setTimeout(function () { if (wl.showNew) wl.showNew(); }, 60);
+            }
+            return refreshCaps();
+          }).then(function () { if (labmode && mq('(pointer:fine)') && !input.disabled) try { input.focus(); } catch (e) {} });
+        })
+        .catch(function () { w.remove(); busy = false; add('sys', DOWN); input.value = text; lockLab(false); refreshCaps(); });
+    }
+    // capture phase: in lab mode the chat form belongs to the lab (chat.js never sees the event)
+    document.addEventListener('submit', function (e) {
+      if (!labmode || e.target !== form) return;
+      e.preventDefault(); e.stopImmediatePropagation(); sendLab();
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (!labmode || e.target !== input) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.stopImmediatePropagation(); sendLab(); }
+    }, true);
+
+    // ---- toolbar (a button clicked with a pointer gives the keyboard back to the stage) ----
+    $('wlrun').onclick = function (ev) {
+      if (!wl) return;
+      if (input) input.blur();
+      wl.run(); ranSinceTurn = true; sig.runs += 1; save(); unexplain();
+      if (narrow() && !side() && chat.classList.contains('open')) closePane();      // the drawer gives the stage back
+      underBar($('wlstage'), true);                                                  // the output must be on screen
+      seenChip();
+      if (ev && ev.detail) this.blur();
+    };
+    $('wlstop').onclick = function (ev) { if (wl) { wl.stop(); sig.stops += 1; save(); } if (ev && ev.detail) this.blur(); };
+    undoBtn.onclick = function () {
+      if (!wl || !st.prev) return;
+      var p = st.prev; st.prev = null; undoBtn.disabled = true;
+      st.note = '（學生按了「上一步」，程式回到 AI 上一次改動之前的版本。）'; sig.undo = 1;
+      wl.applyTurn({ program: p, ops: [] }).then(afterChange);
+      save();
+      add('sys', '已回到上一步的程式。');
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('#wlpad button'), function (b) {
+      var k = b.getAttribute('data-k');
+      b.addEventListener('pointerdown', function (e) { e.preventDefault(); if (wl) wl.key(k, true); });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { if (wl) wl.key(k, false); }); });
+    });
+    var seenEl = null;
+    function seenChip() {
+      if (seenEl && seenEl.parentNode) return;
+      seenEl = chip('說說你看到甚麼……', 'wl-seen', function () {
+        seenEl = null;
+        if (input) { input.value = '我看到'; try { input.focus(); } catch (e) {} }
+      });
+    }
+
+    // reopen in lab mode after a reload, from a #lab link, or because the toggle was tapped while the probe retried
+    var startLab = wantLab || location.hash === '#lab';
+    wantLab = false;
+    try { startLab = startLab || sessionStorage.getItem(MODEKEY) === 'lab'; } catch (e) {}
+    if (startLab) setMode(true);
+    }
+  }
+})();

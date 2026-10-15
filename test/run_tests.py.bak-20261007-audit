@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Browser tests of the built front-end (no AI, no server): every whitelisted opcode compiles, loads in the VM and renders
+as a block; the demo program runs. Needs `npm run build` first and Playwright for Python + Google Chrome (or set CHROME).
+usage: python3 test/run_tests.py            AGPL-3.0 (see LICENSE)"""
+import functools, http.server, json, os, socketserver, sys, threading
+from playwright.sync_api import sync_playwright
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+CHROME = os.environ.get("CHROME", "/usr/bin/google-chrome")
+FIELD = {"var": "v", "list": "L", "broadcast": "m1", "key": "space", "backdrop": "草地"}
+
+
+def serve():
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a): pass
+    h = functools.partial(Quiet, directory=ROOT)
+    s = socketserver.ThreadingTCPServer(("127.0.0.1", 0), h); s.daemon_threads = True
+    threading.Thread(target=s.serve_forever, daemon=True).start()
+    return s, s.server_address[1]
+
+
+def program(op, d):
+    b = {"op": op}
+    for f, ft in (d.get("fields") or {}).items():
+        b[f] = ft[0] if isinstance(ft, list) else FIELD.get(ft, "x")
+    if d["shape"] == "reporter": blocks = [{"op": "event_whenflagclicked"}, {"op": "looks_say", "MESSAGE": b}]
+    elif d["shape"] == "boolean": blocks = [{"op": "event_whenflagclicked"}, {"op": "control_if", "CONDITION": b, "SUBSTACK": []}]
+    elif d["shape"] == "hat": blocks = [b]
+    else: blocks = [{"op": "event_whenflagclicked"}, b]
+    return {"sprites": {"小球": {"scripts": {"t": blocks}}}, "stage": {"scripts": {}}}
+
+
+def main():
+    if not os.path.exists(os.path.join(ROOT, "dist", "engine.json")):
+        sys.exit("run `npm run build` first")
+    spec = json.load(open(os.path.join(ROOT, "src", "opcodes.json"), encoding="utf-8"))["opcodes"]
+    srv, port = serve(); fails = []
+    with sync_playwright() as p:
+        b = p.chromium.launch(executable_path=CHROME, headless=True, args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        pg = b.new_page(viewport={"width": 1366, "height": 768}); errs = []
+        pg.on("pageerror", lambda e: errs.append(str(e)[:200]))
+        pg.goto(f"http://127.0.0.1:{port}/examples/demo/index.html")
+        for _ in range(150):
+            if pg.evaluate("!!window.DEMO_READY"): break
+            pg.wait_for_timeout(200)
+        if not pg.evaluate("!!window.DEMO_READY"):
+            sys.exit(f"demo did not boot: {errs}")
+        pg.evaluate("WL.run()"); pg.wait_for_timeout(1200)
+        y = pg.evaluate("WL.report().sprites['小球'].end[1]")
+        print(("PASS" if y < 0 else "FAIL"), "demo program runs (ball y =", y, ")"); y < 0 or fails.append("demo run")
+        for op, d in spec.items():
+            r = pg.evaluate("p => WL.applyTurn({program: p, ops: []}).then(() => WL.ws.getAllBlocks().length).catch(e => 'ERR ' + e.message)", program(op, d))
+            if not isinstance(r, int) or r < 1:
+                fails.append(f"{op}: {r}")
+        print(("PASS" if not [f for f in fails if ':' in f] else "FAIL"), f"{len(spec)} whitelisted opcodes compile, load and render")
+        if errs: fails.append("page errors: " + "; ".join(errs[:3]))
+        b.close()
+    srv.shutdown()
+    print("\n" + ("all passed" if not fails else "FAILED: " + "; ".join(fails[:10])))
+    sys.exit(1 if fails else 0)
+
+
+if __name__ == "__main__":
+    main()

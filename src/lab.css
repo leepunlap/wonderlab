@@ -161,8 +161,11 @@ body.wl-labmode .chclose{min-width:44px;min-height:44px}
 html.wl-studio-on,html.wl-studio-on body{height:100%}
 body.wl-labmode.wl-studiomode{display:flex;flex-direction:column;overflow:hidden;height:100%}
 body.wl-labmode.wl-studiomode .lessonbar{flex:none}
-body.wl-labmode.wl-studiomode .layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;align-items:stretch}
-body.wl-labmode.wl-studiomode .wl-studio{height:100%}
+body.wl-labmode.wl-studiomode .layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:minmax(0,1fr);align-items:stretch}
+/* The studio is a GRID ITEM of .layout, not a flex item of the body, so height:100% resolved against
+   an auto-sized grid row and collapsed to its content - measured 186px of a 646px layout, which left
+   the lesson's left side as a strip with a void under it. One definite row + stretch fills it. */
+body.wl-labmode.wl-studiomode .wl-studio{align-self:stretch;height:auto;min-height:0;overflow:hidden}
 body.wl-labmode.wl-studiomode .chat{display:flex;position:static;height:calc(100% - 20px);margin:10px 12px 10px 0;transform:none;visibility:visible}
 body.wl-labmode.wl-studiomode .chfab{display:none!important}
 /* the mode switch at the top of the pane, and the row above the box (請助教看看 / the animation setting) */

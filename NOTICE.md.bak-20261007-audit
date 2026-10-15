@@ -1,0 +1,34 @@
+# Notices
+
+**Wonder Lab** front-end. Copyright (C) 2026 IITS (工信學堂（香港）).
+Licensed under the **GNU Affero General Public License v3.0 only** (`LICENSE`).
+
+Wonder Lab is **not affiliated with, sponsored by or endorsed by** the Scratch Foundation, the
+Massachusetts Institute of Technology (MIT) or the Raspberry Pi Foundation. "Scratch", the Scratch
+logo, the Scratch Cat, Gobo, Pico, Nano, Tera and Giga are trademarks of their owners. This project
+does not use them.
+
+## Third-party software in the built page
+
+| Component | Version | Licence | Source |
+|---|---|---|---|
+| @scratch/scratch-vm | 15.2.0 | AGPL-3.0-only | https://github.com/scratchfoundation/scratch-editor (npm `@scratch/scratch-vm`) |
+| @scratch/scratch-render | 15.2.0 | AGPL-3.0-only | same monorepo (npm `@scratch/scratch-render`) |
+| @scratch/scratch-storage | 15.2.0 | AGPL-3.0-only | same monorepo (npm `@scratch/scratch-storage`) |
+| scratch-blocks | 2.1.19 | Apache-2.0 | https://github.com/scratchfoundation/scratch-blocks |
+| Blockly (bundled into scratch-blocks.js) | 12.x | Apache-2.0 | https://github.com/RaspberryPiFoundation/blockly |
+| @blockly/continuous-toolbox, @blockly/field-colour | see package-lock.json | Apache-2.0 | https://github.com/google/blockly-samples |
+| Lucide icons (inline SVG paths in lab.js) | — | ISC | https://lucide.dev |
+
+**Changes to the upstream AGPL bundles.** At build time `tools/build.mjs` makes one change to each
+of the prebuilt `dist/web` bundles. It replaces webpack's fixed public path `"/"` with the folder of
+the loading script, so the code-split chunks load from the same folder.
+
+The exact upstream tarballs are fetched with `npm pack` into `vendor/`. They are listed in
+`vendor/SHA512SUMS`, and the service that runs Wonder Lab mirrors them next to the built page.
+
+**Lucide icons:** ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022
+as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee
+is hereby granted, provided that the above copyright notice and this permission notice appear in all
+copies.
