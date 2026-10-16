@@ -18,6 +18,10 @@
  * lab; the AI 學伴 stays on the right (a drawer below 1280 px). Two modes in the pane: 「AI 幫我砌」 (the AI builds, the
  * editor is locked while it edits) and 「我自己砌」 (the AI is a 助教 and never edits). Everything else (caps, class time,
  * 429, the wrap-up poll, history, reload restore) is the same code. Otherwise the read-only lab, exactly as before.
+ *
+ * The mount itself is NOT here: src/lab-host.js resolves the manifest, builds the editor frame, mounts it and calls
+ * WLStudio.boot(), and the teachers' playground (portals/teachers/index.html) uses that same file. tools/build.mjs
+ * concatenates the host into dist/lab.js, so a lesson page still needs only its one <script> tag.
  */
 (function () {
   'use strict';
@@ -26,6 +30,11 @@
   var ep = chat.getAttribute('data-ep'), slug = ep.split('/').pop();
   var me = document.currentScript && document.currentScript.src;
   var BASE = me ? me.slice(0, me.lastIndexOf('/') + 1).replace(/\?.*$/, '') : new URL('../assets/lab/', location.href).href;
+  // src/lab-host.js: the ONE module that resolves the manifest, mounts the Studio (the editor frame) and boots it.
+  // The teachers' playground uses the same file, and tools/build.mjs concatenates it into dist/lab.js, so a lesson
+  // page already in the wild still needs only its single <script src="assets/lab/lab.js"> tag. Without it this file
+  // still runs every other part of the lab: the Studio simply counts as unavailable and the read-only lab is used.
+  var HOST = window.WonderLabHost || null;
   // the Q&A box as the page was built (chat.js changes the placeholder later, e.g. to a caps message)
   var input0 = document.getElementById('chin'), send0 = document.getElementById('chsend');
   var MAT_PH = (input0 && input0.getAttribute('placeholder')) || '輸入你的問題…', SEND_LABEL = send0 ? send0.textContent : '問';
@@ -197,12 +206,14 @@
 
     var wl = null, booting = null;
     // ---- the full editor (dual mode): only with the Studio in the build, studio:true from the lab GET and >= 1024 px ----
-    // manifest "studio": "studio-<hex>/" (the content-hashed folder of the editor; its page is lab-frame.html)
-    var SDEF = typeof man.studio === 'string' && /^studio-[0-9a-f]+\/$/.test(man.studio) ? { dir: man.studio, page: man.studio_page || 'lab-frame.html' } : null, lastGet = null;
-    var ST = null, sbooting = null, studio = null;           // studio: decided when the lab first opens (true = editor)
+    // manifest "studio": "studio-<hex>/" (the content-hashed folder of the editor; its page is lab-frame.html).
+    // lab-host.js resolves it and owns the frame from here on; this file owns everything around it (the pane, the
+    // conversation, the caps, the reload state).
+    var SDEF = HOST ? HOST.studioDef(man) : null, lastGet = null;
+    var ST = null, sbooting = null, studio = null, hst = null;   // studio: decided when the lab first opens (true = editor)
     var spre = null;                                          // the editor file being prefetched (the frame waits for it: no second download)
     function studioWanted() {
-      return !!(SDEF && lastGet && lastGet.studio === true && (window.innerWidth || document.documentElement.clientWidth || 0) >= 1024 && supported());
+      return !!(HOST && SDEF && lastGet && lastGet.studio === true && (window.innerWidth || document.documentElement.clientWidth || 0) >= 1024 && supported());
     }
     function setup(last) {
     if (setupDone) return; setupDone = true;
@@ -386,6 +397,25 @@
 
     function script(src) { return new Promise(function (ok, bad) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error('load ' + src)); }; document.head.appendChild(s); }); }
     function getJSON(u) { return fetch(u, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
+    // Every AI turn goes through the host's transport (one implementation, shared with the teachers' playground).
+    // The inline fallback only exists for a page that somehow runs this file without assets/lab/lab-host.js beside it;
+    // the build never produces one (tools/build.mjs concatenates the two into dist/lab.js).
+    function labSend(url, body, opt) {
+      if (HOST && HOST.send) return HOST.send(url, body, opt);
+      var init = { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+      if (opt && opt.signal) init.signal = opt.signal;
+      return fetch(url, init).then(function (r) {
+        return r.text().then(function (t) { var d = null; try { d = JSON.parse(t); } catch (e) {} return { status: r.status, data: d, retry: r.status === 429 }; });
+      });
+    }
+    // This file's reading of a lab reply: a body that is not JSON at all (an HTML error page from the proxy) is the
+    // soft "another turn is in flight" shape and keeps the 413 / 504 wording. The transport is the host's now - this
+    // used to be a readReply() function plus a second copy of the same four lines inside sendLab().
+    function reply(res) {
+      var d = res.data || { ok: false, retry: res.retry, reason: res.status === 413 ? BIG : SLOW };
+      d._status = res.status;
+      return d;
+    }
     function boot() { return studio ? bootStudio() : bootRO(); }
     function bootRO() {
       if (booting) return booting;
@@ -659,7 +689,7 @@
     function studioBox() {
       if (sbox) return sbox;
       sbox = el('section', 'wl-studio'); sbox.id = 'wlstudio'; sbox.hidden = true; sbox.setAttribute('aria-label', 'Wonder Lab 積木編輯器');
-      sbox.innerHTML = '<div class="wl-sload" id="wlsload" role="status"><span class="wl-sspin" aria-hidden="true"></span><span>Wonder Lab 編輯器載入中…</span></div>';
+      // the frame, the shared loading overlay and the error line are lab-host.js's (.wl-host > .wl-sload + .wl-sframe)
       lab.parentNode.insertBefore(sbox, lab.nextSibling);
       return sbox;
     }
@@ -696,45 +726,42 @@
       if (type === 'undo') { studioUndo(); return; }
       if (type === 'chat') { if (chat.classList.contains('open')) sClose(); else sOpen(); return; }
     }
+    // ---- the editor itself: lab-host.js resolves the manifest, builds the frame, mounts it in the Studio pane and
+    // waits for it to be ready (with a timeout), then calls WLStudio.boot(). What stays here is the lesson: its data
+    // file, the program to restore, the ids the editor keeps, and what each event means for this page. ----
     function bootStudio() {
       if (sbooting) return sbooting;
-      var t0 = Date.now(), box = studioBox(), load = $('wlsload'), fr = el('iframe', 'wl-sframe');
-      fr.id = 'wlsframe'; fr.title = 'Wonder Lab 積木編輯器'; fr.setAttribute('allow', 'microphone; autoplay');
-      load.hidden = false;
-      // a file the idle prefetch is still downloading is waited for (at most 20 s), so the frame reads it from the cache.
-      // The frame gets its src BEFORE it enters the page: an iframe without src would fire load for about:blank first.
-      var frameReady = Promise.race([spre || Promise.resolve(), new Promise(function (ok) { setTimeout(ok, 20000); })]).then(function () {
-        return new Promise(function (ok, bad) {
-          fr.onload = function () { ok(); }; fr.onerror = function () { bad(new Error('frame')); };
-          setTimeout(function () { bad(new Error('frame timeout')); }, 120000);
-          fr.src = BASE + SDEF.dir + SDEF.page;
-          box.appendChild(fr);
-        });
+      var t0 = Date.now(), box = studioBox(), lesson0 = null;
+      hst = HOST.create({
+        base: BASE, container: box, waitFor: spre, loadingText: 'Wonder Lab 編輯器載入中…',
+        frame: { id: 'wlsframe', title: 'Wonder Lab 積木編輯器' },
+        onEvent: onStudio
       });
-      sbooting = Promise.all([getJSON(BASE + info.data), frameReady]).then(function (r) {
-        var W = fr.contentWindow && fr.contentWindow.WLStudio;
-        if (!W || typeof W.boot !== 'function' || !fr.contentWindow.GUI) throw new Error('studio frame');
-        lessonKeys = !!r[0].keys;
+      // the lesson file and the frame are fetched together (the frame takes seconds: the JSON must not wait for it)
+      sbooting = Promise.all([hst.mount(), getJSON(BASE + info.data)]).then(function (r) {
+        var lesson = r[1]; lesson0 = lesson;
+        lessonKeys = !!lesson.keys;
         var s0 = st.studio && st.studio.project ? st.studio : null;
-        return W.boot({ lesson: r[0], assetBase: new URL(man.assets || 'a/', BASE).href, project: s0 ? s0.project : null,
-          sids: s0 ? s0.sids : null, hand: s0 ? s0.hand : 0, assets: s0 ? s0.assets : null, program: s0 ? null : (st.program || null),
-          onEvent: onStudio }).then(function () { return [W, r[0]]; });
-      }).then(function (x) {
-        ST = window.WLS = x[0];
-        load.hidden = true; window.WL_BOOT_MS = Date.now() - t0; window.WL_STUDIO = true;
+        return hst.boot(lesson, {
+          project: s0 ? s0.project : null, sids: s0 ? s0.sids : null, hand: s0 ? s0.hand : 0, assets: s0 ? s0.assets : null,
+          program: s0 ? null : (st.program || null)
+        }).then(function (x) { return x.studio; });
+      }).then(function (w) {
+        ST = window.WLS = w;
+        window.WL_BOOT_MS = Date.now() - t0; window.WL_STUDIO = true;
         sbase = (st.sig && typeof st.sig === 'object') ? { runs: +st.sig.runs || 0, stops: +st.sig.stops || 0, undo: +st.sig.undo || 0 } : zsig();
         if (!st.seen) st.seen = (st.studio || st.hist.length) ? ST.program() : { sprites: {}, stage: { scripts: {} } };
         ST.setTools({ undo: !!st.sprev, drawer: drawerMode() });
         setSMode(smode, true);
-        if (!st.hist.length) { add('bot', x[1].opening || '你想舞台上發生甚麼事？用你自己的說話講，我會照你說的砌積木。'); offerRestore(); }
+        if (!st.hist.length) { add('bot', (lesson0 && lesson0.opening) || '你想舞台上發生甚麼事？用你自己的說話講，我會照你說的砌積木。'); offerRestore(); }
         save();
         return ST;
       }).catch(function (e) {
         // the editor cannot start on this device: the read-only lab instead, with the same program and conversation
         if (window.console) console.warn('Wonder Lab editor unavailable, read-only lab instead:', e && e.message);
-        try { fr.remove(); } catch (x) {}
+        if (hst) { try { hst.destroy(); } catch (x) {} }      // the frame goes: a half-loaded editor must not stay live
+        hst = null; studio = false; ST = null; window.WLS = null;
         if (sbox) sbox.hidden = true;
-        studio = false; ST = null; window.WLS = null;
         document.body.classList.remove('wl-studiomode', 'wl-selfmode'); document.documentElement.classList.remove('wl-studio-on');
         smodeBar.hidden = smodeHint.hidden = sacts.hidden = true;
         add('sys', '這部裝置未能開啟完整的積木編輯器，改用簡易版 Wonder Lab。');
@@ -759,12 +786,6 @@
     function turnSeen(program) {      // the run and the signals went with this turn; hand edits count from this program on
       st.seen = program; st.note = null; st.report = null; st.ran = false; sbase = zsig(); if (ST) ST.turnDone();
     }
-    function readReply(r) {
-      return r.json().then(function (d) {
-        if (!d || typeof d !== 'object') throw new Error('reply');
-        d._status = r.status; return d;
-      }).catch(function () { return { ok: false, retry: true, _status: r.status, reason: r.status === 413 ? BIG : SLOW }; });
-    }
     /** One turn with the full editor: typed words (kind null) or 請助教看看 (kind review, no text). */
     function studioTurn(text, kind) {
       if (!input || busy || input.disabled) return;
@@ -783,9 +804,8 @@
       if (ai) { ST.lock(true); clearTimeout(lockT); lockT = setTimeout(releaseLock, LOCK_MAX); }
       var snap = studioBody(review ? '' : text, kind), ctl = window.AbortController ? new AbortController() : null, late = false;
       var abortT = setTimeout(function () { late = true; if (ctl) ctl.abort(); }, LOCK_MAX);
-      fetch('/api/ai/lab/' + ep, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(snap.body), signal: ctl ? ctl.signal : undefined })
-        .then(readReply)
+      labSend('/api/ai/lab/' + ep, snap.body, { signal: ctl ? ctl.signal : undefined })
+        .then(reply)
         .then(function (d) {
           clearTimeout(abortT);
           if (late) throw new Error('late');
@@ -869,16 +889,8 @@
       add('me', text); input.value = ''; unexplain();
       var w = add('bot wait', '正在照你的想法砌積木…'); busy = true; lockLab(true);
       var run = ranSinceTurn ? (wl.trace ? wl.report() : (st.report || null)) : null;
-      fetch('/api/ai/lab/' + ep, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, history: st.hist.slice(-8), program: wl.program, run: run, note: st.note, signals: sig, device: device() }) })
-        .then(function (r) {
-          return r.json().then(function (d) {
-            if (!d || typeof d !== 'object') throw new Error('reply');
-            d._status = r.status; return d;
-          }).catch(function () {                 // not JSON (an HTML error page from the proxy)
-            return { ok: false, retry: true, _status: r.status, reason: r.status === 413 ? BIG : SLOW };
-          });
-        })
+      labSend('/api/ai/lab/' + ep, { text: text, history: st.hist.slice(-8), program: wl.program, run: run, note: st.note, signals: sig, device: device() })
+        .then(reply)
         .then(function (d) {
           w.remove(); busy = false;
           if (!d.ok) {
@@ -957,10 +969,11 @@
       var w = add('bot wait wl-cs', 'AI 學伴正在看你的作品…');
       var snap = studio ? studioBody('', 'consol') : null;
       var run = studio ? snap.body.run : (ranSinceTurn ? (wl.trace ? wl.report() : (st.report || null)) : null);
-      fetch('/api/ai/lab/' + ep, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(studio ? (function () { var b = snap.body; delete b.text; return b; })()
-          : { kind: 'consol', history: st.hist.slice(-8), program: wl.program, run: run, note: st.note, signals: sig, device: device() }) })
-        .then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }, function () { return { ok: false, _status: r.status }; }); })
+      labSend('/api/ai/lab/' + ep, studio ? (function () { var b = snap.body; delete b.text; return b; })()
+          : { kind: 'consol', history: st.hist.slice(-8), program: wl.program, run: run, note: st.note, signals: sig, device: device() })
+        // the wrap-up reads a reply more strictly than a chat turn: a body that is not JSON (a proxy's own 429 page,
+        // say) must NOT look like "another turn is in flight", so retry stays undefined here
+        .then(function (res) { var d = res.data || { ok: false }; d._status = res.status; return d; })
         .then(function (d) {
           w.remove(); busy = false; consolBusy = false; lockLab(false);
           if (!d.ok) {

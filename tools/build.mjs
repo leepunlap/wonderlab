@@ -7,7 +7,8 @@
 // 2. take their prebuilt dist/web bundles and patch webpack's publicPath ("/") so chunks load next to the script; each
 //    patched bundle starts with a notice of the change and keeps its <main>.LICENSE.txt next to it (and in LICENSES/)
 // 3. bundle scratch-blocks 2.x (ESM, Blockly 12) into one IIFE with esbuild
-// 4. write dist/engine-<hash>/ (immutable), dist/lab.js + lab.css, dist/engine.json, licences, .gz siblings
+// 4. write dist/engine-<hash>/ (immutable), dist/lab.js (= src/lab-host.js + src/lab.js) + lab-host.js + lab.css,
+//    dist/engine.json, licences, .gz siblings
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -111,7 +112,18 @@ for (const f of walk(ENG).sort()) { h.update(path.relative(ENG, f)); h.update(fs
 const ver = h.digest('hex').slice(0, 10), engDir = 'engine-' + ver;
 rm(DIST); mkdir(DIST);
 fs.renameSync(ENG, path.join(DIST, engDir));
-for (const f of ['lab.js', 'lab.css']) fs.copyFileSync(path.join(ROOT, 'src', f), path.join(DIST, f));
+// The Studio mount lives in ONE file, src/lab-host.js, shared by the lesson lab and the teachers' playground
+// (portals/teachers/index.html). It is emitted twice on purpose:
+//   · concatenated into dist/lab.js — so a lesson page already in the wild keeps working with the single
+//     <script src="assets/lab/lab.js?v=…"> tag it was built with, and nothing about that tag changes. The
+//     playground loads this bundle too unless the deploy also copies the next file;
+//   · dist/lab-host.js — the host on its own, for a page that wants only the mount. NOTE: the lesson-site deploy
+//     (src/iits-lessons-build/build_wonder_lab.py) copies lab.js/lab.css (+ their .gz) from dist/, so lab-host.js
+//     reaches the lesson folder only once that copy list names it.
+const hostSrc = fs.readFileSync(path.join(ROOT, 'src', 'lab-host.js'), 'utf8');
+fs.writeFileSync(path.join(DIST, 'lab-host.js'), hostSrc);
+fs.writeFileSync(path.join(DIST, 'lab.js'), hostSrc.replace(/\s*$/, '\n') + fs.readFileSync(path.join(ROOT, 'src', 'lab.js')));
+fs.copyFileSync(path.join(ROOT, 'src', 'lab.css'), path.join(DIST, 'lab.css'));
 const labVer = createHash('sha1').update(fs.readFileSync(path.join(DIST, 'lab.js'))).update(fs.readFileSync(path.join(DIST, 'lab.css'))).digest('hex').slice(0, 10);
 const engine = { version: ver, engine: engDir + '/', css: 'lab.css?v=' + labVer, lab: 'lab.js?v=' + labVer,
   scripts: ['scratch-blocks.js', 'scratch-storage.js', 'scratch-render.js', 'scratch-vm.js', 'scratch-audio.js', 'wonderlab.js'],

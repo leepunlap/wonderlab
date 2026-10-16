@@ -14,6 +14,12 @@ This repository is the **browser part** that runs on the lesson page:
   upstream `scratch-vm` web bundle does not include — the host has to attach it, or 播放音效 is silent;
 - **the page integration** (`src/lab.js`, `src/lab.css`): the 「課堂教材｜Wonder Lab」 toggle in the AI pane, the lab pane
   with run / stop / undo, an on-screen arrow pad for tablets, and the lab conversation;
+- **the Studio host** (`src/lab-host.js`): the one place that mounts the full editor — it resolves `manifest.json`
+  (no-cache), builds the iframe from the content-hashed `studio-<hex>/` folder, waits for it to be ready, calls
+  `WLStudio.boot()`, and carries the studio's events and the AI turn's transport. The lesson lab uses it, and so does
+  the teachers' portal playground (`portals/teachers/index.html`). The build concatenates it into `dist/lab.js` — a
+  lesson page still needs only its one `<script>` tag — and also emits it on its own as `dist/lab-host.js`, which is
+  what the playground asks for first (it falls back to the `lab.js` bundle while a deploy does not carry it);
 - **the whitelist** (`src/opcodes.json`): the block types the tutor may use, with their inputs, fields, menus and limits.
   The server validates every AI turn against the same file.
 
@@ -42,7 +48,8 @@ npm run build     # -> dist/
 2. takes their prebuilt `dist/web` bundles. Its only change to them replaces webpack's fixed public path `"/"` with the
    folder of the loading script, so the code-split chunks load next to it;
 3. bundles scratch-blocks into one IIFE with esbuild (`src/blocks-entry.mjs`);
-4. writes `dist/engine-<hash>/` (immutable), `dist/lab.js`, `dist/lab.css`, `dist/engine.json`, licences and `.gz` copies.
+4. writes `dist/engine-<hash>/` (immutable), `dist/lab.js` (`src/lab-host.js` + `src/lab.js`), `dist/lab-host.js`,
+   `dist/lab.css`, `dist/engine.json`, licences and `.gz` copies.
    Each patched bundle starts with a one-line notice of the change, and its upstream `<bundle>.LICENSE.txt` is copied next
    to it and into `LICENSES/`.
 
@@ -64,6 +71,9 @@ npm run build && python3 -m http.server 8000
 
 ```bash
 python3 test/run_tests.py     # Playwright + Chrome: every whitelisted opcode loads and renders; the demo program runs
+node test/browser_test_labhost.mjs   # Chrome over CDP, no dependencies: both surfaces mount the Studio through
+                              # src/lab-host.js. Needs `npm run build` and a classfiles tree with a studio-<hash>/
+                              # folder (LABDEV_CLASSFILES=…); modes: lesson | lab-ro | playground | bad-studio
 ```
 
 ## The program model and the AI protocol
