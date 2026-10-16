@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wonder Lab</title>
+<!-- The standalone lab: no lesson site, no lesson page, one tag. Serve the repository root
+     (python3 -m http.server 8000) after `npm run build` and open
+       http://localhost:8000/examples/standalone/
+
+     data-wl-manifest points at dist/engine.json, which is manifest-shaped and names NO studio-<hex>/ folder: that is
+     exactly the "there is no studio folder here" case, so this page shows the READ-ONLY runtime. Point it at a real
+     manifest.json (one with "studio") to get the full editor instead.
+     data-wl-gate="open" means "no lab GET on this page": the manifest decides, and the lab opens without a server.
+
+     AGPL-3.0 (see LICENSE). -->
+<script src="../../dist/lab-standalone.js"
+        data-wl-base="../../dist/"
+        data-wl-manifest="../../dist/engine.json"
+        data-wl-lesson="standalone-demo"
+        data-wl-gate="open"
+        data-wl-start="lab"
+        defer></script>
+</head>
+<body>
+</body>
+</html>

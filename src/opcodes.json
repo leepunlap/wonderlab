@@ -82,6 +82,7 @@
     "sound_play":              {"shape": "stack", "inputs": {"SOUND_MENU": "menu:sound_sounds_menu:SOUND_MENU:sound"}},
     "sound_playuntildone":     {"shape": "stack", "inputs": {"SOUND_MENU": "menu:sound_sounds_menu:SOUND_MENU:sound"}},
     "sound_stopallsounds":     {"shape": "stack"},
+    "sound_cleareffects":      {"shape": "stack"},
     "sound_setvolumeto":       {"shape": "stack", "inputs": {"VOLUME": "num"}},
     "sound_changevolumeby":    {"shape": "stack", "inputs": {"VOLUME": "num"}},
     "sound_volume":            {"shape": "reporter"},

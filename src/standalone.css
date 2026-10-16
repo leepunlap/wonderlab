@@ -1,0 +1,41 @@
+/*! Wonder Lab — standalone page chrome. AGPL-3.0 (see LICENSE).
+   A lesson page brings its own stylesheet: it already has .layout, main.wrap, the #chat pane and the .msg bubbles, and
+   lab.css was written against exactly that. A bare page has none of it, so src/standalone.js links this file first.
+   lab.css itself is NOT duplicated here: it is the lab's own stylesheet and the manifest names it (man.css). */
+html,body{margin:0;height:100%}
+body{display:flex;flex-direction:column;font:15px/1.5 system-ui,"Noto Sans TC","PingFang HK",sans-serif;color:#2b2340;background:#f4f7f6}
+.wl-standalone{display:flex;flex-direction:column;flex:1;min-height:0}
+
+/* the page grid lab.css expects: .layout > main.wrap + #chat, one definite row so the lab pane can fill it */
+.layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:minmax(0,1fr);align-items:stretch}
+main.wrap{min-width:0;min-height:0;overflow:auto}
+
+/* the AI 學伴 pane */
+.chat{display:flex;flex-direction:column;min-width:0;min-height:0;background:#fff;border-left:1px solid #e7dcf6}
+.chhead{display:flex;flex:none;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #ece4f8;font-size:14px}
+.chhead b{font-weight:700}
+.chhead small{color:#8a7fa3;font-weight:400}
+.chclose{margin-left:auto;min-width:44px;min-height:36px;border:0;background:none;color:#6a3fc0;font:inherit;font-size:18px;line-height:1;cursor:pointer}
+.chcaps{flex:none;padding:0 12px}
+.cpclass{display:inline-block;font-size:12px;font-weight:700;color:#4b2a8a;background:#f6f1ff;border:1px solid #ece4f8;border-radius:999px;padding:2px 9px;margin:6px 0}
+.chbody{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.msg{max-width:92%;box-sizing:border-box;border:1px solid #e7dcf6;border-radius:12px;padding:8px 11px;font-size:13.5px;line-height:1.55;background:#fff;
+  white-space:pre-wrap;word-break:break-word}
+.msg.me{align-self:flex-end;background:#efe7fc;border-color:#dbcbf5}
+.msg.bot{align-self:flex-start}
+.msg.sys{align-self:stretch;max-width:none;border:0;background:none;color:#7b6f92;font-size:12.5px;padding:2px 0}
+.msg.wait{color:#7b6f92}
+.sqs{display:flex;flex-wrap:wrap;gap:6px}
+.chform{flex:none;display:flex;gap:6px;padding:8px 12px;border-top:1px solid #ece4f8}
+.chform textarea{flex:1;min-width:0;height:44px;resize:none;box-sizing:border-box;border:1px solid #d9c9f3;border-radius:10px;padding:9px 10px;font:inherit;font-size:16px}
+.chform button{flex:none;min-width:64px;border:0;border-radius:10px;background:#6a3fc0;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.chform button:disabled{opacity:.45;cursor:default}
+.chfab{display:none}
+
+/* a standalone page IS the lab: below 1100 px the pane becomes the drawer lab.css already sizes (--wl-dh), and the
+   lab fills the single column instead of sharing it */
+@media(max-width:1099px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .chat{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;display:none;border-left:0;border-top:1px solid #e7dcf6;border-radius:16px 16px 0 0}
+  .chat.open{display:flex}
+}

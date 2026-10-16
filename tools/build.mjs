@@ -122,10 +122,49 @@ fs.renameSync(ENG, path.join(DIST, engDir));
 //     reaches the lesson folder only once that copy list names it.
 const hostSrc = fs.readFileSync(path.join(ROOT, 'src', 'lab-host.js'), 'utf8');
 fs.writeFileSync(path.join(DIST, 'lab-host.js'), hostSrc);
-fs.writeFileSync(path.join(DIST, 'lab.js'), hostSrc.replace(/\s*$/, '\n') + fs.readFileSync(path.join(ROOT, 'src', 'lab.js')));
+
+/* ---- the lab bundle: a fixed-order concatenation of the modules, inside ONE IIFE -------------------------------------------------
+   The lesson page's single <script> tag is a hard constraint, so the module graph is resolved at build time, not at
+   run time: this list IS the graph's spine (src/lab-registry.js holds the define/require the modules register with,
+   and the entry, last, is the only file that wires them). Order matters only in that the registry and the host come
+   first; every module takes what it needs from the registry rather than from a position in the file.
+   test/check_bundle.mjs reads this list back and fails if the bundle does not match it, if a module assigns a new
+   window.* global, or if a second POST transport appears. Both entries share every module; they differ in the last
+   file only — the lesson entry (dist/lab.js) and the standalone entry (dist/lab-standalone.js). */
+const LAB_MODULES = ['lab-registry.js', 'lab-host.js', 'lab-core.js', 'lab-page.js', 'lab-api.js', 'lab-chat.js',
+  'lab-ui.js', 'lab-ro.js', 'lab-studio.js', 'lab-mode.js'];
+// lab-main.js is the composer (page contract -> manifest -> the module wiring order) and the two entries below are
+// the only files that call WLLab.boot(): the lesson bundle and the standalone bundle differ in that one file.
+const LAB_COMPOSER = 'lab-main.js';
+const LAB_ENTRIES = { lesson: 'lab-entry.js', standalone: 'standalone.js' };
+const src = (f) => fs.readFileSync(path.join(ROOT, 'src', f), 'utf8');
+const labFiles = (entry) => LAB_MODULES.concat([LAB_COMPOSER, LAB_ENTRIES[entry]]);
+function labBanner(entry, what) {
+  return `/*!
+ * Wonder Lab — ${what}, built by tools/build.mjs. DO NOT EDIT: edit src/${LAB_MODULES.slice(2).join(' / src/')} and run \`npm run build\`.
+ * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+ *
+ * ONE classic script on purpose: every deployed L4 lesson page loads only
+ *   <script src="assets/lab/lab.js?v=…" defer></script>
+ * and nothing about that tag may change, so this is the fixed-order concatenation below inside a single IIFE — not a
+ * module loader, and with no new window.* global. Each module registers itself with WLR.define(); the entry is last.
+ *
+${labFiles(entry).map((f) => ' *   ' + f).join('\n')}
+ */
+`;
+}
+function labBundle(entry, what) {
+  return labBanner(entry, what) + '(function () {\n\'use strict\';\n' + labFiles(entry).map(src).join('\n') + '\n}());\n';
+}
+fs.writeFileSync(path.join(DIST, 'lab.js'), labBundle('lesson', 'the lab: the L4 lesson bundle'));
+fs.writeFileSync(path.join(DIST, 'lab-standalone.js'), labBundle('standalone', 'the standalone lab'));
 fs.copyFileSync(path.join(ROOT, 'src', 'lab.css'), path.join(DIST, 'lab.css'));
+// the page chrome a lesson site supplies and a bare page does not (src/standalone.js links it; dist/lab.js never does)
+fs.copyFileSync(path.join(ROOT, 'src', 'standalone.css'), path.join(DIST, 'lab-standalone.css'));
 const labVer = createHash('sha1').update(fs.readFileSync(path.join(DIST, 'lab.js'))).update(fs.readFileSync(path.join(DIST, 'lab.css'))).digest('hex').slice(0, 10);
+const soloVer = createHash('sha1').update(fs.readFileSync(path.join(DIST, 'lab-standalone.js'))).update(fs.readFileSync(path.join(DIST, 'lab-standalone.css'))).digest('hex').slice(0, 10);
 const engine = { version: ver, engine: engDir + '/', css: 'lab.css?v=' + labVer, lab: 'lab.js?v=' + labVer,
+  standalone: 'lab-standalone.js', standaloneCss: 'lab-standalone.css', standaloneVersion: soloVer,
   scripts: ['scratch-blocks.js', 'scratch-storage.js', 'scratch-render.js', 'scratch-vm.js', 'scratch-audio.js', 'wonderlab.js'],
   upstream: Object.fromEntries(Object.entries(ENGINE).map(([k, v]) => [k, v])), blocks: { 'scratch-blocks': PKG.dependencies['scratch-blocks'] } };
 fs.writeFileSync(path.join(DIST, 'engine.json'), JSON.stringify(engine, null, 1));
@@ -136,5 +175,5 @@ for (const f of walk(DIST)) {
   raw += b.length; gz += z.length;
   if (b.length > 1024) fs.writeFileSync(f + '.gz', z);
 }
-log(`dist/${engDir}  raw ${(raw / 1e6).toFixed(2)} MB  gzip ${(gz / 1e6).toFixed(2)} MB  (lab.js/css v=${labVer})`);
+log(`dist/${engDir}  raw ${(raw / 1e6).toFixed(2)} MB  gzip ${(gz / 1e6).toFixed(2)} MB  (lab.js/css v=${labVer}, standalone v=${soloVer})`);
 rm(BUILD);

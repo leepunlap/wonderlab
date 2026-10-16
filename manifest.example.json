@@ -1,0 +1,23 @@
+{
+  "version": "179c864c28",
+  "engine": "engine-179c864c28/",
+  "css": "lab.css?v=ac72b172f9",
+  "lab": "lab.js?v=ac72b172f9",
+  "scripts": [
+    "scratch-blocks.js",
+    "scratch-storage.js",
+    "scratch-render.js",
+    "scratch-vm.js",
+    "scratch-audio.js",
+    "wonderlab.js"
+  ],
+  "assets": "a/",
+  "source": "SOURCE.html",
+  "studio": "studio-92402369aa/",
+  "studio_page": "lab-frame.html",
+  "lessons": {
+    "501-bp01": { "status": "ready", "data": "501-bp01.json?v=f6a1d0ff3d" },
+    "501-bp05": { "status": "hw" },
+    "501-bp07": { "status": "soon" }
+  }
+}

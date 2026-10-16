@@ -93,7 +93,7 @@ const manifest = (studio) => JSON.stringify({ version: ENGINE.version, engine: E
   assets: 'a/', source: 'SOURCE.html', lessons: { [SLUG]: { status: 'ready', data: `${SLUG}.json?v=x` } },
   ...(studio ? { studio: STUDIO + '/' } : {}) }, null, 1);
 
-let labGets = 0, playgroundTurns = [];
+let labGets = 0, labPosts = 0, manifestGets = 0, playgroundTurns = [], labTurns = [];
 const server = createServer((req, res) => {
   const u = req.url.split('?')[0];
   const send = (code, body, ct) => { res.writeHead(code, { 'Content-Type': ct || 'application/octet-stream' }); res.end(body); };
@@ -109,7 +109,19 @@ const server = createServer((req, res) => {
     });
     return;
   }
-  if (u.startsWith('/api/ai/lab/')) { labGets += 1; return send(200, JSON.stringify({ ok: true, studio: process.env.LABDEV_RO !== '1', modes: ['ai', 'self'], program: null, consol: { state: 'off' } }), 'application/json'); }
+  if (u.startsWith('/api/ai/lab/')) {
+    labGets += 1;
+    // a POST is a lab turn: answer it like the AI would, so the round trip is observable in the conversation
+    if (req.method === 'POST') {
+      labPosts += 1;
+      let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => {
+        labTurns.push(b);
+        send(200, JSON.stringify({ ok: true, say: '好，我幫你砌。', question: '', ops: [], consol: { state: 'off' } }), 'application/json');
+      });
+      return;
+    }
+    return send(200, JSON.stringify({ ok: true, studio: process.env.LABDEV_RO !== '1', modes: ['ai', 'self'], program: null, consol: { state: 'off' } }), 'application/json');
+  }
   if (u.startsWith('/api/ai/status/')) return send(200, JSON.stringify({ ok: true, in_class: true, reason: '' }), 'application/json');
   if (u.startsWith('/api/me')) return send(200, JSON.stringify({ ok: true, name: 'Lab host test', admin: true, levels: ['L4'] }), 'application/json');
   if (u.startsWith('/api/reg/')) return send(200, JSON.stringify({ ok: true, levels: { L4: '四級' }, classes: [], teachers: [] }), 'application/json');
@@ -117,7 +129,10 @@ const server = createServer((req, res) => {
   if (u === '/' || u === '/index.html') return send(200, readFileSync(PORTAL, 'utf8'), 'text/html; charset=utf-8');
   if (u === '/lesson.html') return file(join(dir, 'lesson.html'));
   // the playground's <meta name="wl-lab-base"> uses the deployed /files/ path; the lesson page loads assets/lab/
-  if (u === '/assets/lab/manifest.json' || u === '/files/L4/lessons/assets/lab/manifest.json') return send(200, manifest(process.env.LABDEV_RO !== '1'), 'application/json; charset=utf-8');
+  if (u === '/assets/lab/manifest.json' || u === '/files/L4/lessons/assets/lab/manifest.json') {
+    manifestGets += 1;   // how many times a page makes the lab read it: it must be ONCE per page (see lesson())
+    return send(200, manifest(process.env.LABDEV_RO !== '1'), 'application/json; charset=utf-8');
+  }
   if (u.endsWith('/lab-host.js') && process.env.LABDEV_NOHOSTJS === '1') return notFound();   // a deploy that predates it
   for (const pre of ['/assets/lab/', '/files/L4/lessons/assets/lab/']) if (u.startsWith(pre)) return file(join(labDir, u.slice(pre.length)));
   if (u.startsWith('/lab-library/')) return file(join(LIB, u.slice('/lab-library/'.length)));
@@ -168,6 +183,8 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
   Object.defineProperty(window, 'WonderLabHost', { configurable: true, get() { return api; }, set(v) {
     api = v;
     window.__hostScript = (document.currentScript || {}).src || '';   // which file carried the host
+    const send = v.send;                                              // count the lab's AI turns: ONE transport
+    v.send = function (u, b, o) { window.__hostSends = (window.__hostSends || 0) + 1; return send.call(v, u, b, o); };
     const create = v.create;
     v.create = function (o) {
       const h = create(o);
@@ -184,16 +201,35 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
 /* ================================ the lesson page ================================ */
 async function lesson() {
   const ro = process.env.LABDEV_RO === '1';
+  const man0Count = manifestGets, post0 = labPosts;
   console.log(`\n== L4 lesson lab (${ro ? 'lab GET studio:false -> read-only' : 'lab GET studio:true'}) ${origin}/lesson.html`);
   await send('Page.navigate', { url: origin + '/lesson.html' });
   await wait('!!document.querySelector(".wl-mode button")', 20000, 'the lab toggle');
   check('lab.js read the manifest and built the toggle', await ev('document.querySelectorAll(".wl-mode button").length === 2'));
+  // the page reads assets/lab/manifest.json ONCE: lab.js reads it for the toggle and the engine list, and hands
+  // that copy to the host. The host fetching it again was a real bug (two round trips per lesson page).
+  check('the page read manifest.json exactly once', manifestGets - man0Count === 1, `${manifestGets - man0Count} request(s)`);
   await wait('[...document.querySelectorAll(".wl-mode button")][1] && ![...document.querySelectorAll(".wl-mode button")][1].disabled', 20000, 'an enabled toggle');
   await ev(`[...document.querySelectorAll('.wl-mode button')][1].click()`);
   if (ro) {
     const t = await wait('!!window.WL && !!document.getElementById("wllab") && !document.getElementById("wllab").hidden', 120000, 'the read-only lab');
     check('the read-only lab still boots (no Studio involved)', t >= 0, t >= 0 ? `${t} ms` : '');
     check('no studio frame was created', !(await ev('!!document.querySelector(".wl-host, .wl-sframe")')));
+    check('still one manifest read after the lab opened', manifestGets - man0Count === 1, `${manifestGets - man0Count} request(s)`);
+    // a lab turn must go through the host's transport: lab.js has no POST of its own any more. Wait for the REPLY,
+    // not for the call: the host's send() is entered before the request leaves the browser, so counting at that
+    // moment raced the server (measured: host.send x1, POST x0).
+    await ev(`(() => { const i = document.getElementById('chin'); i.value = '測試'; const f = document.getElementById('chform');
+      f.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); })()`);
+    // ...and wait for the POST on THIS side of the wire: the host's send() is entered before the request leaves the
+    // browser, so counting at that moment raced the server (measured: host.send x1, POST x0).
+    const tp = Date.now();
+    while (labPosts - post0 < 1 && Date.now() - tp < 20000) await sleep(200);
+    check('a lab turn goes through WonderLabHost.send and reaches /api/ai/lab/<ep> (one transport, no inline fallback)',
+      (await ev('window.__hostSends || 0')) > 0 && labPosts - post0 === 1,
+      `host.send ×${await ev('window.__hostSends || 0')}, POST ×${labPosts - post0}`);
+    const reply = await wait(`/好，我幫你砌/.test(document.getElementById('wlbody').textContent)`, 20000, 'the reply in the conversation');
+    check('and its answer lands in the lab conversation', reply >= 0, reply >= 0 ? `${reply} ms` : '');
     await shot('labhost_readonly.png');
     return;
   }
@@ -211,17 +247,22 @@ async function lesson() {
     return { vh: innerHeight, w: Math.round(f.width), h: Math.round(f.height), b: Math.round(f.bottom) }; })())`));
   check('the editor fills the Studio pane and stays on screen', g.w > VW * 0.6 && g.h > VH * 0.4 && g.b <= g.vh + 1, `${g.w}x${g.h}, bottom ${g.b} of ${g.vh}`);
   check('the lesson body is still there behind the lab', await ev('!!document.querySelector("main.wrap h1")'));
+  // the host mounts AFTER this point: mounting it must not make it read the manifest a second time.
+  check('still one manifest read after the Studio mounted', manifestGets - man0Count === 1, `${manifestGets - man0Count} request(s)`);
   await shot('labhost_lesson.png');
 }
 
 /* ================================ the playground ================================ */
 async function playground() {
+  const man0Count = manifestGets;
   console.log(`\n== teachers' playground ${origin}/#playground`);
   await send('Page.navigate', { url: origin + '/index.html#playground' });
   await wait('!!document.querySelector(".pg-wrap")', 20000, '.pg-wrap');
   check('the playground view renders', await ev('!!document.querySelector(".pg-wrap")'));
   const t = await wait('typeof PG !== "undefined" && !!PG.host && !!PG.W', 150000, 'the Studio');
   check('the playground mounts the Studio through the shared host', t >= 0, t >= 0 ? `${t} ms` : '');
+  check('the playground read manifest.json exactly once (it hands its copy to the host)',
+    manifestGets - man0Count === 1, `${manifestGets - man0Count} request(s)`);
   check('the module global is the shared host (create / studioDef / send)',
     await ev('typeof window.WonderLabHost.create === "function" && typeof window.WonderLabHost.studioDef === "function" && typeof window.WonderLabHost.send === "function"'));
   const noHostJs = process.env.LABDEV_NOHOSTJS === '1';

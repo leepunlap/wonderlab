@@ -6,7 +6,10 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "python3 test/run_tests.py"
+    "test": "python3 test/run_tests.py",
+    "test:static": "node test/check_bundle.mjs",
+    "test:lab": "node test/browser_test_labhost.mjs",
+    "test:standalone": "node test/browser_test_standalone.mjs"
   },
   "dependencies": {
     "events": "3.3.0",
