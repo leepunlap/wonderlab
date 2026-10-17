@@ -226,7 +226,11 @@
         fr.className = (frameOpt.className ? frameOpt.className + ' ' : '') + 'wl-sframe';
         if (frameOpt.id) fr.id = frameOpt.id;
         fr.title = frameOpt.title || 'Wonder Lab 積木編輯器';
-        fr.setAttribute('allow', frameOpt.allow || 'microphone; autoplay');
+        // `serial` is in the list because the controller connection runs INSIDE this frame and
+        // Web Serial is a policy-gated feature: an iframe that does not allow it can still see
+        // navigator.serial but is refused the port chooser, which looks exactly like "no ports".
+        // It is harmless in browsers that do not know the feature - an unknown entry is ignored.
+        fr.setAttribute('allow', frameOpt.allow || 'serial; microphone; autoplay');
         var attrs = frameOpt.attrs || {}, k;
         for (k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) fr.setAttribute(k, attrs[k]);
         var t = setTimeout(function () { bad(err('ready', 'studio frame timeout after ' + readyTimeout + ' ms')); }, readyTimeout);
