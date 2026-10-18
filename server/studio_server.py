@@ -54,6 +54,7 @@ IITS_LOCAL = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))  # Up 3 lev
 IITS_LESSON_AI = os.path.join(IITS_LOCAL, "src", "iits-repo", "portals", "lesson-ai")
 sys.path.insert(0, IITS_LESSON_AI)
 import lab_core as LC  # noqa: E402  (imports from iits-repo/portals/lesson-ai/)
+import lab_lang as LL  # noqa: E402  (same package: the tutor's language tables)
 
 STAGE = LC.STAGE_NAME
 TEXT_EXT = {".js", ".css", ".html", ".json", ".svg", ".txt", ".map", ".md"}
@@ -166,16 +167,83 @@ def scripts_of(program, sprite):
     return t.get("scripts") or {}
 
 
-def describe(block, depth=0):
-    names = {"event_whenflagclicked": "當綠旗被點擊", "motion_movesteps": "移動", "motion_turnright": "右轉",
-             "control_forever": "重複無限次", "control_repeat": "重複", "looks_sayforsecs": "說", "looks_say": "說",
-             "event_whenkeypressed": "當鍵被按下", "motion_changexby": "x 改變", "motion_changeyby": "y 改變",
-             "control_if": "如果", "motion_ifonedgebounce": "碰到邊緣就反彈", "control_wait": "等待"}
+BLOCK_NAMES = {
+    "zh-Hant": {"event_whenflagclicked": "當綠旗被點擊", "motion_movesteps": "移動", "motion_turnright": "右轉",
+                "control_forever": "重複無限次", "control_repeat": "重複", "looks_sayforsecs": "說", "looks_say": "說",
+                "event_whenkeypressed": "當鍵被按下", "motion_changexby": "x 改變", "motion_changeyby": "y 改變",
+                "control_if": "如果", "motion_ifonedgebounce": "碰到邊緣就反彈", "control_wait": "等待"},
+    "zh-Hans": {"event_whenflagclicked": "当绿旗被点击", "motion_movesteps": "移动", "motion_turnright": "右转",
+                "control_forever": "重复无限次", "control_repeat": "重复", "looks_sayforsecs": "说", "looks_say": "说",
+                "event_whenkeypressed": "当键被按下", "motion_changexby": "x 改变", "motion_changeyby": "y 改变",
+                "control_if": "如果", "motion_ifonedgebounce": "碰到边缘就反弹", "control_wait": "等待"},
+    "en": {"event_whenflagclicked": "when green flag clicked", "motion_movesteps": "move", "motion_turnright": "turn right",
+           "control_forever": "forever", "control_repeat": "repeat", "looks_sayforsecs": "say", "looks_say": "say",
+           "event_whenkeypressed": "when key pressed", "motion_changexby": "change x by", "motion_changeyby": "change y by",
+           "control_if": "if", "motion_ifonedgebounce": "if on edge, bounce", "control_wait": "wait"},
+}
+
+
+# The stub's prose, per locale: the canned reply is a stand-in for the model, so it has to answer in the same language
+# the pane is in. The ops never change — only the sentences around them.
+CANNED = {
+    "zh-Hant": {
+        "sawScripts": "我看到「{sprite}」現在有 {n} 段程式（第一段：{list}）。",
+        "hand": "你自己改過 {n} 段。",
+        "ran": "上次執行：{sprite} 由 {start} 去到 {end}。",
+        "howFlag": "在你自己砌的那段程式下面", "howBase": "用「當綠旗被點擊」開始",
+        "built": "照你說的：{how}{add}",
+        "addForever": "，加了「重複無限次」裏面「移動 10 點」。", "qForever": "按「執行」之前猜猜：角色走到舞台邊之後會怎樣？",
+        "addMove": "，加了「移動 10 點」。", "qMove": "按「執行」之前猜猜：角色會向哪一邊走？",
+        "addSay": "，加了「說 你好！ 2 秒」。", "sayText": "你好！", "qSay": "你想角色說完之後做甚麼？",
+        "addTurn": "，加了「右轉 15 度」。", "qTurn": "轉完之後，角色面向哪一邊？",
+        "noProgram": "現在沒有程式可以刪。", "qStart": "你想角色先做甚麼？",
+        "deleted": "照你說的：刪去了「{sprite}」最後一段程式。", "qDeleted": "刪了之後，按「執行」會發生甚麼？",
+        "fallbackSay": "我們從你的想法開始。", "qNext": "你想角色接下來做甚麼？",
+    },
+    "zh-Hans": {
+        "sawScripts": "我看到「{sprite}」现在有 {n} 段程序（第一段：{list}）。",
+        "hand": "你自己改过 {n} 段。",
+        "ran": "上次运行：{sprite} 由 {start} 去到 {end}。",
+        "howFlag": "在你自己砌的那段程序下面", "howBase": "用「当绿旗被点击」开始",
+        "built": "照你说的：{how}{add}",
+        "addForever": "，加了「重复无限次」里面「移动 10 点」。", "qForever": "按「运行」之前猜猜：角色走到舞台边之后会怎样？",
+        "addMove": "，加了「移动 10 点」。", "qMove": "按「运行」之前猜猜：角色会往哪一边走？",
+        "addSay": "，加了「说 你好！ 2 秒」。", "sayText": "你好！", "qSay": "你想角色说完之后做什么？",
+        "addTurn": "，加了「右转 15 度」。", "qTurn": "转完之后，角色面向哪一边？",
+        "noProgram": "现在没有程序可以删除。", "qStart": "你想角色先做什么？",
+        "deleted": "照你说的：删去了「{sprite}」最后一段程序。", "qDeleted": "删了之后，按「运行」会发生什么？",
+        "fallbackSay": "我们从你的想法开始。", "qNext": "你想角色接下来做什么？",
+    },
+    "en": {
+        "sawScripts": "I can see {n} scripts on {sprite} (the first one: {list}).",
+        "hand": "You changed {n} of them yourself.",
+        "ran": "Last run: {sprite} went from {start} to {end}.",
+        "howFlag": "below the script you built yourself", "howBase": 'starting with "when green flag clicked"',
+        "built": "As you asked: {how}{add}",
+        "addForever": ', and put "move 10 steps" inside "forever".',
+        "qForever": 'Before you press "Run", guess: what happens when the sprite reaches the edge?',
+        "addMove": ', and added "move 10 steps".', "qMove": 'Before you press "Run", guess: which way will the sprite go?',
+        "addSay": ', and added "say Hello! for 2 seconds".', "sayText": "Hello!", "qSay": "What should the sprite do after it speaks?",
+        "addTurn": ', and added "turn right 15 degrees".', "qTurn": "After the turn, which way is the sprite facing?",
+        "noProgram": "There is no script to delete yet.", "qStart": "What do you want the sprite to do first?",
+        "deleted": "As you asked: deleted the last script on {sprite}.",
+        "qDeleted": 'After deleting it, what will happen when you press "Run"?',
+        "fallbackSay": "We start from your idea.", "qNext": "What should the sprite do next?",
+    },
+}
+
+
+def describe(block, depth=0, locale=None):
+    names = BLOCK_NAMES.get(locale or "zh-Hant") or BLOCK_NAMES["zh-Hant"]
     return names.get(block.get("op"), block.get("op"))
 
 
-def canned(text, program, run, studio, lesson):
-    """Return lab_core-shaped raw model output {intent, say, question, ops, focus}. Builds on the student's own scripts."""
+def canned(text, program, run, studio, lesson, locale=None):
+    """Return lab_core-shaped raw model output {intent, say, question, ops, focus}. Builds on the student's own scripts.
+    The prose follows the same locale the caller sent; the ops do not depend on it."""
+    lang = locale if locale in BLOCK_NAMES else "zh-Hant"
+    L = CANNED[lang]
+
     t = text or ""
     sprites = [s["name"] for s in lesson["sprites"]]
     want = (studio or {}).get("focus") or (studio or {}).get("editing")
@@ -191,13 +259,14 @@ def canned(text, program, run, studio, lesson):
     seen = ""
     if mine:
         first = next(iter(mine.values()))
-        seen = f"我看到「{focus}」現在有 {len(mine)} 段程式（第一段：{'、'.join(describe(b) for b in first[:4])}{'…' if len(first) > 4 else ''}）。"
+        seen = L["sawScripts"].format(sprite=focus, n=len(mine),
+                                      list="、".join(describe(b, locale=lang) for b in first[:4]) + ("…" if len(first) > 4 else ""))
     if hand:
-        seen += f"你自己改過 {len(hand)} 段。"
+        seen += L["hand"].format(n=len(hand))
     ran = ""
     if run and isinstance(run.get("sprites"), dict) and focus in run["sprites"]:
         r = run["sprites"][focus]
-        ran = f"上次執行：{focus} 由 {tuple(r.get('start') or [])} 去到 {tuple(r.get('end') or [])}。"
+        ran = L["ran"].format(sprite=focus, start=tuple(r.get("start") or []), end=tuple(r.get("end") or []))
 
     def put(extra, say, q):
         base = list(mine[flag_sid]) if flag_sid else [{"op": "event_whenflagclicked"}]
@@ -207,26 +276,26 @@ def canned(text, program, run, studio, lesson):
             base = base[:-1] + extra + [base[-1]]
         else:
             base = base + extra
-        how = "在你自己砌的那段程式下面" if flag_sid else "用「當綠旗被點擊」開始"
-        return {"intent": "build", "say": f"照你說的：{how}{say}", "question": q,
+        how = L["howFlag"] if flag_sid else L["howBase"]
+        return {"intent": "build", "say": L["built"].format(how=how, add=say), "question": q,
                 "ops": [{"do": "set_script", "sprite": focus, "id": sid, "blocks": base}], "focus": focus}
 
     if re.search(r"(刪|delete|清除程式)", t):
         if not mine:
-            return {"intent": "ask", "say": "現在沒有程式可以刪。", "question": "你想角色先做甚麼？", "ops": [], "focus": focus}
+            return {"intent": "ask", "say": L["noProgram"], "question": L["qStart"], "ops": [], "focus": focus}
         sid = list(mine)[-1]
-        return {"intent": "build", "say": f"照你說的：刪去了「{focus}」最後一段程式。", "question": "刪了之後，按「執行」會發生甚麼？",
+        return {"intent": "build", "say": L["deleted"].format(sprite=focus), "question": L["qDeleted"],
                 "ops": [{"do": "delete_script", "sprite": focus, "id": sid}], "focus": focus}
     if re.search(r"(一直|重複|不停|forever|loop)", t, re.I):
         return put([{"op": "control_forever", "SUBSTACK": [{"op": "motion_movesteps", "STEPS": 10}]}],
-                   "，加了「重複無限次」裏面「移動 10 點」。", "按「執行」之前猜猜：角色走到舞台邊之後會怎樣？")
+                   L["addForever"], L["qForever"])
     if re.search(r"(移|走|行|move|動)", t, re.I):
-        return put([{"op": "motion_movesteps", "STEPS": 10}], "，加了「移動 10 點」。", "按「執行」之前猜猜：角色會向哪一邊走？")
+        return put([{"op": "motion_movesteps", "STEPS": 10}], L["addMove"], L["qMove"])
     if re.search(r"(說|講|say|hello|你好)", t, re.I):
-        return put([{"op": "looks_sayforsecs", "MESSAGE": "你好！", "SECS": 2}], "，加了「說 你好！ 2 秒」。", "你想角色說完之後做甚麼？")
+        return put([{"op": "looks_sayforsecs", "MESSAGE": L["sayText"], "SECS": 2}], L["addSay"], L["qSay"])
     if re.search(r"(轉|turn)", t, re.I):
-        return put([{"op": "motion_turnright", "DEGREES": 15}], "，加了「右轉 15 度」。", "轉完之後，角色面向哪一邊？")
-    return {"intent": "observe", "say": (seen + ran) or "我們從你的想法開始。", "question": "你想角色接下來做甚麼？", "ops": [], "focus": focus}
+        return put([{"op": "motion_turnright", "DEGREES": 15}], L["addTurn"], L["qTurn"])
+    return {"intent": "observe", "say": (seen + ran) or L["fallbackSay"], "question": L["qNext"], "ops": [], "focus": focus}
 
 
 def ta_reply(text, program, run, studio, lesson):
@@ -265,6 +334,7 @@ def stub_turn(body):
     if run is not None and run_in and isinstance(run_in.get("scripts"), list):
         run["scripts"] = run_in["scripts"][:30]                     # the stub keeps the per-script events (the real service: package SV)
     text = str(body.get("text") or "")[:300]
+    LL.enter(body.get("locale"))        # tidy_say/tidy_question below substitute words back in; they must be this turn's
     mode = "self" if body.get("mode") == "self" else "ai"
     if mode == "self" or body.get("kind") in ("review", "consol"):
         raw = ta_reply(text, program, run, studio, lesson)
@@ -280,11 +350,12 @@ def stub_turn(body):
         if not key:
             raise RuntimeError("WL_REAL=1 needs DEEPSEEK_API_KEY in the environment")
         hist = [m for m in (body.get("history") or [])[-8:] if isinstance(m, dict) and m.get("role") in ("user", "assistant")]
-        out = LC.lab_turn(lesson, hist, program, run, text, key, os.environ.get("WL_MODEL", "deepseek-chat"), body.get("note") or None)
+        out = LC.lab_turn(lesson, hist, program, run, text, key, os.environ.get("WL_MODEL", "deepseek-chat"), body.get("note") or None,
+                          locale=body.get("locale"))      # the pane sends the interface language with every turn
         say, question, applied, errors, new_prog, focus = out["say"], out["question"], out["ops"], out["errors"], out["program"], out["focus"]
         src = "deepseek"
     else:
-        raw = canned(text, program, run, studio, lesson)
+        raw = canned(text, program, run, studio, lesson, locale=body.get("locale"))
         new_prog, applied, errors = LC.apply_ops(program, raw["ops"], lesson)
         built = bool(applied)
         say, question, focus = LC.tidy_say(raw["say"], built), LC.tidy_question(raw["question"]), raw["focus"]
