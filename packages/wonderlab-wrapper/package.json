@@ -1,0 +1,33 @@
+{
+  "name": "@wonderlab/wrapper",
+  "version": "0.1.0",
+  "description": "Scratch 3 runtime wrapper for Wonder Lab AI programming",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node test/compiler.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["scratch", "wonderlab", "ai", "education"],
+  "author": "IITS",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "@wonderlab/program-model": "file:../program-model"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  },
+  "peerDependenciesMeta": {
+    "scratch-vm": { "optional": true },
+    "scratch-render": { "optional": true },
+    "scratch-storage": { "optional": true },
+    "scratch-audio": { "optional": true },
+    "scratch-blocks": { "optional": true }
+  },
+  "comments": {
+    "peerDependencies": "Scratch runtime libraries are provided by the browser environment at runtime, not bundled with this package"
+  }
+}
