@@ -30,13 +30,19 @@
   var LOCALE = 'zh-tw';
   var STAGE = '舞台';
 
-  /** Words upstream still says in English. */
-  var REPL = [
-    [/Scratch 3\.0/g, '本編輯器'],
-    [/Scratch Link/g, '裝置連接程式'],
-    [/Scratch 團隊/g, '開發團隊'],
-    [/Scratch/g, '本編輯器']
-  ];
+  /**
+   * Words upstream still says in English, per locale. This used to be one Chinese list applied to
+   * both the chosen locale and `en`, which meant an English build said "needed for 本編輯器 to
+   * run" — the de-branding rule has to speak the language of the messages it is rewriting.
+   */
+  var REPL = {
+    'zh-tw': [[/Scratch 3\.0/g, '本編輯器'], [/Scratch Link/g, '裝置連接程式'], [/Scratch 團隊/g, '開發團隊'], [/Scratch/g, '本編輯器']],
+    'zh-cn': [[/Scratch 3\.0/g, '本编辑器'], [/Scratch Link/g, '设备连接程序'], [/Scratch 团队/g, '开发团队'], [/Scratch/g, '本编辑器']],
+    'en': [[/Scratch 3\.0/g, 'this editor'], [/Scratch Link/g, 'device connector'], [/Scratch/g, 'this editor']]
+  };
+
+  /** The default project name is upstream's, so it follows the editor's locale, not the pane's. */
+  var TITLE = { 'zh-tw': '我的作品', 'zh-cn': '我的作品', 'en': 'My project' };
 
   /** Strings the bundled locale does not carry. */
   var ZH_MISSING = {};
@@ -132,13 +138,14 @@
     var all = Object.assign({}, L.messagesByLocale);
     [locale, 'en'].forEach(function (loc) {
       var m = Object.assign({}, all[loc]);
+      var rules = REPL[loc] || REPL.en;
       Object.keys(m).forEach(function (k) {
-        if (/Scratch/.test(m[k])) REPL.forEach(function (r) { m[k] = m[k].replace(r[0], r[1]); });
+        if (/Scratch/.test(m[k])) rules.forEach(function (r) { m[k] = m[k].replace(r[0], r[1]); });
       });
       all[loc] = m;
     });
     Object.assign(all[locale], ZH_MISSING, opts.missing || {});
-    all[locale]['gui.gui.defaultProjectTitle'] = opts.title || '我的作品';
+    all[locale]['gui.gui.defaultProjectTitle'] = opts.title || TITLE[locale] || '我的作品';
     all.en['gui.gui.defaultProjectTitle'] = opts.titleEn || 'My project';
     store.dispatch({ type: 'scratch-gui/locales/UPDATE_LOCALES', messagesByLocale: all });
   }

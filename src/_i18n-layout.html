@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="studio.css"><link rel="stylesheet" href="studio-models.css">
+<style>#host{width:360px;height:813px;border:1px solid #ccc}#out{white-space:pre;font:12px monospace}</style>
+</head><body>
+<div id="host"></div><pre id="out">…</pre>
+<script src="studio-i18n.js"></script>
+<script src="studio-locale.zh-Hant.js"></script>
+<script src="studio-locale.zh-Hans.js"></script>
+<script src="studio-locale.en.js"></script>
+<script src="studio-chat.js"></script>
+<script src="studio-models.js"></script>
+<script>
+(function () {
+  var I = StudioI18n, L = [], fail = 0;
+  I.boot();
+  function check(id) {
+    I.set(id, { persist: false });
+    var host = document.getElementById('host');
+    var chat = StudioChat.create({
+      mount: host, i18n: I, badgeKey: 'chat.source.stub',
+      menu: [{ id: 'versions', labelKey: 'chat.menu.versions' }, { id: 'about', labelKey: 'chat.menu.about' }],
+      onSend: function () {}, onMenu: function () {}, onUndo: function () {}, onClose: function () {}
+    });
+    chat.setVersionCount(12);            // the widest the chip ever gets
+    chat.setContext(I.t('chat.ctx.prefix') + I.t('chat.ctx.program', { scripts: 3, blocks: 11 }));
+    chat.bot(I.t('chat.greeting'));
+
+    var head = host.querySelector('.wl-chat-head');
+    var title = host.querySelector('.wl-chat-title');
+    var badge = host.querySelector('.wl-chat-badge');
+    var comp = host.querySelector('.wl-composer');
+    var body = host.querySelector('.wl-chat-body');
+    var over = head.scrollWidth - head.clientWidth;
+    var titleH = Math.round(title.getBoundingClientRect().height);
+    var clipped = badge.scrollWidth - badge.clientWidth;
+
+    function ok(cond, label, detail) {
+      if (!cond) fail++;
+      L.push((cond ? 'ok   ' : 'FAIL ') + id + ' ' + label + (detail ? ' :: ' + detail : ''));
+    }
+    ok(over <= 1, 'header no overflow', 'overflow=' + over + 'px');
+    ok(titleH <= 24, 'title one line', titleH + 'px');
+    ok(badge.scrollWidth <= badge.clientWidth + 2, 'badge fully readable', 'clipped=' + clipped + 'px');
+    ok(body.getBoundingClientRect().height >= 600, 'chat area', Math.round(body.getBoundingClientRect().height) + 'px');
+    ok(comp.getBoundingClientRect().height <= 150, 'composer', Math.round(comp.getBoundingClientRect().height) + 'px');
+    L.push('     ' + id + ' title="' + title.textContent + '" badge="' + badge.textContent +
+      '" chip="' + host.querySelector('.wl-ver-chip').textContent + '" ctx="' + host.querySelector('.wl-ctx').textContent + '"');
+  }
+  ['zh-Hant', 'zh-Hans', 'en'].forEach(check);
+  L.push(fail === 0 ? 'LAYOUT PASS' : 'LAYOUT FAILURES: ' + fail);
+  document.getElementById('out').textContent = L.join('\n');
+}());
+</script>
+</body></html>

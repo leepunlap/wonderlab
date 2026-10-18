@@ -10,43 +10,49 @@
 </head>
 <body>
 <div id="wl-app">
-  <main id="wl-editor" aria-label="積木編輯器"></main>
+  <main id="wl-editor" data-i18n-attr="aria-label:app.editorLabel" aria-label="積木編輯器"></main>
 
   <!-- The pane is built by studio-chat.js. This element is only a mount point: behaviour lives in
        the module, so a lesson page can mount the same pane without carrying this markup. -->
-  <aside id="wl-chat" aria-label="AI 學伴"></aside>
+  <aside id="wl-chat" data-i18n-attr="aria-label:chat.title" aria-label="AI 學伴"></aside>
 
-  <!-- Sheets: content the pane shows on demand, kept out of the conversation's column. -->
+  <!-- Sheets: content the pane shows on demand, kept out of the conversation's column. The copy is
+       here because it is page content; the words are in the locale files, so data-i18n is the whole
+       of the translation - StudioI18n.apply() rewrites these nodes whenever the language changes. -->
   <div id="wl-sheets" hidden>
-    <div id="wl-pane-ver" role="region" aria-label="版本記錄">
-      <p class="wl-help">每次你自己改程式，或者 AI 改了程式，都會記下一個版本。之後可以比較：先前試過、行不通的做法，和最後行得通的做法。</p>
+    <div id="wl-pane-ver" role="region" data-i18n-attr="aria-label:chat.menu.versions" aria-label="版本記錄">
+      <p class="wl-help" data-i18n="chat.sheet.versionsHelp">每次你自己改程式，或者 AI 改了程式，都會記下一個版本。之後可以比較：先前試過、行不通的做法，和最後行得通的做法。</p>
       <div class="wl-row">
         <button type="button" id="wl-export" class="wl-btn">
           <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
-          匯出全部版本（JSON）
+          <span data-i18n="chat.sheet.export">匯出全部版本（JSON）</span>
         </button>
       </div>
       <ol id="wl-vlist" class="wl-vlist" reversed></ol>
     </div>
 
-    <div id="wl-pane-about" role="region" aria-label="說明">
-      <h2>這是甚麼</h2>
-      <p>Wonder Lab Studio 原型：左邊是完整的積木編輯器（積木、造型、音效、繪圖編輯器、舞台、角色），右邊是 AI 學伴。你可以自己拖積木，也可以說出想法，由 AI 把想法變成積木。</p>
-      <p>每一次對話都會附上你自己砌的程式和上一次執行的結果，所以 AI 會根據你自己的做法回應。</p>
-      <h2>版權及原始碼</h2>
-      <p>本頁以 GNU Affero General Public License v3.0 發布。編輯器部分來自開源的 scratch-editor 15.2.0（AGPL-3.0-only）及 scratch-blocks 2.1.19（Apache-2.0）。</p>
-      <p><a href="NOTICE.html">版權聲明及原始碼</a> · <a href="source.tar.gz">下載本頁原始碼</a></p>
-      <p class="wl-help">本產品與 Scratch Foundation 或麻省理工學院沒有關係，亦未獲其贊助或認可。</p>
+    <div id="wl-pane-about" role="region" data-i18n-attr="aria-label:chat.menu.about" aria-label="說明">
+      <h2 data-i18n="chat.about.what">這是甚麼</h2>
+      <p data-i18n="chat.about.body1">Wonder Lab Studio 原型：左邊是完整的積木編輯器（積木、造型、音效、繪圖編輯器、舞台、角色），右邊是 AI 學伴。你可以自己拖積木，也可以說出想法，由 AI 把想法變成積木。</p>
+      <p data-i18n="chat.about.body2">每一次對話都會附上你自己砌的程式和上一次執行的結果，所以 AI 會根據你自己的做法回應。</p>
+      <h2 data-i18n="chat.about.legal">版權及原始碼</h2>
+      <p data-i18n="chat.about.legalBody">本頁以 GNU Affero General Public License v3.0 發布。編輯器部分來自開源的 scratch-editor 15.2.0（AGPL-3.0-only）及 scratch-blocks 2.1.19（Apache-2.0）。</p>
+      <p><a href="NOTICE.html" data-i18n="chat.about.noticeLink">版權聲明及原始碼</a> · <a href="source.tar.gz" data-i18n="chat.about.sourceLink">下載本頁原始碼</a></p>
+      <p class="wl-help" data-i18n="chat.about.trademark">本產品與 Scratch Foundation 或麻省理工學院沒有關係，亦未獲其贊助或認可。</p>
     </div>
   </div>
 
   <button type="button" id="wl-fab" class="wl-fab" aria-controls="wl-chat" aria-expanded="false">
     <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-    <span>AI 學伴</span>
+    <span data-i18n="chat.fab">AI 學伴</span>
   </button>
 </div>
 <script src="studio-pre.js"></script>
 <script src="scratch-gui-standalone.js"></script>
+<script src="studio-i18n.js"></script>
+<script src="studio-locale.zh-Hant.js"></script>
+<script src="studio-locale.zh-Hans.js"></script>
+<script src="studio-locale.en.js"></script>
 <script src="studio-ops.js"></script>
 <script src="studio-trace.js"></script>
 <script src="ucmake-blocks.js"></script>
@@ -61,22 +67,33 @@
    studio-chat.js owns the pane's structure and the conversation; studio-models.js owns the model
    pill and everything behind it; studio-app.js owns the editor, the versions and the turn. What is
    left here is the wiring between them and the two sheets' copy - which is exactly the line the
-   architecture draws: behaviour in the modules, words on the page. */
+   architecture draws: behaviour in the modules, words on the locale files. */
 (function () {
   'use strict';
   function $(id) { return document.getElementById(id); }
+
+  /* Resolve the language before anything renders: ?lang= beats the saved choice, which beats the
+     browser. boot() also writes <html lang>, which is what a screen reader and the font stack read. */
+  var I = StudioI18n;
+  I.boot();
+  function T(k, p) { return I.t(k, p); }
+
+  /* The block editor is not re-mountable, so its locale is read once, here. Scratch ships all three;
+     this table is the only place the codes differ. */
+  var EDITOR_LOCALE = { 'zh-Hant': 'zh-tw', 'zh-Hans': 'zh-cn', 'en': 'en' };
+  var bootedEditorLocale = EDITOR_LOCALE[I.locale()] || 'zh-tw';
 
   var verPane = $('wl-pane-ver');
   var aboutPane = $('wl-pane-about');
 
   var chat = StudioChat.create({
     mount: '#wl-chat',
-    badge: '原型 · 模擬回覆',
-    chips: ['我想角色移動', '角色一直走', '角色說你好'],
+    i18n: I,
+    badgeKey: 'chat.source.stub',
     menu: [
-      { id: 'versions', label: '版本記錄' },
-      { id: 'about', label: '說明' },
-      { id: 'export', label: '匯出全部版本（JSON）' }
+      { id: 'versions', labelKey: 'chat.menu.versions' },
+      { id: 'about', labelKey: 'chat.menu.about' },
+      { id: 'export', labelKey: 'chat.sheet.export' }
     ],
     onSend: function (t) { return S.send(t).then(function () { showCtx(); }); },
     /* Restoring a version is a project load, so the context line has to be recomputed when it
@@ -87,8 +104,8 @@
       if (p && p.then) p.then(showCtx, showCtx);
     },
     onMenu: function (id) {
-      if (id === 'versions') chat.openSheet('版本記錄', verPane);
-      else if (id === 'about') chat.openSheet('說明', aboutPane);
+      if (id === 'versions') chat.openSheet('chat.menu.versions', verPane);
+      else if (id === 'about') chat.openSheet('chat.menu.about', aboutPane);
       else if (id === 'export') S.exportVersions();
     },
     onClose: function () { setOpen(false); }
@@ -97,6 +114,7 @@
 
   var modelSelector = StudioModels.create({
     api: '/api/ai/lab/studio',
+    i18n: I,
     ui: {
       onChange: function (id) { if (window.console) console.log('[models] switched to:', id); },
       onError: function (msg) { chat.sys(msg); }
@@ -107,7 +125,9 @@
   if ($('wl-export')) $('wl-export').addEventListener('click', function () { S.exportVersions(); });
 
   var S = StudioApp.create({
-    root: '#wl-editor', api: '/api/ai/lab/studio', library: true, locale: 'zh-tw', ucmake: true,
+    root: '#wl-editor', api: '/api/ai/lab/studio', library: true, ucmake: true,
+    locale: bootedEditorLocale,
+    i18n: I,
     modelSelector: modelSelector,  // Pass model selector to app
     ui: {
       user: function (t) { chat.user(t); },
@@ -115,9 +135,10 @@
       sys: function (t) { chat.sys(t); },
       thinking: function (text) { chat.thinking(text); },
       busy: function (on) { chat.busy(on); if (!on) showCtx(); },
-      source: function (src) { chat.setBadge(src === 'stub' ? '原型 · 模擬回覆' : '真實模型'); },
+      source: function (src) { chat.setBadgeKey(src === 'stub' ? 'chat.source.stub' : 'chat.source.model'); },
       /* The shell owns the version list and the restore; this draws it. Called whenever the list
-         changes, and once at boot with whatever was persisted. */
+         changes, once at boot with whatever was persisted, and once per language change - which is
+         why every word here comes from a key rather than from a literal. */
       version: function (versions, restore, labels) {
         var box = $('wl-vlist'); if (!box) return;
         chat.setVersionCount(versions.length);
@@ -131,15 +152,15 @@
           var meta = document.createElement('div'); meta.className = 'wl-vmeta';
           meta.textContent = '#' + v.n + '  ' + (labels[v.source] || v.source) + '  ' + hh;
           var info = document.createElement('div'); info.className = 'wl-vinfo';
-          info.textContent = (v.blocks || 0) + ' 個積木' +
-            ((v.unsupported && v.unsupported.length) ? '（另有 AI 看不懂的積木）' : '') +
-            (v.run ? ' · 已執行 ' + v.run.secs + ' 秒' : '');
+          info.textContent = T('chat.versions.blocks', { n: v.blocks || 0 }) +
+            ((v.unsupported && v.unsupported.length) ? T('chat.versions.unsupported') : '') +
+            (v.run ? T('chat.versions.ran', { secs: v.run.secs }) : '');
           li.appendChild(meta); li.appendChild(info);
           // only an entry that still carries its snapshot can be restored
           if (v.project && v !== versions[versions.length - 1]) {
             var b = document.createElement('button');
-            b.type = 'button'; b.className = 'wl-btn wl-small'; b.textContent = '還原這個版本';
-            b.onclick = function () { restore(v, '還原了第 ' + v.n + ' 版'); };
+            b.type = 'button'; b.className = 'wl-btn wl-small'; b.textContent = T('chat.versions.restore');
+            b.onclick = function () { restore(v, T('chat.versions.restored', { n: v.n })); };
             li.appendChild(b);
           }
           box.appendChild(li);
@@ -148,14 +169,31 @@
     },
     onLoaded: function () {
       showCtx();
-      chat.bot('你好！我是 AI 學伴。你可以自己拖積木，也可以告訴我你的想法，我會把它變成積木放進左邊的程式區。');
+      chat.bot(T('chat.greeting'));
     }
   });
 
   function showCtx() {
+    /* The language subscription can fire before the editor has booted (boot() runs after this is
+       wired), so neither call may assume S exists yet. */
     try { chat.setContext(S.context()); } catch (x) {}
-    chat.setUndoEnabled(S.canUndo());
+    try { chat.setUndoEnabled(S.canUndo()); } catch (x) {}
   }
+
+  /**
+   * Language changed mid-lesson. Everything this page owns re-reads its words immediately; the two
+   * things it cannot rewrite are the block editor (mounted once with its locale) and the tutor's
+   * replies (which the server produces). Say so once, rather than leaving a half-English page and
+   * no explanation.
+   */
+  I.on(function (code) {
+    showCtx();
+    var want = EDITOR_LOCALE[code] || 'zh-tw';
+    if (want !== bootedEditorLocale) {
+      chat.sys(T('chat.editorReloadHint'));
+      bootedEditorLocale = want;   // one notice per switch, not one per render
+    }
+  });
 
   function setOpen(on) {
     document.body.classList.toggle('wl-chat-open', !!on);
@@ -165,7 +203,7 @@
   if ($('wl-fab')) $('wl-fab').addEventListener('click', function () { setOpen(true); chat.focus(); });
 
   S.boot().catch(function (e) {
-    chat.sys('編輯器載入失敗');
+    chat.sys(T('chat.bootFailed'));
     if (window.console) console.error(e);
   });
 

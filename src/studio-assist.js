@@ -52,6 +52,12 @@
     var workspace = cfg.workspace || noop;
     var history = cfg.history || [];
 
+    /* The interface strings are the page's, but the turn needs one thing only i18n knows: which
+       language the student is reading in, because the tutor must answer in it. Sending the code is
+       the client's half; the prompt's half is server-side (lab_core's 【語言】 line). */
+    var i18n = cfg.i18n || (root.StudioI18n && typeof root.StudioI18n.t === 'function' ? root.StudioI18n : null);
+    function T(key, params) { return i18n ? i18n.t(key, params) : key; }
+
     // The animated build, if the page has one. studio-anim.js performs the edit visibly on the
     // gui's own workspace; it is PRESENTATION, so a failure here must never cost the student their
     // turn - anything other than a clean `ok` falls back to applying the ops instantly.
@@ -170,9 +176,9 @@
         vm.emitTargetsUpdate(false);
 
         if (res.sideBySide.length) {
-          onSys('有一段程式用了 AI 看不懂的積木，AI 的版本放在旁邊，你原本的程式沒有改動。');
+          onSys(T('assist.unsupportedBlocks'));
         }
-        if (res.skipped.length) onSys('有 ' + res.skipped.length + ' 個改動未能套用。');
+        if (res.skipped.length) onSys(T('assist.skipped', { n: res.skipped.length }));
 
         setTimeout(function () { highlight(res.done); }, 50);
         applying = false;
@@ -182,7 +188,7 @@
         return res;
       }, function (e) {
         applying = false;
-        onSys('套用積木時出錯。');
+        onSys(T('assist.applyFailed'));
         if (root.console) console.error(e);
       });
     }
@@ -209,6 +215,7 @@
         program: snap.program,
         run: run,
         note: note,
+        locale: (i18n && i18n.locale()) || cfg.locale || null,
         signals: trace ? trace.sig : undefined,
         studio: {
           targets: targetsInfo(),
@@ -231,11 +238,11 @@
       })
         .then(function (r) {
           return r.json().then(function (d) { d._status = r.status; return d; },
-                              function () { return { ok: false, reason: 'AI 學伴暫時未能回答。' }; });
+                              function () { return { ok: false, reason: T('assist.unavailable') }; });
         })
         .then(function (d) {
           if (!d.ok) {
-            onSys(d.reason || 'AI 學伴暫時未能回答。');
+            onSys(d.reason || T('assist.unavailable'));
             return null;
           }
           onSource(d.source);
@@ -260,7 +267,7 @@
           return applyReply(d, text);
         })
         .catch(function (e) {
-          onSys('連線有問題，請再試一次。');
+          onSys(T('assist.network'));
           if (root.console) console.error(e);
           return null;
         })

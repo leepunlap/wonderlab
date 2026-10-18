@@ -77,6 +77,19 @@
     var sessionCost = 0;
     var turnTokens = null;
 
+    /* Same contract as the pane: keys in, text out, and a re-render when the language changes.
+       Model descriptions are the interesting case — the server sends them in Chinese, so a locale
+       that has its own wording for a model id wins, and one that does not falls back to the
+       server's text rather than to a blank line. */
+    var i18n = cfg.i18n || (root.StudioI18n && typeof root.StudioI18n.t === 'function' ? root.StudioI18n : null);
+    function T(key, params) { return i18n ? i18n.t(key, params) : key; }
+    function descOf(m) {
+      if (!m) return '';
+      var key = 'models.desc.' + m.id;
+      var local = T(key);
+      return local === key ? (m.description || '') : local;
+    }
+
     /* ---------- the widget: a pill, and a popover that only exists while it is wanted ---------- */
     var wrap = h('div', 'wl-mpill-wrap');
 
@@ -157,7 +170,7 @@
       if (!m) return '';
       if (m.limits === null) return '∞';
       var l = m.limits && m.limits.per_lesson_hour;
-      return l ? ('剩 ' + l.left + ' / ' + l.max) : '';
+      return l ? T('models.quota', { left: l.left, max: l.max }) : '';
     }
 
     function quotaClass(m) {
@@ -170,7 +183,7 @@
     function dayText() {
       var m = byId(selected);
       var d = m && m.limits && m.limits.per_student_day;
-      return d ? ('今日剩 ' + d.left + ' / ' + d.max) : '';
+      return d ? T('models.quotaToday', { left: d.left, max: d.max }) : '';
     }
 
     function byId(id) {
@@ -181,9 +194,9 @@
     /* ---------- render ---------- */
     function render() {
       var m = byId(selected);
-      name.textContent = m ? m.display_name : (models.length ? models[0].display_name : '模型');
+      name.textContent = m ? m.display_name : (models.length ? models[0].display_name : T('models.label'));
       dot.className = 'wl-mpill-dot' + (m && m.supports_thinking ? ' is-reasoning' : '');
-      pill.title = m ? (m.display_name + (m.description ? ' — ' + m.description : '')) : '';
+      pill.title = m ? (m.display_name + (descOf(m) ? ' — ' + descOf(m) : '')) : '';
       if (!pop.hidden) renderPop();
     }
 
@@ -201,7 +214,8 @@
 
         var main = h('span', 'wl-mitem-main');
         main.appendChild(h('span', 'wl-mitem-name', m.display_name));
-        if (m.description) main.appendChild(h('span', 'wl-mitem-desc', m.description));
+        var desc = descOf(m);
+        if (desc) main.appendChild(h('span', 'wl-mitem-desc', desc));
         item.appendChild(main);
 
         var q = quotaText(m);
@@ -227,7 +241,7 @@
         });
         sw.appendChild(cb);
         sw.appendChild(h('span', 'wl-mswitch-track'));
-        sw.appendChild(h('span', 'wl-mswitch-label', '顯示推理過程'));
+        sw.appendChild(h('span', 'wl-mswitch-label', T('models.showReasoning')));
         pop.appendChild(sw);
       }
 
@@ -238,17 +252,17 @@
         var foot = h('div', 'wl-mpop-foot');
         if (day) foot.appendChild(h('span', 'wl-mpop-day', day));
         if (used) {
-          var tok = h('span', 'wl-mpop-tok', '本次 ' + fmt(sessionTokens.total) + ' tokens');
+          var tok = h('span', 'wl-mpop-tok', T('models.session', { n: fmt(sessionTokens.total) }));
           foot.appendChild(tok);
           if (role === 'teacher' && sessionCost > 0) {
             foot.appendChild(h('span', 'wl-mpop-cost', 'HK$' + sessionCost.toFixed(3)));
           }
           var reset = h('button', 'wl-mpop-reset', '✕');
           reset.type = 'button';
-          reset.title = '重設統計';
-          reset.setAttribute('aria-label', '重設統計');
+          reset.title = T('models.reset');
+          reset.setAttribute('aria-label', T('models.reset'));
           reset.addEventListener('click', function () {
-            if (root.confirm('重設本次對話統計？這會清除 token 用量和費用記錄。')) clearSession();
+            if (root.confirm(T('models.resetConfirm'))) clearSession();
           });
           foot.appendChild(reset);
         }
@@ -273,7 +287,7 @@
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data || !data.ok) {
-            onError((data && data.error) || '無法載入模型配置');
+            onError((data && data.error) || T('models.loadFailed'));
             return null;
           }
           models = data.models || [];
@@ -288,7 +302,7 @@
           return data;
         })
         .catch(function (e) {
-          onError('連線有問題');
+          onError(T('models.networkFailed'));
           if (root.console) root.console.error('[models] load failed:', e);
           return null;
         });
@@ -319,6 +333,9 @@
       saveSession();
       render();
     }
+
+    // a language change relabels the pill and, if it is open, the popover with it
+    if (i18n && typeof i18n.on === 'function') i18n.on(function () { render(); });
 
     return {
       el: wrap,

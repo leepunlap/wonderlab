@@ -405,12 +405,28 @@
     var SRC_LABEL = { start: '開始', hand: '自己改', ai: 'AI 改', load: '載入', restore: '還原' };
     var DRAW = cfg.ui && cfg.ui.version;
 
+    /* Interface words come from StudioI18n when the page supplies it. SRC_LABEL stays as the
+       fallback so a page that mounts the editor without a locale still reads in Chinese rather
+       than showing keys. */
+    var I18N = cfg.i18n || (root.StudioI18n && typeof root.StudioI18n.t === 'function' ? root.StudioI18n : null);
+    function T(key, params) { return I18N ? I18N.t(key, params) : key; }
+
+    function srcLabels() {
+      var out = {};
+      Object.keys(SRC_LABEL).forEach(function (k) {
+        var key = 'chat.versions.source.' + k;
+        var v = T(key);
+        out[k] = v === key ? SRC_LABEL[k] : v;
+      });
+      return out;
+    }
+
     function snapshotNow() { return ops ? ops.snapshot(vm) : null; }
     function keyOf(s) {
       return JSON.stringify([s.program, s.unsupported,
         vm.runtime.targets.filter(function (t) { return t.isOriginal; }).map(function (t) { return t.getName() + t.getCostumes().length; })]);
     }
-    function drawVersions() { if (DRAW) { try { DRAW(S.versions, restore, SRC_LABEL); } catch (e) {} } }
+    function drawVersions() { if (DRAW) { try { DRAW(S.versions, restore, srcLabels()); } catch (e) {} } }
     function saveVersions() {
       try {
         var keep = S.versions.slice(-60).map(function (v, i, a) {
@@ -449,10 +465,10 @@
         return vm.extensionManager.isExtensionLoaded('pen') ? null : vm.extensionManager.loadExtensionURL('pen');
       }).then(function () {
         loading = false; applying = false;
-        recordVersion('restore', label || ('還原了第 ' + v.n + ' 版'), { from: v.n });
+        recordVersion('restore', label || T('chat.versions.restored', { n: v.n }), { from: v.n });
       }, function (e) {
         loading = false; applying = false;
-        if (cfg.ui && cfg.ui.sys) cfg.ui.sys('還原失敗：' + ((e && e.message) || e));
+        if (cfg.ui && cfg.ui.sys) cfg.ui.sys(T('chat.versions.restoreFailed') + ((e && e.message) || e));
       });
     }
     function exportVersions() {
@@ -474,7 +490,7 @@
     S.undo = function () {
       var v = assist ? assist.undo() : null;
       if (!v) return Promise.resolve(null);
-      return restore(v, '還原了第 ' + v.n + ' 版');
+      return restore(v, T('chat.versions.restored', { n: v.n }));
     };
     S.canUndo = function () { return !!(assist && assist.canUndo()); };
     S.targetsInfo = function () { return assist ? assist.targetsInfo() : []; };
@@ -690,12 +706,14 @@
         n += Object.keys(sn.program.sprites[k].scripts || {}).length;
       });
       n += Object.keys((sn.program.stage || {}).scripts || {}).length;
-      var parts = ['你的程式：' + n + ' 段、' + sn.blocks + ' 個積木'];
+      var parts = [T('chat.ctx.program', { scripts: n, blocks: sn.blocks })];
       var diff = root.StudioOps && assist && assist.lastProgram() ? root.StudioOps.diff(assist.lastProgram(), sn.program) : [];
-      if (diff.length) parts.push('你自己改了 ' + diff.length + ' 段');
-      if (trace && trace.ranSinceTurn) parts.push('上次執行的結果');
-      if (sn.unsupported.length) parts.push('（有 ' + sn.unsupported.length + ' 段用了 AI 未支援的積木）');
-      return '送出時會附上：' + parts.join('、');
+      if (diff.length) parts.push(T('chat.ctx.hand', { n: diff.length }));
+      if (trace && trace.ranSinceTurn) parts.push(T('chat.ctx.run'));
+      if (sn.unsupported.length) parts.push(T('chat.ctx.unsupported', { n: sn.unsupported.length }));
+      /* Assembled from parts, never concatenated in code: English puts the count after the noun and
+         joins with commas; Chinese puts it before and joins with 、. */
+      return T('chat.ctx.prefix') + parts.join(T('chat.ctx.join'));
     };
     S.recordVersion = recordVersion;
     S.restoreVersion = restore;

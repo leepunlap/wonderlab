@@ -1,0 +1,112 @@
+<!doctype html><html lang="zh-Hant-HK"><head><meta charset="utf-8">
+<link rel="stylesheet" href="studio.css"><link rel="stylesheet" href="studio-models.css">
+<style>#pane{width:360px;height:813px;border:1px solid #ccc}#out{white-space:pre;font:12px monospace}</style>
+</head><body>
+<div id="pane"></div>
+<pre id="out">running…</pre>
+<script src="studio-i18n.js"></script>
+<script src="studio-locale.zh-Hant.js"></script>
+<script src="studio-locale.zh-Hans.js"></script>
+<script src="studio-locale.en.js"></script>
+<script src="studio-chat.js"></script>
+<script src="studio-models.js"></script>
+<script>
+(function () {
+  var I = StudioI18n, L = [], fail = 0;
+  function log(k, v) { L.push(k + ' = ' + v); }
+  function eq(k, got, want) {
+    var ok = got === want;
+    if (!ok) fail++;
+    L.push((ok ? 'ok   ' : 'FAIL ') + k + ' :: ' + JSON.stringify(got) + (ok ? '' : ' ≠ ' + JSON.stringify(want)));
+  }
+  function pane() { return document.querySelector('#wl-chat .wl-chat-shell') || document.querySelector('.wl-chat-shell'); }
+  function txt(sel) { var e = pane().querySelector(sel); return e ? e.textContent.trim() : null; }
+  function cjk(s) { return /[\u3400-\u9FFF]/.test(String(s || '')); }
+
+  I.boot();
+  log('resolved', I.locale());
+  log('registered', JSON.stringify(I.available()));
+
+  var sent = null;
+  var chat = StudioChat.create({
+    mount: '#pane', i18n: I, badgeKey: 'chat.source.stub',
+    menu: [{ id: 'about', labelKey: 'chat.menu.about' }, { id: 'export', labelKey: 'chat.sheet.export' }],
+    onSend: function (t) { sent = t; }, onMenu: function () {}, onUndo: function () {}
+  });
+  var m = StudioModels.create({ api: '/api/ai/status/studio', i18n: I });
+  chat.setAccessory(m.el);
+
+  var CASES = [
+    { id: 'zh-Hant', title: 'AI 學伴', send: '送出', chip: '我想角色移動', menu: '說明', quota: '剩 8 / 10', desc: '快速回應，適合一般對話', undo: '上一步', ver: '版本 3' },
+    { id: 'zh-Hans', title: 'AI 学伴', send: '发送', chip: '我想让角色移动', menu: '说明', quota: '剩 8 / 10', desc: '快速响应，适合一般对话', undo: '撤销', ver: '版本 3' },
+    { id: 'en', title: 'AI Companion', send: 'Send', chip: 'Make the sprite move', menu: 'About', quota: '8 / 10 left', desc: 'Fast replies, fine for most turns', undo: 'Undo', ver: 'Version 3' }
+  ];
+
+  function walk(c) {
+    eq(c.id + ' title', txt('.wl-chat-title'), c.title);
+    eq(c.id + ' send aria', pane().querySelector('.wl-send').getAttribute('aria-label'), c.send);
+    eq(c.id + ' undo', txt('.wl-undo-btn'), c.undo);
+    eq(c.id + ' chip[0]', pane().querySelectorAll('.wl-chip')[0] ? pane().querySelectorAll('.wl-chip')[0].textContent : null, c.chip);
+    eq(c.id + ' menu item', pane().querySelectorAll('.wl-menu-label')[0] ? pane().querySelectorAll('.wl-menu-label')[0].textContent : null, c.menu);
+    eq(c.id + ' badge', txt('.wl-chat-badge'), I.t('chat.source.stub'));
+    eq(c.id + ' version chip', txt('.wl-ver-chip'), c.ver);
+    eq(c.id + ' html lang', document.documentElement.getAttribute('lang'), I.HTML_LANG[c.id]);
+    // popover: descriptions and quota come from the model config, not the server's Chinese
+    var pill = pane().querySelector('.wl-mpill');
+    pill.click();
+    eq(c.id + ' quota', pane().querySelectorAll('.wl-mitem-quota')[0] ? pane().querySelectorAll('.wl-mitem-quota')[0].textContent : null, c.quota);
+    eq(c.id + ' desc', pane().querySelectorAll('.wl-mitem-desc')[0] ? pane().querySelectorAll('.wl-mitem-desc')[0].textContent : null, c.desc);
+    // language group: three buttons, the active one marked
+    var on = pane().querySelector('.wl-lang-btn.is-on');
+    eq(c.id + ' lang active', on ? on.getAttribute('data-locale') : null, c.id);
+    eq(c.id + ' lang count', pane().querySelectorAll('.wl-lang-btn').length, 3);
+    document.body.click();
+    // no key leaks, and English contains no Chinese anywhere in the pane except the language
+    // buttons themselves - those are meant to stay in their own script.
+    var langBox = pane().querySelector('.wl-lang');
+    var langText = langBox ? langBox.textContent : '';
+    var all = (pane().textContent || '').replace(langText, '');
+    log(c.id + ' key leak', /(chat|models|assist)\.[a-zA-Z]/.test(all) ? 'LEAK' : 'none');
+    if (c.id === 'en') {
+      var cj = all.match(/[\u3400-\u9FFF]+/g);
+      log('en CJK residue', cj && cj.length ? JSON.stringify(cj.slice(0, 8)) : 'none');
+      if (cj && cj.length) fail++;
+    }
+  }
+
+  m.load().then(function () {
+    chat.setVersionCount(3);
+    CASES.forEach(function (c) { I.set(c.id, { persist: false }); walk(c); });
+
+    // live switch keeps the conversation and the half-typed sentence
+    I.set('zh-Hant', { persist: false });
+    chat.user('我打了一半的字');
+    var inp = pane().querySelector('.wl-input');
+    inp.value = '未送出的句子';
+    I.set('en', { persist: false });
+    eq('switch keeps rows', pane().querySelectorAll('.wl-mrow').length, 1);
+    eq('switch keeps draft', inp.value, '未送出的句子');
+    eq('switch relabels title', txt('.wl-chat-title'), 'AI Companion');
+
+    // the answer's reasoning toggle relabels too
+    chat.thinking('<think>先想想高度</think>');
+    eq('thinking label', txt('.wl-waiting-label'), 'Thinking…');
+    chat.bot('Try 10 steps first.');
+    var tg = pane().querySelector('.wl-think-toggle');
+    eq('think toggle label', tg ? tg.textContent.trim() : null, 'Show reasoning');
+    tg.click();
+    eq('think toggle open label', tg.textContent.trim(), 'Hide reasoning');
+
+    // send trims and fires, once
+    var i2 = pane().querySelector('.wl-input');
+    i2.value = '  hello  ';
+    pane().querySelector('.wl-send').click();
+    eq('send fires trimmed', sent, 'hello');
+    eq('input cleared', i2.value, '');
+
+    L.push(fail === 0 ? 'ALL PASS' : ('FAILURES: ' + fail));
+    document.getElementById('out').textContent = L.join('\n');
+  }, function (e) { document.getElementById('out').textContent = 'LOAD FAILED ' + e; });
+}());
+</script>
+</body></html>

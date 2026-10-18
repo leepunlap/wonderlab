@@ -37,8 +37,13 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-chat-head { display: flex; align-items: center; gap: 7px; height: var(--wl-head-h); padding: 0 10px; box-sizing: border-box;
   background: var(--wl-accent); color: var(--wl-accent-ink); flex: none; }
 .wl-chat-head .ic { width: 17px; height: 17px; flex: none; }
-.wl-chat-title { font-size: .94rem; margin: 0; font-weight: 700; }
-.wl-chat-badge { font-size: .68rem; padding: 2px 7px; border-radius: 999px; background: rgba(255, 255, 255, .18); white-space: nowrap; }
+.wl-chat-title { font-size: .94rem; margin: 0; font-weight: 700; min-width: 0; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+/* The badge is the first thing to give way: it is secondary information, and English runs about
+   twice the width of the Chinese it replaces. Ellipsis rather than a wrap, because the header is a
+   fixed 44px band and a second line would push the conversation down. */
+.wl-chat-badge { font-size: .68rem; padding: 2px 7px; border-radius: 999px; background: rgba(255, 255, 255, .18);
+  white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .wl-chat-badge[hidden] { display: none; }
 .wl-head-spacer { margin-left: auto; }
 .wl-ver-chip { font: inherit; font-size: .7rem; padding: 2px 8px; border: 0; border-radius: 999px;
@@ -57,6 +62,17 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-menu-item:hover { background: var(--wl-pane); }
 .wl-menu-badge { margin-left: auto; font-size: .72rem; color: var(--wl-muted); }
 
+/* Language: three equal targets in the menu, never in the header. The active one is filled, so the
+   current language is readable at a glance without a tick or a second label. */
+.wl-menu-sep { height: 1px; margin: 5px 3px; background: var(--wl-line); }
+.wl-lang { display: flex; gap: 4px; padding: 2px 4px 3px; }
+.wl-lang-btn { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font: inherit; font-size: .74rem; color: var(--wl-muted);
+  background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-lang-btn:hover { color: var(--wl-text); border-color: var(--wl-muted); }
+.wl-lang-btn.is-on { color: var(--wl-accent-ink); background: var(--wl-accent); border-color: var(--wl-accent); font-weight: 600; }
+.wl-lang-btn:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
+
 .wl-chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;
   background: var(--wl-bg); }
 .wl-msgs { display: flex; flex-direction: column; gap: 10px; }
@@ -73,7 +89,8 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 
 .wl-empty { display: flex; flex-wrap: wrap; gap: 6px; }
 .wl-chip { font: inherit; font-size: .8rem; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--wl-line);
-  background: var(--wl-pane); color: var(--wl-text); cursor: pointer; min-height: 32px; }
+  background: var(--wl-pane); color: var(--wl-text); cursor: pointer; min-height: 32px;
+  max-width: 100%; text-align: left; }
 .wl-chip:hover { border-color: var(--wl-accent); }
 .wl-chip:focus-visible, .wl-more-btn:focus-visible, .wl-ver-chip:focus-visible, .wl-menu-item:focus-visible,
 .wl-undo-btn:focus-visible, .wl-send:focus-visible, .wl-fab:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
