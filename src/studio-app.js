@@ -263,6 +263,7 @@
       // The AI turn. It owns no DOM: every visible effect is one of the callbacks below.
       if (on('assist')) assist = S.assist = root.StudioAssist.create({
         vm: vm, api: S.api, ops: ops, trace: trace,
+        modelSelector: cfg.modelSelector,  // Pass model selector to assist
         place: function (target, n) { return core().place(vm, target, n); },
         workspace: function () { return S.workspace(); },
         history: S.hist,

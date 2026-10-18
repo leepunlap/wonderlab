@@ -46,6 +46,7 @@
     var ops = cfg.ops || (root.StudioOps);
     var trace = cfg.trace || null;
     var api = cfg.api || '/api/ai/lab/studio';
+    var modelSelector = cfg.modelSelector || null;  // Model selector integration
     var place = cfg.place || noop;
     var workspace = cfg.workspace || noop;
     var history = cfg.history || [];
@@ -216,6 +217,11 @@
         }
       };
 
+      // Augment request with model selection
+      if (modelSelector) {
+        body = modelSelector.augmentRequest(body);
+      }
+
       return fetch(api, {
         method: 'POST',
         credentials: 'same-origin',
@@ -232,6 +238,20 @@
             return null;
           }
           onSource(d.source);
+
+          // Update model selector with usage and tokens
+          if (modelSelector) {
+            modelSelector.updateFromResponse(d);
+          }
+
+          // Display thinking content if present
+          if (d.thinking && modelSelector) {
+            var thinkingHtml = modelSelector.showThinkingContent(d.thinking);
+            if (thinkingHtml && ui.thinking) {
+              ui.thinking(thinkingHtml);
+            }
+          }
+
           history.push(
             { role: 'user', content: text },
             { role: 'assistant', content: ((d.say || '') + ' ' + (d.question || '')).trim() }

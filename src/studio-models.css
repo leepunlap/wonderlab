@@ -1,0 +1,343 @@
+/*!
+ * Wonder Lab Studio — Model selector styles.
+ * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+ */
+
+/* Model selector container */
+.wl-models {
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.wl-models-head {
+  font-weight: 600;
+  color: #0F172A;
+  margin-bottom: 10px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wl-models-badge {
+  background: #3B82F6;
+  color: white;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Model item (radio + info) */
+.wl-model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin: 6px 0;
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wl-model-item:hover {
+  border-color: #3B82F6;
+  background: #F1F5F9;
+}
+
+.wl-model-item[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wl-model-item input[type="radio"] {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.wl-model-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wl-model-name {
+  font-weight: 600;
+  color: #0F172A;
+  margin-bottom: 2px;
+}
+
+.wl-model-desc {
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.4;
+}
+
+.wl-model-usage {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #E2E8F0;
+  color: #475569;
+}
+
+.wl-model-usage.wl-usage-ok {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.wl-model-usage.wl-usage-warn {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.wl-model-usage.wl-usage-low {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+/* Thinking toggle (for R1) */
+.wl-thinking-toggle {
+  padding: 8px 12px;
+  margin: 4px 0 0 36px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.wl-thinking-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.wl-thinking-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Usage stats footer */
+.wl-models-stats {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.wl-models-stats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Token tracking display */
+.wl-token-stats {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #E2E8F0;
+  font-size: 12px;
+}
+
+.wl-token-turn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #64748B;
+}
+
+.wl-token-session {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0F172A;
+  font-weight: 500;
+}
+
+.wl-token-label {
+  color: #64748B;
+  font-weight: 400;
+}
+
+.wl-token-detail {
+  color: #94A3B8;
+  font-size: 11px;
+}
+
+.wl-token-cost {
+  margin-left: auto;
+  color: #059669;
+  font-weight: 600;
+}
+
+.wl-reset-session {
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid #E2E8F0;
+  border-radius: 4px;
+  color: #64748B;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wl-reset-session:hover {
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #991B1B;
+}
+
+/* Thinking content display */
+.wl-thinking {
+  background: #FFFBEB;
+  border: 1px solid #FDE047;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.wl-thinking-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #854D0E;
+  margin-bottom: 8px;
+}
+
+.wl-thinking-head .ic {
+  width: 16px;
+  height: 16px;
+  stroke: #CA8A04;
+}
+
+.wl-thinking-body {
+  color: #713F12;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+  background: #FEFCE8;
+  border-radius: 4px;
+}
+
+/* Status line (compact tokens/cost at bottom of chat) */
+.wl-status-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  font-size: 11px;
+  color: #64748B;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+.wl-status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wl-status-item .ic {
+  width: 12px;
+  height: 12px;
+  stroke: #94A3B8;
+}
+
+.wl-status-total {
+  margin-left: auto;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* Icon base styles */
+.ic {
+  display: inline-block;
+  vertical-align: middle;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .wl-models {
+    background: #1E293B;
+    border-color: #334155;
+  }
+
+  .wl-models-head {
+    color: #F8FAFC;
+  }
+
+  .wl-model-item {
+    background: #0F172A;
+    border-color: #334155;
+  }
+
+  .wl-model-item:hover {
+    background: #1E293B;
+    border-color: #3B82F6;
+  }
+
+  .wl-model-name {
+    color: #F8FAFC;
+  }
+
+  .wl-model-desc {
+    color: #94A3B8;
+  }
+
+  .wl-model-usage {
+    background: #334155;
+    color: #CBD5E1;
+  }
+
+  .wl-token-session {
+    color: #F8FAFC;
+  }
+
+  .wl-thinking {
+    background: #422006;
+    border-color: #78350F;
+  }
+
+  .wl-thinking-head {
+    color: #FDE047;
+  }
+
+  .wl-thinking-body {
+    background: #451A03;
+    color: #FEF3C7;
+  }
+
+  .wl-status-line {
+    background: #0F172A;
+    border-color: #334155;
+  }
+
+  .wl-status-total {
+    color: #CBD5E1;
+  }
+}

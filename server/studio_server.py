@@ -292,8 +292,33 @@ def stub_turn(body):
     STUB["turns"] += 1
     if body.get("mode") in ("ai", "self"):          # the dual-mode contract: focus = the scripts the reply is about
         focus = [{"sprite": o.get("sprite"), "id": o.get("id")} for o in applied if o.get("do") == "set_script"][:4]
-    return {"ok": True, "say": say, "question": question, "ops": applied, "errors": errors, "program": new_prog, "focus": focus,
-            "mode": mode, "left": 99, "in_class": False, "masked": False, "ms": int((time.time() - t0) * 1000), "checks": [], "source": src}
+
+    # Mock token usage and limits
+    model_used = body.get("model") or "deepseek-chat"
+    is_r1 = model_used == "deepseek-reasoner"
+
+    # Simulate token counts (in real implementation, get from API response)
+    input_tokens = len(text) * 4 + len(str(program)) // 2  # Rough estimate
+    output_tokens = len(say) * 4 + len(str(applied)) // 2
+    reasoning_tokens = 0
+    if is_r1 and body.get("show_thinking"):
+        reasoning_tokens = output_tokens * 3  # R1 thinking is typically 3x output
+
+    # Mock updated limits (decremented by 1)
+    limits_after = {
+        "per_lesson_hour": {"left": 7 if not is_r1 else 2, "max": 10 if not is_r1 else 5},
+        "per_lesson_day": {"left": 19 if not is_r1 else 7, "max": 25 if not is_r1 else 10},
+        "per_student_day": {"left": 44 if not is_r1 else 14, "max": 60 if not is_r1 else 20}
+    }
+
+    result = {"ok": True, "say": say, "question": question, "ops": applied, "errors": errors, "program": new_prog, "focus": focus,
+            "mode": mode, "left": 99, "in_class": False, "masked": False, "ms": int((time.time() - t0) * 1000), "checks": [], "source": src,
+            "model_used": model_used, "tokens": {"input": input_tokens, "output": output_tokens}, "limits_after": limits_after}
+
+    if reasoning_tokens > 0:
+        result["tokens"]["reasoning"] = reasoning_tokens
+
+    return result
 
 
 def mask(s):
@@ -317,11 +342,64 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def _site_status(self):
-        return {"ok": True, "open": True, "open_from": "07:00", "open_until": "21:00", "left": 10, "lesson_hour_left": 10, "lesson_day_left": 25,
-                "student_day_left": 60, "per_lesson_hour": 10, "per_lesson_day": 25, "per_student_day": 60, "max_chars": 200}
+        # Mock models configuration
+        models = [
+            {
+                "id": "deepseek-chat",
+                "display_name": "DeepSeek Chat",
+                "description": "快速回應，適合一般對話",
+                "default": True,
+                "enabled": True,
+                "supports_thinking": False,
+                "limits": {
+                    "per_lesson_hour": {"left": 8, "max": 10},
+                    "per_lesson_day": {"left": 20, "max": 25},
+                    "per_student_day": {"left": 45, "max": 60}
+                },
+                "costs": {
+                    "input_per_1m": 0.27,   # HK$ per 1M tokens
+                    "output_per_1m": 1.10,
+                    "cached_input_per_1m": 0.054
+                }
+            },
+            {
+                "id": "deepseek-reasoner",
+                "display_name": "DeepSeek R1",
+                "description": "深度推理，可顯示思考過程",
+                "default": False,
+                "enabled": True,
+                "supports_thinking": True,
+                "limits": {
+                    "per_lesson_hour": {"left": 3, "max": 5},
+                    "per_lesson_day": {"left": 8, "max": 10},
+                    "per_student_day": {"left": 15, "max": 20}
+                },
+                "costs": {
+                    "input_per_1m": 0.55,
+                    "output_per_1m": 2.19,
+                    "cached_input_per_1m": 0.11,
+                    "reasoning_per_1m": 2.19  # R1's thinking tokens same as output
+                }
+            }
+        ]
+
+        # Mock role (in real implementation, get from session/auth)
+        role = "student"  # or "teacher"
+
+        return {
+            "ok": True,
+            "open": True,
+            "models": models,
+            "role": role,
+            "open_from": "07:00",
+            "open_until": "21:00"
+        }
 
     def do_GET(self):
         p = urlparse(self.path).path
+        # Standalone studio status endpoint
+        if p == "/api/ai/status/studio":
+            return self._j(200, self._site_status())
         if p == "/api/ai/lab/_log":                      # test hook: the last request bodies the stub received
             return self._j(200, {"ok": True, "log": LOG[-10:]})
         if p == "/api/ai/lab/_set":                      # test hook: delay / failures / studio flag / wrap-up pending

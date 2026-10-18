@@ -6,6 +6,7 @@
 <title>Wonder Lab Studio</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="studio.css">
+<link rel="stylesheet" href="studio-models.css">
 </head>
 <body>
 <div id="wl-app">
@@ -28,6 +29,7 @@
     </div>
 
     <section id="wl-pane-chat" role="tabpanel" aria-labelledby="wl-tab-chat" class="wl-pane">
+      <div id="wl-model-selector"></div>
       <div id="wl-msgs" role="log" aria-live="polite"></div>
       <div class="wl-chips" aria-label="試試這樣說">
         <button type="button" class="wl-chip">「我想角色移動」</button>
@@ -83,6 +85,7 @@
 <script src="studio-trace.js"></script>
 <script src="ucmake-blocks.js"></script>
 <script src="studio-anim.js"></script>
+<script src="studio-models.js"></script>
 <script src="studio-core.js"></script>
 <script src="studio-assist.js"></script>
 <script src="studio-app.js"></script>
@@ -112,12 +115,39 @@
   }
   tabs();
 
+  // Initialize model selector
+  var modelSelector = StudioModels.create({
+    api: '/api/ai/lab/studio',
+    ui: {
+      mount: function (html) {
+        var container = $('wl-model-selector');
+        if (container) container.innerHTML = html;
+      },
+      onModelChange: function (modelId) {
+        console.log('[models] Switched to:', modelId);
+      },
+      onError: function (msg) {
+        add('sys', msg);
+      }
+    }
+  });
+
   var S = StudioApp.create({
     root: '#wl-editor', api: '/api/ai/lab/studio', library: true, locale: 'zh-tw', ucmake: true,
+    modelSelector: modelSelector,  // Pass model selector to app
     ui: {
       user: function (t) { add('me', t); },
       bot: function (t, isQ) { add(isQ ? 'bot q' : 'bot', t); },
       sys: function (t) { add('sys', t); },
+      thinking: function (html) {
+        var msgs = $('wl-msgs');
+        if (msgs) {
+          var div = document.createElement('div');
+          div.innerHTML = html;
+          msgs.appendChild(div.firstChild);
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+      },
       busy: function (on) { if ($('wl-send')) $('wl-send').disabled = on; if ($('wl-input')) $('wl-input').disabled = on; },
       source: function (src) { var b = document.querySelector('.wl-badge'); if (b && src) b.textContent = src === 'stub' ? '原型 · 模擬回覆' : '真實模型'; },
       /* The shell owns the version list and the restore; this draws it. Called whenever the list
@@ -166,6 +196,28 @@
   if ($('wl-send')) $('wl-send').addEventListener('click', function (e) { e.preventDefault(); send(); });
   if ($('wl-undo')) $('wl-undo').addEventListener('click', function () { S.undo(); });
   if ($('wl-export')) $('wl-export').addEventListener('click', function () { S.exportVersions(); });
+
+  // Wire up suggestion chips to populate input
+  document.querySelectorAll('.wl-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var inp = $('wl-input');
+      if (inp) {
+        inp.value = chip.textContent;
+        inp.focus();
+      }
+    });
+  });
+
+  // Enter key sends message (Shift+Enter for new line)
+  var inp = $('wl-input');
+  if (inp) {
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+  }
   if ($('wl-fab')) $('wl-fab').addEventListener('click', function () {
     var c = $('wl-chat'); if (!c) return;
     var open = c.hasAttribute('hidden'); if (open) c.removeAttribute('hidden'); else c.setAttribute('hidden', '');
@@ -175,6 +227,11 @@
   S.boot().catch(function (e) {
     var c = $('wl-ctx'); if (c) c.textContent = '編輯器載入失敗';
     if (window.console) console.error(e);
+  });
+
+  // Load model selector after boot
+  modelSelector.load().catch(function (e) {
+    if (window.console) console.error('[models] Failed to load:', e);
   });
 }());
 </script>
