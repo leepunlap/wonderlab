@@ -48,9 +48,12 @@ LIB_DIR = os.environ.get("WL_LIBRARY") or ""
 # Import pedagogy from iits-repo (proprietary), not from local copy (keeps wonderlab AGPL-clean).
 # The production lesson-ai service has the authoritative lab_core.py, lab_ta.py, lab_consol.py.
 # This prototype server imports from there so there's only one copy to maintain.
-IITS_LESSON_AI = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "iits-repo", "portals", "lesson-ai")
+# Path: wonderlab-studio/server → wonderlab-studio → src → iits-local
+# Then: iits-local/src/iits-repo/portals/lesson-ai
+IITS_LOCAL = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))  # Up 3 levels to iits-local
+IITS_LESSON_AI = os.path.join(IITS_LOCAL, "src", "iits-repo", "portals", "lesson-ai")
 sys.path.insert(0, IITS_LESSON_AI)
-import lab_core as LC  # noqa: E402  (stdlib only; reads lab_opcodes.json next to it)
+import lab_core as LC  # noqa: E402  (imports from iits-repo/portals/lesson-ai/)
 
 STAGE = LC.STAGE_NAME
 TEXT_EXT = {".js", ".css", ".html", ".json", ".svg", ".txt", ".map", ".md"}
