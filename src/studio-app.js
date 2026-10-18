@@ -272,8 +272,18 @@
         animate: on('animate') ? (root.WLAnim || null) : null,
         animBudget: cfg.animBudget,
         ui: Object.assign({}, cfg.ui, {
-          // the version store is the shell's, so the assistant records into it rather than keeping its own
-          record: function (kind, label, extra) { return recordVersion(kind, label, extra); }
+          // The version store is the shell's, so the assistant records into it rather than keeping
+          // its own. Recording an AI change is also where 上一步 becomes possible: the entry before
+          // the new one holds the program as it stood *before* the assistant touched it.
+          record: function (kind, label, extra) {
+            var v = recordVersion(kind, label, extra);
+            if (v && kind === 'ai' && assist) {
+              var prev = S.versions[S.versions.length - 2];
+              assist.setUndoTo(prev && prev.project ? prev : null);
+              drawVersions();          // the pane learns whether 上一步 is available
+            }
+            return v;
+          }
         })
       });
 
@@ -331,6 +341,10 @@
         ? Promise.resolve()
         : vm.extensionManager.loadExtensionURL('pen');
       p.then(function () {
+        // A fresh session needs a baseline. Without one, the very first thing the assistant does
+        // has nothing behind it to step back to, so 上一步 would be unavailable exactly when the
+        // student is most likely to want it.
+        if (!S.versions.length) recordVersion('start', '開始', {});
         if (!S.ready) {
           S.ready = true;
           S.readyAt = (root.performance && performance.now()) || 0;
@@ -455,7 +469,14 @@
     S.boot = boot;
     S.send = function (text) { return assist ? assist.send(text) : Promise.resolve(null); };
     S.applyReply = function (d, t) { return assist ? assist.applyReply(d, t) : null; };
-    S.undo = function () { return assist ? assist.undo() : null; };
+    /* 上一步 restores the version the assistant changed away from. Returning that version without
+       loading it - which is what this used to do - is why the button never did anything. */
+    S.undo = function () {
+      var v = assist ? assist.undo() : null;
+      if (!v) return Promise.resolve(null);
+      return restore(v, '還原了第 ' + v.n + ' 版');
+    };
+    S.canUndo = function () { return !!(assist && assist.canUndo()); };
     S.targetsInfo = function () { return assist ? assist.targetsInfo() : []; };
     S.snapshot = function () { return lastProgram(); };
 

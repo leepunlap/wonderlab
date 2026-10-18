@@ -23,6 +23,7 @@
  *       user:  function (text) {},        // the student's line
  *       bot:   function (text, isQuestion) {},
  *       sys:   function (text) {},        // notices that are not the assistant speaking
+ *       thinking: function (raw) {},      // R1's reasoning, unwrapped and un-styled
  *       busy:  function (on) {},
  *       source:function (src) {},         // 'stub' | 'deepseek' — so the pane can say which
  *       record:function (kind, label, extra) {}   // >> a version entry
@@ -244,13 +245,9 @@
             modelSelector.updateFromResponse(d);
           }
 
-          // Display thinking content if present
-          if (d.thinking && modelSelector) {
-            var thinkingHtml = modelSelector.showThinkingContent(d.thinking);
-            if (thinkingHtml && ui.thinking) {
-              ui.thinking(thinkingHtml);
-            }
-          }
+          // R1's reasoning, handed over raw. How it looks is the pane's business, not ours: this
+          // module carries no markup, so a lesson page can render 思考過程 its own way.
+          if (d.thinking && ui.thinking) ui.thinking(d.thinking);
 
           history.push(
             { role: 'user', content: text },

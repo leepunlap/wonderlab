@@ -1,343 +1,123 @@
 /*!
- * Wonder Lab Studio — Model selector styles.
+ * Wonder Lab Studio — the model pill, the popover and the thinking block.
  * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+ *
+ * Everything here uses the studio's own tokens (--wl-*) rather than a palette of its own, so the
+ * picker reads as part of the pane instead of a component that arrived from another product. The
+ * old version of this file carried a second, unrelated palette and a half-done dark mode; both are
+ * gone — the pane is light, and a partial dark theme is worse than none.
+ *
+ * The layout rule this file exists to obey: the model choice costs 30px of height when closed.
+ * Everything else about it — descriptions, quota, the reasoning switch, token totals — is inside
+ * the popover and therefore costs nothing until somebody opens it.
  */
 
-/* Model selector container */
-.wl-models {
-  background: #F8FAFC;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 16px;
-  font-size: 13px;
+/* ---- the pill, in the composer's accessory slot ---- */
+.wl-mpill-wrap { position: relative; display: inline-flex; }
+
+.wl-mpill {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px;
+  font: inherit; font-size: .78rem; line-height: 1; color: var(--wl-muted);
+  background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 999px; cursor: pointer;
+  white-space: nowrap; max-width: 190px;
+}
+.wl-mpill:hover { border-color: var(--wl-accent); color: var(--wl-text); }
+.wl-mpill.is-open { border-color: var(--wl-accent); color: var(--wl-text); }
+.wl-mpill:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
+
+.wl-mpill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--wl-accent); flex: none; }
+.wl-mpill-dot.is-reasoning { background: #b07d00; }
+.wl-mpill-name { overflow: hidden; text-overflow: ellipsis; }
+.wl-mpill-chev { width: 12px; height: 12px; flex: none; opacity: .7; }
+.wl-mpill.is-open .wl-mpill-chev { transform: rotate(180deg); }
+
+/* ---- the popover: opens upward, because the pill lives at the bottom of the pane ---- */
+.wl-mpop {
+  position: absolute; bottom: calc(100% + 6px); left: 0; width: 292px; z-index: 20;
+  max-height: min(62vh, 440px); overflow-y: auto; padding: 6px; box-sizing: border-box;
+  background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .14);
+}
+.wl-mpop[hidden] { display: none; }
+
+.wl-mitem {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
+}
+.wl-mitem:hover { background: var(--wl-pane); }
+.wl-mitem.is-on { background: #eef7f8; }
+.wl-mitem.is-off { opacity: .5; cursor: not-allowed; }
+.wl-mitem.is-off:hover { background: none; }
+
+.wl-mitem-check { width: 14px; height: 14px; flex: none; color: var(--wl-accent); }
+.wl-mitem-check .ic { width: 14px; height: 14px; }
+
+.wl-mitem-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wl-mitem-name { font-size: .84rem; font-weight: 600; color: var(--wl-text); }
+.wl-mitem-desc { font-size: .72rem; color: var(--wl-muted); line-height: 1.35; }
+
+.wl-mitem-quota {
+  flex: none; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  padding: 2px 7px; border-radius: 6px; background: #e9ecef; color: var(--wl-text); white-space: nowrap;
+}
+.wl-mitem-quota.is-ok { background: #d3f9d8; color: #2b8a3e; }
+.wl-mitem-quota.is-warn { background: #fff3bf; color: #996500; }
+.wl-mitem-quota.is-low { background: #ffe3e3; color: #c92a2a; }
+
+.wl-mpop-sep { height: 1px; background: var(--wl-line); margin: 6px 4px; }
+
+/* ---- the reasoning switch ---- */
+.wl-mswitch { display: flex; align-items: center; gap: 8px; padding: 4px 8px 6px; cursor: pointer; }
+.wl-mswitch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.wl-mswitch-track {
+  position: relative; width: 30px; height: 17px; border-radius: 999px; background: #c9d0d8; flex: none;
+  transition: background .15s ease;
+}
+.wl-mswitch-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; transition: transform .15s ease;
+}
+.wl-mswitch input:checked + .wl-mswitch-track { background: var(--wl-accent); }
+.wl-mswitch input:checked + .wl-mswitch-track::after { transform: translateX(13px); }
+.wl-mswitch input:focus-visible + .wl-mswitch-track { outline: 2px solid #ffb000; outline-offset: 2px; }
+.wl-mswitch-label { font-size: .76rem; color: var(--wl-text); }
+
+/* ---- the popover footer: today's allowance and this session's spend ---- */
+.wl-mpop-foot {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 8px 5px;
+  font-size: .72rem; color: var(--wl-muted); font-variant-numeric: tabular-nums;
+}
+.wl-mpop-cost { color: var(--wl-accent); font-weight: 600; }
+.wl-mpop-reset {
+  margin-left: auto; font: inherit; font-size: .72rem; line-height: 1; padding: 3px 6px;
+  background: none; border: 1px solid var(--wl-line); border-radius: 6px; color: var(--wl-muted); cursor: pointer;
+}
+.wl-mpop-reset:hover { border-color: #fca5a5; color: #c92a2a; }
+
+/* ---- the thinking state: a message, not a panel ---- */
+.wl-waiting-label { font-size: .84rem; color: var(--wl-muted); }
+.wl-progress { position: relative; height: 3px; margin-top: 8px; border-radius: 2px; background: #e7ebef; overflow: hidden; }
+.wl-progress-fill {
+  position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 2px; background: var(--wl-accent);
+  animation: wl-progress 1.1s ease-in-out infinite;
+}
+@keyframes wl-progress { 0% { left: -40%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .wl-progress-fill { animation: none; left: 0; width: 100%; opacity: .35; }
+  .wl-mswitch-track, .wl-mswitch-track::after { transition: none; }
 }
 
-.wl-models-head {
-  font-weight: 600;
-  color: #0F172A;
-  margin-bottom: 10px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ---- the answer that resolved out of it, with its collapsible reasoning ---- */
+.wl-answer { white-space: pre-wrap; }
+.wl-think-toggle {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 0;
+  font: inherit; font-size: .72rem; color: var(--wl-accent); background: none; border: 0; cursor: pointer;
 }
-
-.wl-models-badge {
-  background: #3B82F6;
-  color: white;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 500;
+.wl-think-toggle .ic { width: 12px; height: 12px; }
+.wl-think-toggle[aria-expanded="true"] .wl-chev { transform: rotate(180deg); }
+.wl-think-body {
+  margin-top: 6px; padding: 8px; max-height: 220px; overflow-y: auto;
+  font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace; font-size: .74rem; line-height: 1.55;
+  color: var(--wl-muted); white-space: pre-wrap; background: var(--wl-pane);
+  border: 1px solid var(--wl-line); border-radius: 8px;
 }
-
-/* Model item (radio + info) */
-.wl-model-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  margin: 6px 0;
-  background: white;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.wl-model-item:hover {
-  border-color: #3B82F6;
-  background: #F1F5F9;
-}
-
-.wl-model-item[disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.wl-model-item input[type="radio"] {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.wl-model-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.wl-model-name {
-  font-weight: 600;
-  color: #0F172A;
-  margin-bottom: 2px;
-}
-
-.wl-model-desc {
-  font-size: 12px;
-  color: #64748B;
-  line-height: 1.4;
-}
-
-.wl-model-usage {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: #E2E8F0;
-  color: #475569;
-}
-
-.wl-model-usage.wl-usage-ok {
-  background: #DCFCE7;
-  color: #166534;
-}
-
-.wl-model-usage.wl-usage-warn {
-  background: #FEF3C7;
-  color: #92400E;
-}
-
-.wl-model-usage.wl-usage-low {
-  background: #FEE2E2;
-  color: #991B1B;
-}
-
-/* Thinking toggle (for R1) */
-.wl-thinking-toggle {
-  padding: 8px 12px;
-  margin: 4px 0 0 36px;
-  font-size: 12px;
-  color: #64748B;
-}
-
-.wl-thinking-toggle label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.wl-thinking-toggle input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  cursor: pointer;
-}
-
-/* Usage stats footer */
-.wl-models-stats {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #E2E8F0;
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: #64748B;
-}
-
-.wl-models-stats span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Token tracking display */
-.wl-token-stats {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #E2E8F0;
-  font-size: 12px;
-}
-
-.wl-token-turn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  color: #64748B;
-}
-
-.wl-token-session {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #0F172A;
-  font-weight: 500;
-}
-
-.wl-token-label {
-  color: #64748B;
-  font-weight: 400;
-}
-
-.wl-token-detail {
-  color: #94A3B8;
-  font-size: 11px;
-}
-
-.wl-token-cost {
-  margin-left: auto;
-  color: #059669;
-  font-weight: 600;
-}
-
-.wl-reset-session {
-  margin-left: 8px;
-  padding: 2px 6px;
-  background: transparent;
-  border: 1px solid #E2E8F0;
-  border-radius: 4px;
-  color: #64748B;
-  font-size: 10px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.wl-reset-session:hover {
-  background: #FEE2E2;
-  border-color: #FCA5A5;
-  color: #991B1B;
-}
-
-/* Thinking content display */
-.wl-thinking {
-  background: #FFFBEB;
-  border: 1px solid #FDE047;
-  border-radius: 6px;
-  padding: 12px;
-  margin: 12px 0;
-  font-size: 13px;
-}
-
-.wl-thinking-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: #854D0E;
-  margin-bottom: 8px;
-}
-
-.wl-thinking-head .ic {
-  width: 16px;
-  height: 16px;
-  stroke: #CA8A04;
-}
-
-.wl-thinking-body {
-  color: #713F12;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-  font-size: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 8px;
-  background: #FEFCE8;
-  border-radius: 4px;
-}
-
-/* Status line (compact tokens/cost at bottom of chat) */
-.wl-status-line {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #F8FAFC;
-  border-top: 1px solid #E2E8F0;
-  font-size: 11px;
-  color: #64748B;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
-}
-
-.wl-status-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.wl-status-item .ic {
-  width: 12px;
-  height: 12px;
-  stroke: #94A3B8;
-}
-
-.wl-status-total {
-  margin-left: auto;
-  color: #475569;
-  font-weight: 500;
-}
-
-/* Icon base styles */
-.ic {
-  display: inline-block;
-  vertical-align: middle;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .wl-models {
-    background: #1E293B;
-    border-color: #334155;
-  }
-
-  .wl-models-head {
-    color: #F8FAFC;
-  }
-
-  .wl-model-item {
-    background: #0F172A;
-    border-color: #334155;
-  }
-
-  .wl-model-item:hover {
-    background: #1E293B;
-    border-color: #3B82F6;
-  }
-
-  .wl-model-name {
-    color: #F8FAFC;
-  }
-
-  .wl-model-desc {
-    color: #94A3B8;
-  }
-
-  .wl-model-usage {
-    background: #334155;
-    color: #CBD5E1;
-  }
-
-  .wl-token-session {
-    color: #F8FAFC;
-  }
-
-  .wl-thinking {
-    background: #422006;
-    border-color: #78350F;
-  }
-
-  .wl-thinking-head {
-    color: #FDE047;
-  }
-
-  .wl-thinking-body {
-    background: #451A03;
-    color: #FEF3C7;
-  }
-
-  .wl-status-line {
-    background: #0F172A;
-    border-color: #334155;
-  }
-
-  .wl-status-total {
-    color: #CBD5E1;
-  }
-}
+.wl-think-body[hidden] { display: none; }

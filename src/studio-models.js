@@ -1,367 +1,339 @@
 /*!
- * Wonder Lab Studio — AI model selector.
+ * Wonder Lab Studio — AI model picker, as a module.
  * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
  *
  * WHAT THIS IS
- * The model selector and usage tracking UI. Fetches available models from the API, displays them
- * with usage limits, and lets students/teachers switch between models (DeepSeek Chat vs R1).
+ * Which model answers, and what it has cost so far. It used to be a 232px card bolted to the top of
+ * the AI 學伴 pane — half the pane, for a choice a student changes once a term. It is now a 30px
+ * pill that sits in the composer's accessory slot; the descriptions and the quota live one tap away
+ * in a popover, so they are there for the teacher who wants them and invisible to everybody else.
  *
  * WHAT IT OWNS
- * - Model configuration fetch from /api/ai/status/<ep>
- * - Current model selection state
- * - Usage indicators (remaining requests per model)
- * - Thinking toggle for R1 model
+ * - The model configuration fetch from /api/ai/status/<ep>, and the current selection.
+ * - The pill and its popover: names, one-line descriptions, remaining quota, the R1
+ *   顯示推理過程 switch (which is a property of the MODEL, so it belongs in the model's menu).
+ * - Session token and cost accounting, persisted to localStorage, including the reset.
  *
  * WHAT IT DOES NOT OWN
- * The actual API call to the AI service (studio-assist.js owns that). This just augments the
- * request body with { model, show_thinking } and updates usage counts from responses.
+ * The API call itself (studio-assist.js owns that) and anything about where it is on screen. The
+ * module hands back a single element, `el`; StudioChat drops it into the composer slot, and a lesson
+ * page can drop the same element into its own bar without either knowing about the other.
  *
- *   var modelSelector = StudioModels.create({
+ *   var models = StudioModels.create({
  *     api: '/api/ai/lab/studio',
- *     ui: {
- *       mount: function (html) {},           // inject the model selector HTML
- *       onModelChange: function (modelId) {}, // notify when model changes
- *       onError: function (msg) {}           // show error messages
- *     }
+ *     ui: { onChange: function (id) {}, onError: function (msg) {} }
  *   });
- *   modelSelector.load().then(function () {
- *     var req = modelSelector.augmentRequest(baseRequest);
- *     // ... send to API ...
- *     modelSelector.updateFromResponse(response);
- *   });
+ *   chat.setAccessory(models.el);
+ *   models.load().then(function () { ... });
+ *   body = models.augmentRequest(body);      // adds { model, show_thinking }
+ *   models.updateFromResponse(response);     // quota + tokens from the turn that just ran
  *
  * ES5, like the rest of the studio's own code: this ships to old browsers.
  */
 (function (root) {
   'use strict';
 
+  var doc = root.document;
+  var SESSION_KEY = 'wl-studio-session';
+
   function noop() {}
+
+  function h(tag, cls, text) {
+    var e = doc.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function ic(paths, extra) {
+    var s = doc.createElement('span');
+    s.innerHTML = '<svg class="ic' + (extra ? ' ' + extra : '') + '" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      paths + '</svg>';
+    return s.firstChild;
+  }
+
+  var ICON_CHECK = '<path d="M20 6 9 17l-5-5"/>';
+  var ICON_CHEV = '<path d="m6 9 6 6 6-6"/>';
+
+  function fmt(n) {
+    n = n || 0;
+    return n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n);
+  }
 
   function create(cfg) {
     cfg = cfg || {};
     var api = cfg.api || '/api/ai/lab/studio';
     var statusApi = api.replace(/\/lab\/[^/]+$/, '/status/studio');
     var ui = cfg.ui || {};
-    var onMount = ui.mount || noop;
-    var onModelChange = ui.onModelChange || noop;
+    var onChange = ui.onChange || noop;
     var onError = ui.onError || noop;
 
     var models = [];
-    var selectedModel = null;
+    var selected = null;
     var showThinking = false;
     var role = 'student';
-    var container = null;
-    var totalTokens = 0;
-    var totalCost = 0;
-    var statusLine = null;
-
-    // Session tracking
     var sessionTokens = { input: 0, output: 0, reasoning: 0, total: 0 };
     var sessionCost = 0;
-    var turnTokens = null; // Last turn's token usage
-    var sessionKey = 'wl-studio-session'; // localStorage key
+    var turnTokens = null;
 
-    /** Load persisted session data */
+    /* ---------- the widget: a pill, and a popover that only exists while it is wanted ---------- */
+    var wrap = h('div', 'wl-mpill-wrap');
+
+    var pill = h('button', 'wl-mpill');
+    pill.type = 'button';
+    pill.setAttribute('aria-haspopup', 'listbox');
+    pill.setAttribute('aria-expanded', 'false');
+    var dot = h('span', 'wl-mpill-dot');
+    var name = h('span', 'wl-mpill-name', '模型');
+    pill.appendChild(dot);
+    pill.appendChild(name);
+    pill.appendChild(ic(ICON_CHEV, 'wl-mpill-chev'));
+
+    var pop = h('div', 'wl-mpop');
+    pop.setAttribute('role', 'listbox');
+    pop.hidden = true;
+
+    wrap.appendChild(pill);
+    wrap.appendChild(pop);
+
+    function open() {
+      renderPop();
+      pop.hidden = false;
+      pill.setAttribute('aria-expanded', 'true');
+      pill.classList.add('is-open');
+    }
+    function close() {
+      pop.hidden = true;
+      pill.setAttribute('aria-expanded', 'false');
+      pill.classList.remove('is-open');
+    }
+    pill.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (pop.hidden) open(); else close();
+    });
+    doc.addEventListener('click', function (e) {
+      if (!pop.hidden && !wrap.contains(e.target)) close();
+    });
+    doc.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !pop.hidden) { close(); pill.focus(); }
+    });
+
+    /* ---------- persistence ---------- */
     function loadSession() {
       try {
-        var stored = localStorage.getItem(sessionKey);
-        if (stored) {
-          var data = JSON.parse(stored);
-          sessionTokens = data.tokens || sessionTokens;
-          sessionCost = data.cost || 0;
-          selectedModel = data.selectedModel || selectedModel;
-          showThinking = data.showThinking || false;
-        }
+        var raw = root.localStorage && root.localStorage.getItem(SESSION_KEY);
+        if (!raw) return;
+        var d = JSON.parse(raw);
+        sessionTokens = d.tokens || sessionTokens;
+        sessionCost = d.cost || 0;
+        selected = d.selectedModel || selected;
+        showThinking = !!d.showThinking;
       } catch (e) {
-        if (root.console) console.warn('[models] Failed to load session:', e);
+        if (root.console) root.console.warn('[models] session load failed:', e);
       }
     }
 
-    /** Persist session data */
     function saveSession() {
       try {
-        localStorage.setItem(sessionKey, JSON.stringify({
-          tokens: sessionTokens,
-          cost: sessionCost,
-          selectedModel: selectedModel,
-          showThinking: showThinking,
-          timestamp: Date.now()
+        if (!root.localStorage) return;
+        root.localStorage.setItem(SESSION_KEY, JSON.stringify({
+          tokens: sessionTokens, cost: sessionCost,
+          selectedModel: selected, showThinking: showThinking, t: Date.now()
         }));
-      } catch (e) {
-        if (root.console) console.warn('[models] Failed to save session:', e);
-      }
+      } catch (e) { /* a private-mode failure is not worth a dialog */ }
     }
 
-    /** Clear session data */
     function clearSession() {
       sessionTokens = { input: 0, output: 0, reasoning: 0, total: 0 };
       sessionCost = 0;
       turnTokens = null;
-      try {
-        localStorage.removeItem(sessionKey);
-      } catch (e) {}
+      try { if (root.localStorage) root.localStorage.removeItem(SESSION_KEY); } catch (e) {}
       render();
     }
 
-    /** Fetch available models from the API */
-    function load() {
-      // Load persisted session first
-      loadSession();
+    /* ---------- model facts, in the words the UI uses ---------- */
+    function quotaText(m) {
+      if (!m) return '';
+      if (m.limits === null) return '∞';
+      var l = m.limits && m.limits.per_lesson_hour;
+      return l ? ('剩 ' + l.left + ' / ' + l.max) : '';
+    }
 
-      return fetch(statusApi, {
-        method: 'GET',
-        credentials: 'same-origin'
-      })
+    function quotaClass(m) {
+      var l = m && m.limits && m.limits.per_lesson_hour;
+      if (!l || !l.max) return '';
+      var pct = l.left / l.max;
+      return pct > 0.5 ? 'is-ok' : (pct > 0.2 ? 'is-warn' : 'is-low');
+    }
+
+    function dayText() {
+      var m = byId(selected);
+      var d = m && m.limits && m.limits.per_student_day;
+      return d ? ('今日剩 ' + d.left + ' / ' + d.max) : '';
+    }
+
+    function byId(id) {
+      for (var i = 0; i < models.length; i++) if (models[i].id === id) return models[i];
+      return null;
+    }
+
+    /* ---------- render ---------- */
+    function render() {
+      var m = byId(selected);
+      name.textContent = m ? m.display_name : (models.length ? models[0].display_name : '模型');
+      dot.className = 'wl-mpill-dot' + (m && m.supports_thinking ? ' is-reasoning' : '');
+      pill.title = m ? (m.display_name + (m.description ? ' — ' + m.description : '')) : '';
+      if (!pop.hidden) renderPop();
+    }
+
+    function renderPop() {
+      while (pop.firstChild) pop.removeChild(pop.firstChild);
+
+      models.forEach(function (m) {
+        var on = m.id === selected;
+        var item = h('div', 'wl-mitem' + (on ? ' is-on' : '') + (m.enabled === false ? ' is-off' : ''));
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(on));
+
+        if (on) item.appendChild(ic(ICON_CHECK, 'wl-mitem-check'));
+        else item.appendChild(h('span', 'wl-mitem-check'));
+
+        var main = h('span', 'wl-mitem-main');
+        main.appendChild(h('span', 'wl-mitem-name', m.display_name));
+        if (m.description) main.appendChild(h('span', 'wl-mitem-desc', m.description));
+        item.appendChild(main);
+
+        var q = quotaText(m);
+        if (q) item.appendChild(h('span', 'wl-mitem-quota ' + quotaClass(m), q));
+
+        if (m.enabled !== false) {
+          item.addEventListener('click', function () { pick(m.id); });
+        }
+        pop.appendChild(item);
+      });
+
+      // 顯示推理過程 is a property of the chosen model, so it lives with the choice
+      var m = byId(selected);
+      if (m && m.supports_thinking) {
+        pop.appendChild(h('div', 'wl-mpop-sep'));
+        var sw = h('label', 'wl-mswitch');
+        var cb = h('input');
+        cb.type = 'checkbox';
+        cb.checked = showThinking;
+        cb.addEventListener('change', function () {
+          showThinking = cb.checked;
+          saveSession();
+        });
+        sw.appendChild(cb);
+        sw.appendChild(h('span', 'wl-mswitch-track'));
+        sw.appendChild(h('span', 'wl-mswitch-label', '顯示推理過程'));
+        pop.appendChild(sw);
+      }
+
+      var day = dayText();
+      var used = sessionTokens.total > 0;
+      if (day || used) {
+        pop.appendChild(h('div', 'wl-mpop-sep'));
+        var foot = h('div', 'wl-mpop-foot');
+        if (day) foot.appendChild(h('span', 'wl-mpop-day', day));
+        if (used) {
+          var tok = h('span', 'wl-mpop-tok', '本次 ' + fmt(sessionTokens.total) + ' tokens');
+          foot.appendChild(tok);
+          if (role === 'teacher' && sessionCost > 0) {
+            foot.appendChild(h('span', 'wl-mpop-cost', 'HK$' + sessionCost.toFixed(3)));
+          }
+          var reset = h('button', 'wl-mpop-reset', '✕');
+          reset.type = 'button';
+          reset.title = '重設統計';
+          reset.setAttribute('aria-label', '重設統計');
+          reset.addEventListener('click', function () {
+            if (root.confirm('重設本次對話統計？這會清除 token 用量和費用記錄。')) clearSession();
+          });
+          foot.appendChild(reset);
+        }
+        pop.appendChild(foot);
+      }
+    }
+
+    function pick(id) {
+      if (id === selected) return close();
+      selected = id;
+      showThinking = false;   // a fresh model starts from its own defaults
+      saveSession();
+      render();
+      close();
+      onChange(id);
+    }
+
+    /* ---------- the network ---------- */
+    function load() {
+      loadSession();
+      return fetch(statusApi, { method: 'GET', credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          if (!data.ok) {
-            onError(data.error || '無法載入模型配置');
-            return;
+          if (!data || !data.ok) {
+            onError((data && data.error) || '無法載入模型配置');
+            return null;
           }
           models = data.models || [];
           role = data.role || 'student';
-
-          // Select default model
-          var def = models.filter(function (m) { return m.default; })[0];
-          selectedModel = def ? def.id : (models[0] ? models[0].id : null);
-
+          // A remembered choice wins, but only while the server still offers it.
+          if (!byId(selected)) {
+            var def = null;
+            models.forEach(function (m) { if (m.default) def = def || m; });
+            selected = def ? def.id : (models[0] ? models[0].id : null);
+          }
           render();
           return data;
         })
         .catch(function (e) {
           onError('連線有問題');
-          if (root.console) console.error('[models] Failed to load:', e);
+          if (root.console) root.console.error('[models] load failed:', e);
+          return null;
         });
     }
 
-    /** Generate HTML for model selector */
-    function render() {
-      if (!models.length) return;
-
-      var html = '<div class="wl-models">';
-      html += '<div class="wl-models-head">選擇 AI 模型';
-      if (role === 'teacher') html += ' <span class="wl-models-badge">教師模式</span>';
-      html += '</div>';
-
-      models.forEach(function (m) {
-        var checked = m.id === selectedModel ? ' checked' : '';
-        var disabled = !m.enabled ? ' disabled' : '';
-        html += '<label class="wl-model-item' + disabled + '">';
-        html += '<input type="radio" name="wl-model" value="' + m.id + '"' + checked + disabled + '>';
-        html += '<div class="wl-model-info">';
-        html += '<div class="wl-model-name">' + escapeHtml(m.display_name) + '</div>';
-        html += '<div class="wl-model-desc">' + escapeHtml(m.description) + '</div>';
-        html += '</div>';
-
-        // Usage indicator
-        if (m.limits === null) {
-          html += '<div class="wl-model-usage">∞</div>';
-        } else if (m.limits && m.limits.per_lesson_hour) {
-          var left = m.limits.per_lesson_hour.left;
-          var max = m.limits.per_lesson_hour.max;
-          var pct = max > 0 ? Math.round((left / max) * 100) : 0;
-          var cls = pct > 50 ? 'ok' : (pct > 20 ? 'warn' : 'low');
-          html += '<div class="wl-model-usage wl-usage-' + cls + '">';
-          html += left + '/' + max;
-          html += '</div>';
-        }
-        html += '</label>';
-
-        // Thinking toggle for R1
-        if (m.supports_thinking && m.id === selectedModel) {
-          html += '<div class="wl-thinking-toggle">';
-          html += '<label>';
-          html += '<input type="checkbox" id="wl-show-thinking" ' + (showThinking ? 'checked' : '') + '>';
-          html += ' 顯示推理過程';
-          html += '</label>';
-          html += '</div>';
-        }
-      });
-
-      // Overall usage stats for students
-      if (role === 'student' && models.length && models[0].limits) {
-        var m0 = models[0];
-        html += '<div class="wl-models-stats">';
-        if (m0.limits.per_lesson_day) {
-          html += '<span>本課今日: ' + m0.limits.per_lesson_day.left + '/' + m0.limits.per_lesson_day.max + '</span>';
-        }
-        if (m0.limits.per_student_day) {
-          html += '<span>今日總共: ' + m0.limits.per_student_day.left + '/' + m0.limits.per_student_day.max + '</span>';
-        }
-        html += '</div>';
-      }
-
-      // Token and cost tracking (always visible for transparency)
-      if (sessionTokens.total > 0) {
-        html += '<div class="wl-token-stats">';
-
-        // Last turn info
-        if (turnTokens) {
-          html += '<div class="wl-token-turn">';
-          html += '<span class="wl-token-label">上一次：</span>';
-          html += '<span>' + formatNumber(turnTokens.total) + ' tokens</span>';
-          if (turnTokens.reasoning > 0) {
-            html += '<span class="wl-token-detail">（推理 ' + formatNumber(turnTokens.reasoning) + '）</span>';
-          }
-          html += '</div>';
-        }
-
-        // Session totals
-        html += '<div class="wl-token-session">';
-        html += '<span class="wl-token-label">本次總計：</span>';
-        html += '<span>' + formatNumber(sessionTokens.total) + ' tokens</span>';
-
-        if (role === 'teacher' && sessionCost > 0) {
-          html += '<span class="wl-token-cost">HK$' + sessionCost.toFixed(3) + '</span>';
-        }
-        html += '<button type="button" class="wl-reset-session" title="重設統計">✕</button>';
-        html += '</div>';
-
-        html += '</div>';
-      }
-
-      html += '</div>';
-
-      onMount(html);
-      attachListeners();
-    }
-
-    function formatNumber(num) {
-      if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-      }
-      return String(num);
-    }
-
-    /** Attach event listeners after rendering */
-    function attachListeners() {
-      var radios = document.querySelectorAll('input[name="wl-model"]');
-      for (var i = 0; i < radios.length; i++) {
-        radios[i].addEventListener('change', function (e) {
-          selectedModel = e.target.value;
-          showThinking = false; // Reset when switching models
-          saveSession(); // Persist model selection
-          render();
-          onModelChange(selectedModel);
-        });
-      }
-
-      var thinkingCheckbox = document.getElementById('wl-show-thinking');
-      if (thinkingCheckbox) {
-        thinkingCheckbox.addEventListener('change', function (e) {
-          showThinking = e.target.checked;
-          saveSession(); // Persist thinking toggle
-        });
-      }
-
-      // Reset session button
-      var resetBtn = document.querySelector('.wl-reset-session');
-      if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
-          if (confirm('重設本次對話統計？這會清除 token 用量和費用記錄。')) {
-            clearSession();
-          }
-        });
-      }
-    }
-
-    /** Augment API request with model selection */
+    /** The two fields the service reads off every turn. */
     function augmentRequest(req) {
       req = req || {};
-      req.model = selectedModel;
-      if (showThinking) {
-        req.show_thinking = true;
-      }
+      req.model = selected;
+      if (showThinking) req.show_thinking = true;
       return req;
     }
 
-    /** Update usage counts from API response */
     function updateFromResponse(resp) {
       if (!resp) return;
-
-      // Update usage limits
-      if (resp.limits_after) {
-        models.forEach(function (m) {
-          if (m.id === resp.model_used && resp.limits_after) {
-            m.limits = resp.limits_after;
-          }
-        });
-      }
-
-      // Update token tracking
+      var m = byId(resp.model_used);
+      if (m && resp.limits_after) m.limits = resp.limits_after;
       if (resp.tokens) {
         turnTokens = resp.tokens;
         sessionTokens.input += resp.tokens.input || 0;
         sessionTokens.output += resp.tokens.output || 0;
         sessionTokens.reasoning += resp.tokens.reasoning || 0;
         sessionTokens.total += resp.tokens.total || 0;
-
-        // Calculate cost
-        var model = models.filter(function (m) { return m.id === resp.model_used; })[0];
-        if (model && model.cost_per_1k_tokens) {
-          var turnCost = (resp.tokens.total / 1000) * model.cost_per_1k_tokens;
-          sessionCost += turnCost;
+        if (m && m.cost_per_1k_tokens) {
+          sessionCost += (resp.tokens.total / 1000) * m.cost_per_1k_tokens;
         }
       }
-
-      saveSession(); // Persist after each turn
+      saveSession();
       render();
     }
 
-    /** Display thinking content if present */
-    function showThinkingContent(thinking) {
-      if (!thinking) return;
-
-      // Extract thinking text (strip XML tags)
-      var text = thinking.replace(/<\/?think>/g, '').trim();
-      if (!text) return;
-
-      var html = '<div class="wl-thinking">';
-      html += '<div class="wl-thinking-head">';
-      html += '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">';
-      html += '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>';
-      html += '<path d="M12 17h.01"/></svg>';
-      html += '推理過程';
-      html += '</div>';
-      html += '<div class="wl-thinking-body">' + escapeHtml(text) + '</div>';
-      html += '</div>';
-
-      return html;
-    }
-
-    function escapeHtml(str) {
-      var div = document.createElement('div');
-      div.textContent = str || '';
-      return div.innerHTML;
-    }
-
-    function getSelectedModel() {
-      return selectedModel;
-    }
-
-    function getShowThinking() {
-      return showThinking;
-    }
-
-    function getModels() {
-      return models.slice(); // Return copy
-    }
-
-    function getRole() {
-      return role;
-    }
-
     return {
+      el: wrap,
       load: load,
       render: render,
       augmentRequest: augmentRequest,
       updateFromResponse: updateFromResponse,
-      showThinkingContent: showThinkingContent,
       clearSession: clearSession,
-      getSelectedModel: getSelectedModel,
-      getShowThinking: getShowThinking,
-      getModels: getModels,
-      getRole: getRole
+      getSelectedModel: function () { return selected; },
+      getShowThinking: function () { return showThinking; },
+      getModels: function () { return models.slice(); },
+      getRole: function () { return role; },
+      getSessionTokens: function () { return sessionTokens; },
+      /** R1 ships its reasoning wrapped in <think>; nobody downstream should see the tags. */
+      cleanThinking: function (t) { return String(t || '').replace(/<\/?think>/g, '').trim(); }
     };
   }
 
