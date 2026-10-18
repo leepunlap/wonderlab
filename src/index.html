@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wonder Lab Studio</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<div id="wl-app">
+  <main id="wl-editor" aria-label="積木編輯器"></main>
+
+  <aside id="wl-chat" aria-label="AI 學伴">
+    <header class="wl-head">
+      <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+      <h1>AI 學伴</h1>
+      <span class="wl-badge" title="原型：回覆來自模擬端點，不是真正的 AI">原型 · 模擬回覆</span>
+      <button type="button" id="wl-close" class="wl-icon-btn" aria-label="收起 AI 學伴">
+        <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </header>
+
+    <div id="wl-tabs" role="tablist" aria-label="AI 學伴">
+      <button type="button" role="tab" id="wl-tab-chat" aria-controls="wl-pane-chat" aria-selected="true">對話</button>
+      <button type="button" role="tab" id="wl-tab-ver" aria-controls="wl-pane-ver" aria-selected="false">版本 <span id="wl-vcount" class="wl-count">0</span></button>
+      <button type="button" role="tab" id="wl-tab-about" aria-controls="wl-pane-about" aria-selected="false">說明</button>
+    </div>
+
+    <section id="wl-pane-chat" role="tabpanel" aria-labelledby="wl-tab-chat" class="wl-pane">
+      <div id="wl-msgs" role="log" aria-live="polite"></div>
+      <div class="wl-chips" aria-label="試試這樣說">
+        <button type="button" class="wl-chip">「我想角色移動」</button>
+        <button type="button" class="wl-chip">「角色一直走」</button>
+        <button type="button" class="wl-chip">「角色說你好」</button>
+      </div>
+      <p id="wl-ctx" class="wl-ctx">送出時會附上：你的程式</p>
+      <form id="wl-form" class="wl-form">
+        <label for="wl-input" class="wl-sr">你的想法</label>
+        <textarea id="wl-input" rows="2" placeholder="說說你的想法，例如：按空白鍵時角色跳起" autocomplete="off"></textarea>
+        <button type="submit" id="wl-send" class="wl-send" aria-label="送出">
+          <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+        </button>
+      </form>
+      <div class="wl-row">
+        <button type="button" id="wl-undo" class="wl-btn" disabled>
+          <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+          上一步
+        </button>
+      </div>
+    </section>
+
+    <section id="wl-pane-ver" role="tabpanel" aria-labelledby="wl-tab-ver" class="wl-pane" hidden>
+      <p class="wl-help">每次你自己改程式，或者 AI 改了程式，都會記下一個版本。之後可以比較：先前試過、行不通的做法，和最後行得通的做法。</p>
+      <div class="wl-row">
+        <button type="button" id="wl-export" class="wl-btn">
+          <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+          匯出全部版本（JSON）
+        </button>
+      </div>
+      <ol id="wl-vlist" class="wl-vlist" reversed></ol>
+    </section>
+
+    <section id="wl-pane-about" role="tabpanel" aria-labelledby="wl-tab-about" class="wl-pane" hidden>
+      <h2>這是甚麼</h2>
+      <p>Wonder Lab Studio 原型：左邊是完整的積木編輯器（積木、造型、音效、繪圖編輯器、舞台、角色），右邊是 AI 學伴。你可以自己拖積木，也可以說出想法，由 AI 把想法變成積木。</p>
+      <p>每一次對話都會附上你自己砌的程式和上一次執行的結果，所以 AI 會根據你自己的做法回應。</p>
+      <h2>版權及原始碼</h2>
+      <p>本頁以 GNU Affero General Public License v3.0 發布。編輯器部分來自開源的 scratch-editor 15.2.0（AGPL-3.0-only）及 scratch-blocks 2.1.19（Apache-2.0）。</p>
+      <p><a href="NOTICE.html">版權聲明及原始碼</a> · <a href="source.tar.gz">下載本頁原始碼</a></p>
+      <p class="wl-help">本產品與 Scratch Foundation 或麻省理工學院沒有關係，亦未獲其贊助或認可。</p>
+    </section>
+  </aside>
+
+  <button type="button" id="wl-fab" class="wl-fab" aria-controls="wl-chat" aria-expanded="false">
+    <svg class="ic" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+    <span>AI 學伴</span>
+  </button>
+</div>
+<script src="studio-pre.js"></script>
+<script src="scratch-gui-standalone.js"></script>
+<script src="studio-ops.js"></script>
+<script src="studio-trace.js"></script>
+<script src="ucmake-blocks.js"></script>
+<script src="studio-anim.js"></script>
+<script src="studio-core.js"></script>
+<script src="studio-assist.js"></script>
+<script src="studio-app.js"></script>
+<script>
+/* The page mounts the shell and binds its own pane. No boot code here: studio-app.js owns the
+   EditorState, the storage, the render, the VM hook and the order the modules mount in. What is
+   left below is markup binding - the ids this page happens to use - which is exactly the line the
+   architecture draws: behaviour in the shell, appearance in the page. */
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function add(cls, text) {
+    var d = document.createElement('div'); d.className = 'wl-msg ' + cls;
+    d.textContent = text; $('wl-msgs').appendChild(d);
+    $('wl-msgs').scrollTop = $('wl-msgs').scrollHeight; return d;
+  }
+  function tabs() {
+    ['chat', 'ver', 'about'].forEach(function (k) {
+      var t = $('wl-tab-' + k); if (!t) return;
+      t.addEventListener('click', function () {
+        ['chat', 'ver', 'about'].forEach(function (j) {
+          if ($('wl-tab-' + j)) $('wl-tab-' + j).setAttribute('aria-selected', String(j === k));
+          if ($('wl-pane-' + j)) $('wl-pane-' + j).hidden = (j !== k);
+        });
+      });
+    });
+  }
+  tabs();
+
+  var S = StudioApp.create({
+    root: '#wl-editor', api: '/api/ai/lab/studio', library: true, locale: 'zh-tw', ucmake: true,
+    ui: {
+      user: function (t) { add('me', t); },
+      bot: function (t, isQ) { add(isQ ? 'bot q' : 'bot', t); },
+      sys: function (t) { add('sys', t); },
+      busy: function (on) { if ($('wl-send')) $('wl-send').disabled = on; if ($('wl-input')) $('wl-input').disabled = on; },
+      source: function (src) { var b = document.querySelector('.wl-badge'); if (b && src) b.textContent = src === 'stub' ? '原型 · 模擬回覆' : '真實模型'; },
+      /* The shell owns the version list and the restore; this draws it. Called whenever the list
+         changes, and once at boot with whatever was persisted. */
+      version: function (versions, restore, labels) {
+        var box = $('wl-vlist'); if (!box) return;
+        if ($('wl-vcount')) $('wl-vcount').textContent = String(versions.length);
+        box.innerHTML = '';
+        versions.slice().reverse().forEach(function (v) {
+          var li = document.createElement('li');
+          li.className = 'wl-v wl-v-' + v.source;
+          var t = new Date(v.t);
+          var hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+          var meta = document.createElement('div'); meta.className = 'wl-vmeta';
+          meta.textContent = '#' + v.n + '  ' + (labels[v.source] || v.source) + '  ' + hh;
+          var info = document.createElement('div'); info.className = 'wl-vinfo';
+          info.textContent = (v.blocks || 0) + ' 個積木' +
+            ((v.unsupported && v.unsupported.length) ? '（另有 AI 看不懂的積木）' : '') +
+            (v.run ? ' · 已執行 ' + v.run.secs + ' 秒' : '');
+          li.appendChild(meta); li.appendChild(info);
+          // only an entry that still carries its snapshot can be restored
+          if (v.project && v !== versions[versions.length - 1]) {
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'wl-btn wl-small'; b.textContent = '還原這個版本';
+            b.onclick = function () { restore(v, '還原了第 ' + v.n + ' 版'); };
+            li.appendChild(b);
+          }
+          box.appendChild(li);
+        });
+      }
+    },
+    onLoaded: function () {
+      showCtx();
+      add('bot', '你好！我是 AI 學伴。你可以自己拖積木，也可以告訴我你的想法，我會把它變成積木放進左邊的程式區。');
+    }
+  });
+
+  function showCtx() { var e = $('wl-ctx'); if (e) { try { e.textContent = S.context(); } catch (x) {} } }
+  function send() {
+    var inp = $('wl-input'); if (!inp) return;
+    var t = (inp.value || '').trim(); if (!t) return;
+    inp.value = '';
+    S.send(t).then(function () { showCtx(); });
+  }
+  if ($('wl-form')) $('wl-form').addEventListener('submit', function (e) { e.preventDefault(); send(); });
+  if ($('wl-send')) $('wl-send').addEventListener('click', function (e) { e.preventDefault(); send(); });
+  if ($('wl-undo')) $('wl-undo').addEventListener('click', function () { S.undo(); });
+  if ($('wl-export')) $('wl-export').addEventListener('click', function () { S.exportVersions(); });
+  if ($('wl-fab')) $('wl-fab').addEventListener('click', function () {
+    var c = $('wl-chat'); if (!c) return;
+    var open = c.hasAttribute('hidden'); if (open) c.removeAttribute('hidden'); else c.setAttribute('hidden', '');
+    $('wl-fab').setAttribute('aria-expanded', String(open));
+  });
+
+  S.boot().catch(function (e) {
+    var c = $('wl-ctx'); if (c) c.textContent = '編輯器載入失敗';
+    if (window.console) console.error(e);
+  });
+}());
+</script>
+</body>
+</html>

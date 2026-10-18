@@ -1,0 +1,263 @@
+/*!
+ * Wonder Lab Studio — program model <-> live editor blocks.
+ * Copyright (C) 2026 IITS (工信學堂（香港）). GNU Affero General Public License v3.0 only (see LICENSE).
+ * Ported from wonderlab-src/src/wonderlab.js (compile): the same compact program model and the same opcode whitelist
+ * (opcodes.json), but instead of compiling a whole project.json it writes ONE script at a time into the live VM that
+ * scratch-gui is editing, so the student's own scripts, costumes, sounds and positions stay as they are.
+ *
+ * Program model (what lab_core.py validates and the AI edits):
+ *   {sprites: {<name>: {scripts: {<id>: [block, ...]}}}, stage: {scripts: {...}}}     stage name in ops: "舞台"
+ * Ops (lab_core.apply_ops output): {do: "set_script", sprite, id, n} | {do: "delete_script", sprite, id};
+ * the blocks of a set_script come from the reply's merged `program`.
+ */
+(function (global) {
+  'use strict';
+  var STAGE = '舞台';
+  var SHADOW = { num: ['math_number', 'NUM'], pos: ['math_positive_number', 'NUM'], whole: ['math_whole_number', 'NUM'],
+    int: ['math_integer', 'NUM'], angle: ['math_angle', 'NUM'], color: ['colour_picker', 'COLOUR'], text: ['text', 'TEXT'] };
+  var NUMERIC = { num: 1, pos: 1, whole: 1, int: 1, angle: 1 };
+  var MENU_DEFAULT = { obj_rm: '_random_', obj_m: '_mouse_', obj_me: '_edge_', clone: '_myself_', key: 'space', color_param: 'color' };
+  var SOUP = '!#$%()*+,-./:;=?@[]^_`{|}~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  function uid() { var s = ''; for (var i = 0; i < 20; i++) s += SOUP.charAt(Math.floor(Math.random() * SOUP.length)); return s; }
+
+  function Ops(spec) {
+    this.spec = spec;                   // opcodes.json
+    this.sids = {};                     // target name -> {topBlockId: scriptId}
+    this.hand = 0;
+  }
+  Ops.STAGE = STAGE;
+
+  Ops.prototype.nameOf = function (t) { return t.isStage ? STAGE : t.getName(); };
+  Ops.prototype.targets = function (vm) { return vm.runtime.targets.filter(function (t) { return t.isOriginal; }); };
+  Ops.prototype.targetByName = function (vm, name) {
+    var self = this;
+    return this.targets(vm).filter(function (t) { return self.nameOf(t) === name; })[0] || null;
+  };
+
+  /* ---------- live VM -> compact program (what the student built or edited by hand) ---------- */
+  Ops.prototype.snapshot = function (vm) {
+    var self = this, prog = { sprites: {}, stage: { scripts: {} } }, unsupported = [], count = 0;
+    this.targets(vm).forEach(function (t) {
+      var name = self.nameOf(t), B = t.blocks._blocks, map = self.sids[name] || (self.sids[name] = {});
+      var dst = t.isStage ? prog.stage : (prog.sprites[name] = { scripts: {} });
+      var used = {};
+      // keep a stable script id per top block: registered -> encoded in an AI block id -> new hand id
+      Object.keys(map).forEach(function (top) { if (!B[top] || !B[top].topLevel) delete map[top]; else used[map[top]] = 1; });
+      t.blocks.getScripts().forEach(function (top) {
+        var b = B[top]; if (!b || b.shadow) return;
+        var sid = map[top];
+        if (!sid) {
+          var m = /^wl_([A-Za-z0-9-]{1,12})_/.exec(top);
+          sid = (m && !used[m[1]]) ? m[1] : null;
+          while (!sid || used[sid]) { self.hand += 1; sid = 'h' + self.hand; }
+          map[top] = sid; used[sid] = 1;
+        }
+        var ctx = { bad: [] };
+        var blocks = self.stackOut(B, top, ctx);
+        count += countOps(blocks);
+        if (ctx.bad.length) unsupported.push({ sprite: name, id: sid, ops: uniq(ctx.bad).slice(0, 12) });
+        if (blocks.length) dst.scripts[sid] = blocks;
+      });
+    });
+    return { program: prog, unsupported: unsupported, blocks: count };
+  };
+  Ops.prototype.stackOut = function (B, id, ctx) {
+    var out = [];
+    for (var guard = 0; id && B[id] && guard < 500; guard++) {
+      var c = this.blockOut(B, B[id], ctx);
+      if (c) out.push(c);
+      id = B[id].next;
+    }
+    return out;
+  };
+  Ops.prototype.blockOut = function (B, b, ctx) {
+    var def = this.spec.opcodes[b.opcode], self = this;
+    if (!def) { ctx.bad.push(b.opcode); return null; }       // outside the whitelist: reported in `unsupported`, never sent as a block
+    var o = { op: b.opcode };
+    Object.keys(def.inputs || {}).forEach(function (name) {
+      var type = def.inputs[name], inp = b.inputs[name], child = inp && inp.block && B[inp.block];
+      if (!child) return;
+      if (type === 'stack') { var s = self.stackOut(B, child.id, ctx); if (s.length) o[name] = s; return; }
+      if (type === 'bool') { var v = self.blockOut(B, child, ctx); if (v) o[name] = v; return; }
+      var val = self.valueOut(B, child, type, ctx);
+      if (val !== undefined) o[name] = val;
+    });
+    Object.keys(def.fields || {}).forEach(function (name) {
+      var f = b.fields[name]; if (f) o[name] = f.value;
+    });
+    return o;
+  };
+  Ops.prototype.valueOut = function (B, c, type, ctx) {
+    if (c.opcode === 'data_variable') return { 'var': c.fields.VARIABLE.value };
+    if (c.opcode === 'data_listcontents') return { list: c.fields.LIST.value };
+    if (c.shadow) {
+      var keys = Object.keys(c.fields || {}); if (!keys.length) return undefined;
+      var v = c.fields[keys[0]].value;
+      if (NUMERIC[type] && v !== '' && isFinite(+v)) return +v;
+      return v;
+    }
+    return this.blockOut(B, c, ctx) || undefined;
+  };
+
+  /* ---------- compact script -> VM internal blocks ---------- */
+  Ops.prototype.variable = function (vm, target, name, type) {
+    var stage = vm.runtime.getTargetForStage();
+    function find(t) { if (!t) return null; for (var k in t.variables) { var v = t.variables[k]; if (v.name === name && v.type === type) return v; } return null; }
+    var v = (target && !target.isStage && find(target)) || find(stage);
+    if (v) return v.id;
+    var id = uid();
+    stage.createVariable(id, name, type);
+    return id;
+  };
+  Ops.prototype.build = function (vm, target, list, x, y, sid) {
+    var self = this, spec = this.spec.opcodes, out = [], exts = {};
+    function add(b) { out.push(b); return b.id; }
+    function shadow(parent, opcode, field, value, extra) {
+      var f = {}; f[field] = Object.assign({ name: field, value: String(value) }, extra || {});
+      return add({ id: uid(), opcode: opcode, inputs: {}, fields: f, next: null, parent: parent, shadow: true, topLevel: false });
+    }
+    function reporterVar(parent, kind, name) {
+      var isList = kind === 'list', vid = self.variable(vm, target, name, isList ? 'list' : '');
+      var f = {}, fn = isList ? 'LIST' : 'VARIABLE';
+      f[fn] = { name: fn, value: name, id: vid, variableType: isList ? 'list' : '' };
+      return add({ id: uid(), opcode: isList ? 'data_listcontents' : 'data_variable', inputs: {}, fields: f, next: null, parent: parent, shadow: false, topLevel: false });
+    }
+    function stack(arr, parent) {
+      var first = null, prev = null;
+      (arr || []).forEach(function (b) {
+        var id = block(b, prev ? prev.id : parent);
+        if (!id) return;
+        var cur = out.filter(function (x) { return x.id === id; })[0];
+        if (prev) prev.next = id; else first = id;
+        prev = cur;
+      });
+      return first;
+    }
+    function block(b, parent, idOverride) {
+      var def = spec[b && b.op]; if (!def) return null;
+      if (def.ext) exts[def.ext] = 1;
+      var id = idOverride || uid();
+      var blk = { id: id, opcode: b.op, inputs: {}, fields: {}, next: null, parent: parent || null, shadow: false, topLevel: false };
+      add(blk);
+      Object.keys(def.inputs || {}).forEach(function (name) {
+        var type = def.inputs[name], v = b[name];
+        if (type === 'stack') { if (Array.isArray(v) && v.length) { var f = stack(v, id); if (f) blk.inputs[name] = { name: name, block: f, shadow: null }; } return; }
+        if (type === 'bool') { if (v && v.op) { var bb = block(v, id); if (bb) blk.inputs[name] = { name: name, block: bb, shadow: null }; } return; }
+        if (type === 'broadcast') {
+          var nm = String(v == null ? 'message1' : v), mid = self.variable(vm, target, nm, 'broadcast_msg');
+          var sh = shadow(id, 'event_broadcast_menu', 'BROADCAST_OPTION', nm, { id: mid, variableType: 'broadcast_msg' });
+          blk.inputs[name] = { name: name, block: sh, shadow: sh }; return;
+        }
+        var shId;
+        if (type.indexOf('menu:') === 0) {
+          var p = type.split(':'), mv = (v == null || typeof v === 'object') ? (MENU_DEFAULT[p[3]] || '') : String(v);
+          if (p[3] === 'costume' && (v == null || typeof v === 'object')) mv = target && target.getCostumes()[0] ? target.getCostumes()[0].name : '';
+          if (p[3] === 'backdrop' && (v == null || typeof v === 'object')) { var st = vm.runtime.getTargetForStage(); mv = st.getCostumes()[0] ? st.getCostumes()[0].name : ''; }
+          shId = shadow(id, p[1], p[2], mv);
+        } else {
+          var sd = SHADOW[type] || SHADOW.text, dflt = type === 'color' ? '#000000' : (type === 'text' ? '' : '0');
+          shId = shadow(id, sd[0], sd[1], (v == null || typeof v === 'object') ? dflt : v);
+        }
+        var top = shId;
+        if (v && typeof v === 'object') {
+          if (v['var'] != null) top = reporterVar(id, 'var', String(v['var']));
+          else if (v.list != null) top = reporterVar(id, 'list', String(v.list));
+          else if (v.op) top = block(v, id) || shId;
+        }
+        blk.inputs[name] = { name: name, block: top, shadow: shId };
+      });
+      Object.keys(def.fields || {}).forEach(function (name) {
+        var ft = def.fields[name], v = b[name];
+        if (ft === 'var' || ft === 'list' || ft === 'broadcast') {
+          var vt = ft === 'var' ? '' : (ft === 'list' ? 'list' : 'broadcast_msg'), nm = String(v == null ? (ft === 'broadcast' ? 'message1' : '我的變數') : v);
+          blk.fields[name] = { name: name, value: nm, id: self.variable(vm, target, nm, vt), variableType: vt };
+        } else {
+          blk.fields[name] = { name: name, value: String(v == null ? (Array.isArray(ft) ? ft[0] : (ft === 'key' ? 'space' : '')) : v) };
+        }
+      });
+      if (b.op === 'control_stop') blk.mutation = { tagName: 'mutation', children: [], hasnext: b.STOP_OPTION === 'other scripts in sprite' ? 'true' : 'false' };
+      return id;
+    }
+    var first = null, prev = null;
+    (list || []).forEach(function (b, i) {
+      var id = block(b, prev ? prev.id : null, i === 0 ? 'wl_' + sid + '_' + uid().replace(/[^A-Za-z0-9]/g, '').slice(0, 6) : null);
+      if (!id) return;
+      var cur = out.filter(function (x) { return x.id === id; })[0];
+      if (prev) prev.next = id; else first = cur;
+      prev = cur;
+    });
+    if (first) { first.topLevel = true; first.x = Math.round(x); first.y = Math.round(y); }
+    return { blocks: out, top: first ? first.id : null, exts: Object.keys(exts) };
+  };
+
+  /* ---------- apply one AI turn (lab_core reply) to the live editor ---------- */
+  // place(target, nBlocks) -> {x, y}: where a NEW script goes (the host knows the visible workspace area)
+  Ops.prototype.apply = function (vm, reply, place) {
+    var self = this, prog = reply.program || {}, done = [], skipped = [], sideBySide = [];
+    var ops = (reply.ops || []).filter(function (o) { return o && (o['do'] === 'set_script' || o['do'] === 'delete_script'); });
+    var needExt = {};
+    ops.forEach(function (o) {
+      if (o['do'] !== 'set_script') return;
+      var src = o.sprite === STAGE ? (prog.stage || {}) : ((prog.sprites || {})[o.sprite] || {});
+      JSON.stringify((src.scripts || {})[o.id] || []).replace(/"op":"([a-z]+)_/g, function (m, p) { if (p === 'pen') needExt.pen = 1; });
+    });
+    var load = Object.keys(needExt).filter(function (e) { return !vm.extensionManager.isExtensionLoaded(e); })
+      .map(function (e) { return vm.extensionManager.loadExtensionURL(e); });
+    return Promise.all(load).then(function () {
+      var touched = {};
+      ops.forEach(function (o) {
+        var target = self.targetByName(vm, o.sprite);
+        if (!target) { skipped.push(o); return; }
+        var name = self.nameOf(target), map = self.sids[name] || (self.sids[name] = {});
+        var oldTop = Object.keys(map).filter(function (k) { return map[k] === o.id && target.blocks._blocks[k]; })[0];
+        var hasForeign = false;
+        if (oldTop) {        // a script with blocks outside the whitelist: the AI never saw them, so never overwrite it
+          var probe = { bad: [] }; self.stackOut(target.blocks._blocks, oldTop, probe); hasForeign = probe.bad.length > 0;
+        }
+        if (o['do'] === 'delete_script') {
+          if (oldTop && !hasForeign) { target.blocks.deleteBlock(oldTop); delete map[oldTop]; done.push({ op: o, top: null, target: target }); touched[target.id] = target; }
+          else skipped.push(o);
+          return;
+        }
+        var src = o.sprite === STAGE ? (prog.stage || {}) : ((prog.sprites || {})[o.sprite] || {});
+        var list = (src.scripts || {})[o.id];
+        if (!Array.isArray(list)) { skipped.push(o); return; }
+        var pos;
+        if (oldTop && !hasForeign) {
+          var ob = target.blocks._blocks[oldTop]; pos = { x: ob.x || 0, y: ob.y || 0 };
+          target.blocks.deleteBlock(oldTop); delete map[oldTop];
+        } else {
+          pos = place(target, countOps(list));
+          if (hasForeign) sideBySide.push(o);
+        }
+        var sid = hasForeign ? o.id + 'b' : o.id;
+        var built = self.build(vm, target, list, pos.x, pos.y, sid);
+        built.blocks.forEach(function (b) { target.blocks.createBlock(b); });
+        if (built.top) { map[built.top] = sid; done.push({ op: o, top: built.top, target: target }); }
+        touched[target.id] = target;
+      });
+      Object.keys(touched).forEach(function (id) { touched[id].blocks.updateTargetSpecificBlocks(touched[id].isStage); });
+      return { done: done, skipped: skipped, sideBySide: sideBySide };
+    });
+  };
+
+  /** Which scripts changed between two compact programs (for "the student edited these by hand"). */
+  Ops.diff = function (a, b) {
+    function flat(p) {
+      var o = {};
+      if (!p) return o;
+      Object.keys(p.sprites || {}).forEach(function (n) { var s = (p.sprites[n] || {}).scripts || {}; Object.keys(s).forEach(function (k) { o[n + '\u0000' + k] = JSON.stringify(s[k]); }); });
+      var st = (p.stage || {}).scripts || {}; Object.keys(st).forEach(function (k) { o[STAGE + '\u0000' + k] = JSON.stringify(st[k]); });
+      return o;
+    }
+    var A = flat(a), Bm = flat(b), out = [];
+    Object.keys(Bm).forEach(function (k) { var p = k.split('\u0000'); if (!(k in A)) out.push({ sprite: p[0], id: p[1], change: 'added' }); else if (A[k] !== Bm[k]) out.push({ sprite: p[0], id: p[1], change: 'changed' }); });
+    Object.keys(A).forEach(function (k) { var p = k.split('\u0000'); if (!(k in Bm)) out.push({ sprite: p[0], id: p[1], change: 'removed' }); });
+    return out;
+  };
+
+  function countOps(x) { var n = 0; JSON.stringify(x || []).replace(/"op":/g, function () { n += 1; }); return n; }
+  function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
+  Ops.countOps = countOps;
+  global.StudioOps = Ops;
+})(window);

@@ -1,0 +1,50 @@
+{
+ "errors": [],
+ "ready_s": 2.67,
+ "blocks_in_workspace": 3,
+ "sprite_x_after_run": 267,
+ "run_report": {
+  "secs": 1.5,
+  "still_running": false,
+  "ended_by_itself": true,
+  "keys": [],
+  "answers": [],
+  "sprites": {
+   "角色1": {
+    "start": [
+     0,
+     0
+    ],
+    "end": [
+     267,
+     0
+    ],
+    "x_range": [
+     0,
+     267
+    ],
+    "y_range": [
+     0,
+     0
+    ],
+    "dir": 90,
+    "size": 100,
+    "visible_at_end": true,
+    "was_hidden": false,
+    "reached_edge": true,
+    "said": [],
+    "touched": {},
+    "costume": "造型1",
+    "costume_changes": 0,
+    "max_clones": 0,
+    "touched_colors": {}
+   }
+  },
+  "vars": {},
+  "lists": {},
+  "hat_wait": false,
+  "backdrop": "背景1"
+ },
+ "no_hscroll": true,
+ "user_agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1"
+}

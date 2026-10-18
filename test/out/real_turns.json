@@ -1,0 +1,168 @@
+{
+ "turns": [
+  {
+   "student": "我想佢一直行",
+   "sent_program": {
+    "sprites": {
+     "角色1": {
+      "scripts": {
+       "h1": [
+        {
+         "op": "event_whenflagclicked"
+        },
+        {
+         "op": "motion_movesteps",
+         "STEPS": 10
+        }
+       ]
+      }
+     }
+    },
+    "stage": {
+     "scripts": {}
+    }
+   },
+   "sent_run": {
+    "secs": 1.6,
+    "still_running": false,
+    "ended_by_itself": true,
+    "keys": [],
+    "answers": [],
+    "sprites": {
+     "角色1": {
+      "start": [
+       0,
+       0
+      ],
+      "end": [
+       10,
+       0
+      ],
+      "x_range": [
+       0,
+       10
+      ],
+      "y_range": [
+       0,
+       0
+      ],
+      "dir": 90,
+      "size": 100,
+      "visible_at_end": true,
+      "was_hidden": false,
+      "reached_edge": false,
+      "said": [],
+      "touched": {},
+      "costume": "造型1",
+      "costume_changes": 0,
+      "max_clones": 0,
+      "touched_colors": {}
+     }
+    },
+    "vars": {},
+    "lists": {},
+    "hat_wait": false,
+    "backdrop": "背景1"
+   },
+   "reply_msgs": [
+    "me: 我想佢一直行",
+    "bot: 照你說的：角色1一直行，我把它放進「重複無限次」，每次移動 10 點。",
+    "bot q: 按「執行」之前猜猜：角色1行到舞台右邊之後會怎樣？"
+   ],
+   "applied_ops": [
+    {
+     "do": "set_script",
+     "sprite": "角色1",
+     "id": "h1",
+     "n": 2
+    }
+   ],
+   "program_after": {
+    "sprites": {
+     "角色1": {
+      "scripts": {
+       "h1": [
+        {
+         "op": "event_whenflagclicked"
+        },
+        {
+         "op": "control_forever",
+         "SUBSTACK": [
+          {
+           "op": "motion_movesteps",
+           "STEPS": 10
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "stage": {
+     "scripts": {}
+    }
+   }
+  },
+  {
+   "student": "佢行出咗舞台",
+   "sent_program": {
+    "sprites": {
+     "角色1": {
+      "scripts": {
+       "h1": [
+        {
+         "op": "event_whenflagclicked"
+        },
+        {
+         "op": "control_forever",
+         "SUBSTACK": [
+          {
+           "op": "motion_movesteps",
+           "STEPS": 10
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "stage": {
+     "scripts": {}
+    }
+   },
+   "sent_run": null,
+   "reply_msgs": [
+    "me: 佢行出咗舞台",
+    "bot: 你睇到：角色1一路行，行到舞台右邊就出咗去，唔見咗。",
+    "bot q: 你想角色1行到舞台右邊嘅時候，發生咩事？"
+   ],
+   "applied_ops": [],
+   "program_after": {
+    "sprites": {
+     "角色1": {
+      "scripts": {
+       "h1": [
+        {
+         "op": "event_whenflagclicked"
+        },
+        {
+         "op": "control_forever",
+         "SUBSTACK": [
+          {
+           "op": "motion_movesteps",
+           "STEPS": 10
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "stage": {
+     "scripts": {}
+    }
+   }
+  }
+ ],
+ "console_errors": []
+}

@@ -1,0 +1,121 @@
+/*!
+ * Wonder Lab Studio — run report ("run and look"), ported from wonderlab-src/src/wonderlab.js (run/sample/report).
+ * Copyright (C) 2026 IITS. GNU Affero General Public License v3.0 only (see LICENSE).
+ * scratch-gui owns the green flag / stop buttons, so the trace starts on the VM's PROJECT_START (green flag) or on the
+ * first PROJECT_RUN_START after an idle stage (a clicked script, a key hat) and ends on PROJECT_STOP_ALL.
+ * The report has the shape lab_core.sanitize_run() keeps.
+ */
+(function (global) {
+  'use strict';
+  var WAIT_HATS = { event_whenkeypressed: 1, event_whenthisspriteclicked: 1, event_whenstageclicked: 1 };
+
+  function Trace(vm) {
+    this.vm = vm; this.trace = null; this.sig = { runs: 0, stops: 0, undo: 0 }; this.ranSinceTurn = false; this.onRun = null;
+    var self = this, rt = vm.runtime, lastStop = 0;
+    vm.on('PROJECT_START', function () { self.start('flag'); });
+    vm.on('PROJECT_RUN_START', function () { if (!self.trace || self.trace.stoppedAt) self.start('script'); });
+    vm.on('PROJECT_STOP_ALL', function () {
+      lastStop = Date.now();
+      setTimeout(function () {            // greenFlag() = stopAll() + start: a stop followed at once by a start is not a 停止 press
+        if (self.trace && self.trace.t0 < lastStop && !self.trace.stoppedAt) { self.trace.stoppedAt = lastStop; self.sig.stops += 1; clearInterval(self._tick); if (self.onRun) self.onRun('stop'); }
+      }, 30);
+    });
+    rt.on('SAY', function (target, type, text) {
+      if (self.trace && text && target && !target.isStage) {
+        var s = self.sprite(target.getName()); if (s.said.indexOf(text) < 0 && s.said.length < 6) s.said.push(String(text).slice(0, 40));
+      }
+    });
+    rt.on('ANSWER', function (a) { if (self.trace && self.trace.answers.length < 5) self.trace.answers.push(String(a).slice(0, 20)); });
+    document.addEventListener('keydown', function (e) {
+      if (!self.trace || self.trace.stoppedAt || /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '') || e.repeat) return;
+      if (self.trace.keys.length < 30) self.trace.keys.push(e.key === ' ' ? 'space' : String(e.key).replace('Arrow', '').toLowerCase());
+    }, true);
+    this.watchColors();
+  }
+
+  Trace.prototype.start = function (how) {
+    var self = this;
+    this.trace = { t0: Date.now(), how: how, sprites: {}, keys: [], answers: [], stoppedAt: null, idleAt: null, samples: 0 };
+    this.sig.runs += 1; this.ranSinceTurn = true;
+    clearInterval(this._tick);
+    this.sample();                       // PROJECT_START comes before the hats run: this is the true start position
+    this._tick = setInterval(function () { self.sample(); }, 100);
+    if (this.onRun) this.onRun('start');
+  };
+  Trace.prototype.sprite = function (name) {
+    var s = this.trace.sprites[name];
+    if (!s) s = this.trace.sprites[name] = { start: null, end: null, minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9, said: [], touched: {}, touchedColors: {}, edge: false, clones: 0, hidden: false };
+    return s;
+  };
+  function hex(rgb) { return '#' + [0, 1, 2].map(function (i) { var v = Math.max(0, Math.min(255, Math.round(+rgb[i] || 0))); return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+  Trace.prototype.noteColor = function (name, rgb) {
+    if (!this.trace || !name) return;
+    var s = this.sprite(name), h = hex(rgb);
+    if (!(h in s.touchedColors) && Object.keys(s.touchedColors).length < 6) s.touchedColors[h] = ((Date.now() - this.trace.t0) / 1000).toFixed(1);
+  };
+  /** a colour check the program makes (碰到顏色) that comes out true is recorded (sampling can miss a quick bounce) */
+  Trace.prototype.watchColors = function () {
+    var self = this, t = this.vm.runtime.targets[0], P = t && Object.getPrototypeOf(t);
+    if (!P || typeof P.isTouchingColor !== 'function' || P.__wlColors) return;
+    var orig = P.isTouchingColor;
+    P.isTouchingColor = function (rgb) {
+      var r = orig.apply(this, arguments);
+      if (r && self.trace && !this.isStage && this.sprite && rgb && rgb.length >= 3) self.noteColor(this.sprite.name, rgb);
+      return r;
+    };
+    P.__wlColors = true;
+  };
+  Trace.prototype.sample = function () {
+    var tr = this.trace, rt = this.vm.runtime, self = this; if (!tr) return;
+    if (!this.vm.runtime.targets[0] || !Object.getPrototypeOf(this.vm.runtime.targets[0]).__wlColors) this.watchColors();
+    tr.samples += 1;
+    var orig = rt.targets.filter(function (t) { return !t.isStage && t.isOriginal; });
+    orig.forEach(function (t) {
+      var s = self.sprite(t.getName()), x = Math.round(t.x) || 0, y = Math.round(t.y) || 0;
+      if (!s.start) s.start = [x, y];
+      s.end = [x, y]; s.dir = Math.round(t.direction); s.size = Math.round(t.size); s.visible = t.visible;
+      if (!t.visible) s.hidden = true;
+      s.minX = Math.min(s.minX, x); s.maxX = Math.max(s.maxX, x); s.minY = Math.min(s.minY, y); s.maxY = Math.max(s.maxY, y);
+      if (Math.abs(x) >= 235 || Math.abs(y) >= 175) s.edge = true;
+      var cs = t.getCostumes(); s.costume = cs[t.currentCostume] ? cs[t.currentCostume].name : '';
+      s.costumeChanges = (s.costumeChanges || 0) + (s.lastCostume != null && s.lastCostume !== t.currentCostume ? 1 : 0); s.lastCostume = t.currentCostume;
+      s.clones = Math.max(s.clones, t.sprite.clones.length - 1);
+      if (tr.samples % 3 === 0) orig.forEach(function (o) {
+        if (o !== t && !s.touched[o.getName()] && t.visible && o.visible && t.isTouchingSprite(o.getName())) s.touched[o.getName()] = ((Date.now() - tr.t0) / 1000).toFixed(1);
+      });
+    });
+    if (rt.threads.length === 0 && tr.samples > 3 && !tr.idleAt) tr.idleAt = Date.now();
+    if (Date.now() - tr.t0 > 120000) clearInterval(this._tick);
+  };
+  Trace.prototype.report = function (program) {
+    var tr = this.trace; if (!tr) return null;
+    var rt = this.vm.runtime, out = { secs: +(((tr.stoppedAt || Date.now()) - tr.t0) / 1000).toFixed(1),
+      still_running: rt.threads.length > 0 && !tr.stoppedAt, ended_by_itself: !!tr.idleAt, keys: tr.keys.slice(0, 15), answers: tr.answers, sprites: {}, vars: {}, lists: {} };
+    out.hat_wait = waitsForInput(program);
+    if (out.hat_wait) out.ended_by_itself = false;
+    Object.keys(tr.sprites).forEach(function (n) {
+      var s = tr.sprites[n];
+      out.sprites[n] = { start: s.start, end: s.end, x_range: [s.minX, s.maxX], y_range: [s.minY, s.maxY], dir: s.dir, size: s.size,
+        visible_at_end: s.visible, was_hidden: s.hidden, reached_edge: s.edge, said: s.said, touched: s.touched, costume: s.costume,
+        costume_changes: s.costumeChanges || 0, max_clones: s.clones, touched_colors: s.touchedColors || {} };
+    });
+    var st = rt.getTargetForStage();
+    Object.keys(st.variables).forEach(function (k) {
+      var v = st.variables[k];
+      if (v.type === '') out.vars[v.name] = v.value;
+      else if (v.type === 'list') out.lists[v.name] = { length: v.value.length, first: v.value.slice(0, 12) };
+    });
+    out.backdrop = st.getCostumes()[st.currentCostume] ? st.getCostumes()[st.currentCostume].name : '';
+    return out;
+  };
+  Trace.prototype.turnDone = function () { this.ranSinceTurn = false; this.sig = { runs: 0, stops: 0, undo: 0 }; };
+
+  function waitsForInput(prog) {
+    var found = false;
+    function scan(scr) { Object.keys(scr || {}).forEach(function (k) { var a = scr[k]; if (a && a[0] && WAIT_HATS[a[0].op]) found = true; }); }
+    Object.keys((prog && prog.sprites) || {}).forEach(function (n) { scan((prog.sprites[n] || {}).scripts); });
+    scan(prog && prog.stage && prog.stage.scripts);
+    return found;
+  }
+  global.StudioTrace = Trace;
+})(window);

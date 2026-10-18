@@ -1,0 +1,273 @@
+# Wonder Lab Studio — prototype
+
+**Status (2026-10-07): prototype only. Nothing is deployed.** It runs on a local test server
+(`127.0.0.1:8920`) and does not touch `/var/www`, nginx, systemd, the lesson-ai service or any database.
+
+Wonder Lab Studio is the **full editor from the open-source scratch-editor 15.2.0** (`@scratch/scratch-gui`, the same
+stack as `@scratch/scratch-vm` 15.2.0) embedded in a page with an **AI chat pane that drives the editor**. The student
+can drag blocks by hand at any time. Every chat turn sends the student's own program and the last run back to the AI,
+so the AI builds on what the student made (Kapur, productive failure). It is the planned web replacement for UCMake
+(UCMake = a rebranded OpenBlock desktop app); see "Recommended path" at the end.
+
+Screenshots: `shots/` (listed under "Screenshots"). Test results: `test/out/*.json`.
+
+---
+
+## 1. What was built
+
+```
+ ┌──────────────── browser ───────────────────────────────────────────────┐
+ │  studio-pre.js   editor width media queries (JS + CSS) -> editor width │
+ │  scratch-gui-standalone.js  (upstream, unmodified: GUI + VM + blocks + │
+ │                              paint editor + renderer + audio)          │
+ │      EditorState({locale:'zh-tw'}, StudioStorage)  -> vm (onVmInit)    │
+ │  studio.js       boot, branding, chat pane, versions, undo             │
+ │  studio-ops.js   compact program  <->  live VM blocks (one script/op)  │
+ │  studio-trace.js run report (green flag / stop / keys / say / answers) │
+ └──────────────┬───────────────────────────────────────────────▲────────┘
+     POST {text, history, program, run, note, signals, studio}  │ {say, question, ops, program, focus}
+ ┌──────────────▼───────────────────────────────────────────────┴────────┐
+ │ server/studio_server.py  static files + STUB of /api/ai/lab           │
+ │   lab_core.py (copied unchanged): sanitize_program / apply_ops /      │
+ │   sanitize_run / tidy_*;  canned replies, or WL_REAL=1 -> lab_turn()  │
+ └────────────────────────────────────────────────────────────────────────┘
+```
+
+| Requirement | How |
+|---|---|
+| Full editor, left | `@scratch/scratch-gui` **15.2.0 standalone build** (`dist/scratch-gui-standalone.js`, exports `EditorState` + `createStandaloneRoot`). Palette, workspace, stage, sprite list, costumes and sounds tabs, paint editor, sound editor, debug-strategies modal, File menu all work. Locale `zh-tw`. No build step and no fork: the library is consumed as published. |
+| Chat pane, right | `src/index.html` + `studio.css`. Side by side from 1280 px wide (pane 360 px). Below 1280 px (iPad landscape 1024) the pane is a drawer opened by the 「AI 學伴」 button in the menu bar. `studio-pre.js` rewrites the editor's viewport media queries (JS `matchMedia` and the CSS `@media` rules) so the editor lays itself out for the width it really has (at 1440 it uses its own "constrained stage" layout, as on a 1024 screen). |
+| Student drags blocks | Untouched editor behaviour. |
+| AI drives the editor | `vm` from the GUI's `onVmInit` prop. The reply is the **same shape lab_core emits**: `ops` = `apply_ops()` output (`{do:"set_script"|"delete_script", sprite, id, n}`), blocks taken from the reply's merged `program`. `studio-ops.js` is a port of `wonderlab.js` `compile()`, but writes **one script at a time** into the live VM (`target.blocks.createBlock`), then `vm.emitWorkspaceUpdate()` so the GUI redraws. A replaced script keeps its position; a new one goes into a free spot in the visible workspace. Changed scripts get a teal outline for 8 s and are scrolled into view. Same whitelist (`src/opcodes.json` = `wonderlab-src/src/opcodes.json` = `lab_opcodes.json`), pen extension loaded on demand. |
+| Student work flows back | Each turn sends `program` = a **decompile of the live VM** into the compact model (hand-built scripts get ids `h1, h2…`; AI scripts keep their id through the block id `wl_<id>_…`, which also survives .sb3 save/load), `run` = the trace report (ported from `wonderlab.js` run/sample/report; starts on the green flag or a clicked script, ends on stop), `signals` `{runs, stops, undo}`, `note` after 上一步, and a prototype extension `studio`: live sprite/costume/backdrop names, the editing sprite, `hand_edits` (scripts added/changed/removed by hand since the last AI turn) and `unsupported` (scripts that use blocks outside the whitelist; those blocks are never sent as blocks). |
+| Versions | Every settled hand edit (1.2 s after the last change), every AI turn, load and restore is a version: time, source (開始 / 自己改 / AI 改 / AI 回覆 / 載入 / 還原), compact program, unsupported list, block count, the student's words / AI's `say`, the **run report of that version**, and the full project JSON (`vm.toJSON()`; assets are cached so painted costumes restore). Tab 「版本」 lists them with 「還原這個版本」 and 「匯出全部版本（JSON）」 for a later consolidation step (compare failed attempts with the working one). 「上一步」 restores the version before the last AI change and tells the AI (same note as lab.js). Kept in memory and in `localStorage` (last 60; project JSON for the last 15). |
+| .sb3 | The editor's own 檔案 > 下載到你的電腦 / 從你的電腦載入. Round trip verified (UI and `vm.saveProjectSb3()`). |
+| Stub endpoint | `server/studio_server.py` on 8920 (`POST /api/ai/lab/<anything>`). Canned, keyword-based replies that **build on the student's own green-flag script** (e.g. 「一直走」 adds 重複無限次 + 移動 10 點 to it); any other message gets an observe reply that describes the student's program and last run. Replies go through the real `lab_core` validators, so they are exactly what the service would accept. |
+| Branding / licence | See sections 3 and 4. Licence + source page `/NOTICE.html`, AGPL source download `/source.tar.gz`. |
+
+### Files
+
+```
+src/index.html        page: editor host + chat pane (Lucide icons inline, ISC)
+src/studio-pre.js     media-query rewrite (must load before the bundle)
+src/studio.js         boot, StudioStorage + default project, branding, chat, versions, undo
+src/studio-ops.js     program model <-> live VM blocks, diff
+src/studio-trace.js   run report
+src/studio.css        layout + pane styles
+src/opcodes.json      whitelist (copy of wonderlab-src/src/opcodes.json)
+src/assets/           neutral default sprite (2 costumes), backdrop, logo, favicon, paint icon
+src/NOTICE.html       licences, source offer, trademark notice (zh-Hant)
+server/studio_server.py   static + stub API (+ /source.tar.gz, /LICENSE.txt), ports 8920–8929 only
+server/lab_core.py        copy of ycltesthk-portals/lesson-ai/lab_core.py (2026-10-07, unchanged)
+test/e2e.py           the productive-failure walk-through + checks + screenshots (Playwright, Chrome)
+test/perf.py          bundle sizes + first-load timing with network / CPU throttling
+test/real_turns.py    2 real DeepSeek turns through lab_core.lab_turn
+test/webkit_ipad.cjs  WebKit (Safari engine) with an iPad profile, 1024x768
+```
+
+## 2. Versions and licences
+
+Found on npm on 2026-10-07: `@scratch/scratch-gui` versions run up to **15.2.0** (latest; 15.0.0–15.2.0 are the 15.x
+line). It is published with a library build and a standalone build, so no monorepo clone or source build was needed.
+
+| Package | Version | Licence |
+|---|---|---|
+| @scratch/scratch-gui | 15.2.0 (monorepo gitHead 970132883d63286762783448d4d487dcefedabf8) | AGPL-3.0-only |
+| @scratch/scratch-vm / -render / -storage / -paint / -svg-renderer | 15.2.0 | AGPL-3.0-only |
+| scratch-blocks | 2.1.19 (on Blockly 12) | Apache-2.0 |
+| scratch-l10n | 6.1.118 | AGPL-3.0-only |
+| scratch-audio | 2.0.268 | AGPL-3.0-only |
+| scratch-render-fonts | 1.0.252 | Apache-2.0, fonts OFL-1.1 |
+| React / Redux (inside the standalone bundle) | 18.3 / 4.2 | MIT |
+| Lucide icons | lucide-static 1.52.0 | ISC |
+| This prototype | 0.0.1 | AGPL-3.0-only (`LICENSE`) |
+
+Tools: Node 22.22.1, npm 9.2.0, Python 3.14, Playwright (Python 1.60 with Chrome 153 at `/usr/bin/google-chrome`;
+Node 1.61.1 for WebKit). Details and third-party notices: `NOTICE.md`, `/NOTICE.html`,
+`/scratch-gui-standalone.js.LICENSE.txt`.
+
+## 3. How to run
+
+```bash
+cd /home/blee/wonderlab-studio
+npm ci                                              # installs @scratch/scratch-gui 15.2.0 exactly (package-lock.json)
+python3 server/studio_server.py --port 8920         # open http://127.0.0.1:8920/   (stub AI, no model calls)
+
+# checks (server running)
+python3 test/e2e.py                                 # PF walk-through, 25 checks, screenshots -> shots/
+python3 test/perf.py --runs 3                       # sizes + load times -> test/out/perf.json
+node test/webkit_ipad.cjs                           # WebKit + iPad profile -> test/out/webkit_ipad.json
+
+# optional: real model turns (key only via the environment; at most WL_REAL_MAX calls)
+(set -a; . ~/.deepseek; set +a; WL_REAL=1 WL_REAL_MAX=2 python3 server/studio_server.py --port 8921)
+python3 test/real_turns.py --base http://127.0.0.1:8921
+```
+
+Stop the server with Ctrl+C. Ports: 8920 (stub) and 8921 (real-model test) only.
+
+### Pointing it at the real `/api/ai/lab` endpoint
+
+1. Front-end: set the endpoint before `studio.js` loads, e.g.
+   `<script>window.WL_API = '/api/ai/lab/files/L4/lessons/<slug>';</script>` and serve the page from the same origin as
+   lesson-ai (requests use `credentials: 'same-origin'`, so the portal login cookie is sent). The client already
+   handles `{ok:false, reason}`, 429/413/502 the way `lab.js` does (message + keeps the student's words).
+2. lab_core needs a **studio mode** (not done, nothing in ycltesthk-portals was edited):
+   - `Ctx` / `sanitize_program` / `apply_ops` validate sprite names against the lesson's fixed sprites. In the Studio
+     the student adds, renames and paints sprites, so the lesson context must be built from `body.studio.targets`
+     (sanitised: names ≤ 40 chars, word filter, caps on counts), as `lesson_from()` in `server/studio_server.py` does.
+   - a free-creation brief (goal / question path) for lessons that open the Studio, or the lesson's own brief;
+   - two prompt lines: 【學生自己改過】 from `studio.hand_edits` and 【AI 看不懂的積木】 from `studio.unsupported`;
+   - storage: `lab_programs` keeps the compact program only; the Studio needs the .sb3 (assets) and the version list
+     per student, server side.
+   - `MAX_BODY` (64 000) is enough for the snapshot; `studio` adds about 0.5–2 KB.
+3. Verified with the copied `lab_core.lab_turn` and DeepSeek (`deepseek-chat`), 2 calls, `test/out/real_turns.json`:
+   the student drags 「當綠旗被點擊 + 移動 10 點」, runs it, says 「我想佢一直行」 → the model **rewrote the student's own
+   script `h1`** into 「當綠旗被點擊 → 重複無限次 { 移動 10 點 }」 (applied in the live editor, same position), asked for a
+   prediction; then 「佢行出咗舞台」 → `observe`, no ops, one question (PF rules held). Screenshot `shots/10-…`.
+
+## 4. Trademark items removed or replaced
+
+| Item | What the page does |
+|---|---|
+| Scratch logo (menu bar) | replaced by a neutral "Wonder Lab" SVG (`#logo_img` swapped at run time, alt text changed; logo not clickable) |
+| Scratch Cat default sprite | own default project (id "0" in our `StudioStorage`): neutral robot sprite 「角色1」 with 2 costumes, white 「背景1」, no sounds; also used by 檔案 > 新建專案 |
+| Cat-head icon on the add-sprite and add-costume buttons | replaced by a Lucide pencil (those buttons now paint) |
+| "Scratch 專案" default title, crash / unsupported-browser / WebGL / telemetry / Scratch Link / "加入 Scratch" strings | every zh-tw and en UI string containing "Scratch" rewritten (本編輯器 / 開發團隊 / 裝置連接程式); title 「我的作品」 |
+| Sprite / backdrop / costume / sound libraries and 「驚喜」 | hidden: they show the Scratch Cat and other mascots and load images from the Scratch asset CDN. The main add buttons paint (or record) instead |
+| Extension library | hidden (WeDo / Vernier help links on scratch.mit.edu, translate and text-to-speech call Scratch services). Pen is pre-loaded |
+| Tutorials (教程) | hidden (Scratch Cat videos and cards) |
+| Share / community / My Stuff / account / language menus | off through GUI props (`canShare`, `enableCommunity`, `showComingSoon`, `canChangeLanguage` false) |
+| Links / requests to scratch.mit.edu | none: e2e checks the DOM text, `alt/title/aria-label/data-tip/href`, and that **no request leaves the local server** |
+| Page title / favicon | 「Wonder Lab Studio」, own favicon |
+| Non-affiliation notice | 「說明」 tab and `/NOTICE.html` |
+
+**Not removed (only hidden):** the upstream bundle still contains the library JSON, cat icons, tutorial images and
+scratch.mit.edu URLs; they are never shown or fetched, but they are in the files we serve. A build from a fork removes them.
+
+## 5. What works (verified)
+
+`python3 test/e2e.py` — **25/25 checks pass** (`test/out/results.json`), Chrome 153 headless:
+
+- editor ready with the neutral default sprite; zh-tw UI, block text and paint editor;
+- hand-dragged 「當綠旗被點擊 + 移動 10 點」 appears in the snapshot; the green flag run is traced (start [0,0] → end [10,0]);
+- 1st AI turn: request carries the hand-built program, the run report and `hand_edits`; the reply's ops land in the
+  live workspace, extending the student's own script (4 blocks, outlined);
+- the student drags 「右轉 15 度」 into the AI's loop → captured; 2nd turn sends it, and the AI's next change keeps it;
+- version history start → hand → hand → AI → hand → AI; the run report is stored with the version that ran;
+- 上一步 restores the program before the last AI turn and the next request carries the 上一步 note + `undo: 1`;
+- a block outside the whitelist (停播所有音效) is reported in `unsupported`, never sent; the AI's change to that script is
+  placed **next to it** and the student's script is left as it was (with a chat notice);
+- .sb3: 檔案 > 下載到你的電腦 → new page → 從你的電腦載入 → same program (and `vm.saveProjectSb3 → loadProject`);
+- costumes tab (paint editor), sounds tab and 除錯方式 modal open; no "Scratch" text or link anywhere visible;
+- iPad width 1024x768 (Chromium, touch, iPad UA): no horizontal scroll, drawer opens, AI turn applies blocks;
+- no console errors; no request outside the local server.
+
+Also: File > 新建專案 loads the neutral default; the paint button creates 「角色2」 and opens the paint editor;
+**WebKit** (Playwright WebKit, iPad gen 7 profile at 1024x768): loads in 2.7 s locally, no errors, AI turn applies
+3 blocks, green flag runs (sprite to x = 267), run report correct, no horizontal scroll (`shots/11`, `shots/12`).
+
+## 6. What does not work / limits
+
+- **No asset libraries, no surprise sprite, no extension library** (hidden, see section 4). Only pen; music, video
+  sensing, text-to-speech, translate and all hardware extensions are unavailable. Painting, uploading images/sounds and
+  recording work.
+- **Branding is patched at run time** on an unmodified bundle: DOM edits keyed on aria-labels / class fragments
+  (`main-button`, `tutorials-button`), a locale-message override, `builtinHelper._store` for the default project.
+  Each scratch-gui upgrade can break them silently. Language switching is off (only zh-tw and en were patched).
+- **Workspace access goes through React internals** (fiber walk to the Blocks container for `workspace`). Only used for
+  placing new scripts in view, the outline and scrolling; if it breaks, ops still apply (fallback placement).
+- After an AI turn the workspace's own undo (Ctrl+Z) history is cleared (the GUI reloads the workspace). 上一步 and
+  版本 cover it.
+- If the student edits a script **while** a turn is in flight and the AI replaces that script, the edit is overwritten
+  (it is still in 版本 if it had settled for 1.2 s). The real service needs a "program changed since sent" check.
+- Hand-made script ids (`h1`, `h2` …) are renumbered by order after an .sb3 reload; AI script ids survive.
+- Versions live only in this browser (memory + localStorage; on a shared device they persist until cleared). Painted
+  costumes of older versions restore only in the same session. No server-side history yet.
+- The stub is keyword-based; only 2 real model turns were run. No lab_core change was made, so the real endpoint
+  cannot be used yet (section 3).
+- iPad: tested in headless Chromium with an iPad UA and in Playwright WebKit — **not on a real iPad**; touch dragging of
+  blocks was not tested (only taps). Below 1280 px the chat is a drawer that covers the stage while open.
+- Upstream console **warnings** remain (no errors): Blockly 12 deprecations (`getVariablesOfType`), "pen_* overwrites
+  previous definition" (pen re-registered on each project load), `FieldColourSlider` DOM init, `flyoutinflater`,
+  Canvas2D `willReadFrequently`. The copied lab_core prints "tagging disabled" (no taxonomy file; harmless).
+- Install size: `node_modules` 1.1 GB (scratch-gui's full dependency tree); the served `dist/` is 120 MB without
+  source maps (68 MB tutorial/extension images, 14 MB MediaPipe), of which a cold load fetches 5.8 MB.
+
+## 7. Size and performance
+
+Bundle (gzip -9, what nginx `gzip_static` would send):
+
+| File | Raw | Gzipped |
+|---|---|---|
+| scratch-gui-standalone.js (everything: React, GUI, VM, renderer, blocks, paint, audio, TF.js) | 17.18 MB | **5.71 MB** |
+| Our code (studio*.js, css, html, opcodes.json) | 73 KB | 25 KB |
+| Cold load total (26 requests) | 17.3 MB decoded | **5.77 MB transferred** |
+| Warm reload (HTTP cache) | — | 30 KB |
+
+First load to "editor ready and chat usable" (`test/perf.py`, 3 runs, median, headless Chrome, 1440x900 unless noted):
+
+| Profile | Ready |
+|---|---|
+| localhost, no throttling | 1.5 s (first run 3.1 s) |
+| school Wi-Fi model: 20 Mbit/s, 40 ms RTT | **3.8 s** |
+| same + 4x CPU slowdown (low-end laptop / tablet) | **7.5 s** |
+| iPad width 1024x768, Wi-Fi model + 4x CPU | 7.2 s |
+| second visit (cache), Wi-Fi model | 0.8 s |
+| Playwright WebKit, iPad profile, localhost | 2.7 s |
+
+For comparison, the slim Wonder Lab (option A) is 4.9 MB gz (plan §risks). The full editor is only ~0.9 MB more, but
+TF.js and MediaPipe sit in the main bundle; a forked build that lazy-loads them is the main size lever.
+
+## 8. Risks
+
+1. **AGPL-3.0**: the page is AGPL and must offer its Corresponding Source to every user (done: `/source.tar.gz` +
+   pinned upstream tarballs). A fork must publish its changes, including any lab-specific UI code linked into it.
+   The server (lesson-ai) is a separate program talking over HTTP; keep it that way.
+2. **Upstream churn**: scratch-gui 15.x moved fast in 2026 (15.0 → 15.2 in months, Blockly 12 migration, paint
+   sandboxing). Run-time patches (section 6) will break on upgrades; pin versions and re-run `test/e2e.py`.
+3. **Trademarks**: hidden-but-present assets in the served bundle (section 4). Fine for a prototype, not for release.
+4. **Payload on weak devices**: 7–8 s at 4x CPU; iPads with 3 GB RAM may struggle with the paint editor + WebGL.
+   Needs real-device tests.
+5. **AI over-help / PF fidelity** stays a server concern (lab_core guards). The Studio adds a new risk: the AI rewrites
+   whole scripts, so a student's later hand edit can be overwritten if the model ignores it; the prompt must show
+   `hand_edits`, and the client keeps every version.
+6. **Privacy**: versions (with the student's words and the AI's replies) are in localStorage on shared school devices.
+
+## 9. Recommended path to replace UCMake
+
+1. **Now**: keep the slim Wonder Lab (option A) for the guided L4 lessons; use the Studio as the open "free build"
+   mode and as the base for the web UCMake. No change to Thursday/Saturday classes.
+2. **Fork the scratch-editor monorepo at 15.2.0** (gitHead above) and build scratch-gui ourselves:
+   branding at build time (logo, default project, l10n overrides, no tutorials), our own asset library (own or
+   CC-licensed art on our CDN, `getLibraryAssetUrl`), a filtered extension list, a small host API (props/events that
+   expose `vm`, the workspace and an `applyOps` hook — replacing the fiber walk and DOM patches), and code splitting
+   (TF.js / MediaPipe only when video sensing is added, fewer locales) — target < 3 MB gz.
+3. **Server studio mode** in lab_core (section 3): dynamic sprite context, prompt lines for hand edits and
+   unsupported blocks, a "program changed since sent" guard, server-side .sb3 + version history per student, and a
+   teacher view that puts a student's failed attempts next to the working version (consolidation phase).
+4. **Hardware / device extensions (out of scope now)**: UCMake = OpenBlock desktop (MIT; device support through
+   openblock-link and Arduino-style upload). For the web: write a **UC-Mind extension from upstream open source only**
+   (not UCMake's NDA device packages) on the scratch-vm extension API, with
+   (a) live mode over **Web Serial / WebUSB / Web Bluetooth** (Chrome, Edge, ChromeOS — not iPad Safari), or a small
+   local helper on Windows laptops (openblock-link style, MIT), and (b) upload mode: compile on the server
+   (arduino-cli) and flash from the browser (Web Serial + esptool-js style flasher). Hardware lessons then run on
+   laptops / Chromebooks, not iPads. Needs the supplier's board protocol and project format (decision D6) and
+   OpenBlock-compatible export.
+5. **Before any class use**: real iPad / Chromebook tests (touch drag, memory), `gzip_static` + immutable caching
+   behind nginx, preloading at class start, and an accessibility pass on the pane.
+
+## Screenshots (`shots/`)
+
+| File | Shows |
+|---|---|
+| 01-start-1440x900.png | start: full editor (zh-tw, neutral sprite, Wonder Lab logo) + chat pane |
+| 02-hand-built-1440x900.png | the student's own hand-dragged script |
+| 03-ai-turn-1440x900.png | AI turn applied into the student's script (outlined) |
+| 04-versions-1440x900.png | 「版本」 tab: start / hand / AI versions, run kept with its version |
+| 05-costumes-paint-1440x900.png | costumes tab with the paint editor, fitted next to the pane |
+| 06-ipad-1024x768.png | iPad landscape width, pane closed (「AI 學伴」 button top right) |
+| 07-ipad-chat-open-1024x768.png | iPad width, drawer open after an AI turn |
+| 08-ipad-after-ai-1024x768.png | iPad width, blocks in the workspace after the turn |
+| 09-side-by-side-1440x900.png | script with a non-whitelisted block kept; AI version placed next to it |
+| 10-real-model-turns-1440x900.png | 2 real DeepSeek turns through lab_core (build, then observe) |
+| 11-webkit-ipad-1024x768.png, 12-webkit-ipad-after-ai-run-1024x768.png | Playwright WebKit with an iPad profile |

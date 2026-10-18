@@ -1,0 +1,57 @@
+/* Wonder Lab Studio inside an L4 lesson page (lab-frame.html). Copyright (C) 2026 IITS. AGPL-3.0-only. */
+html, body { height: 100%; margin: 0; }
+body { overflow: hidden; background: #fff; color: #1d2733;
+  font-family: "Helvetica Neue", Helvetica, Arial, "PingFang HK", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+#wl-editor { position: relative; width: 100%; height: 100%; overflow: hidden; }
+/* below the editor's 1024 px design width the blocks area gives way (instead of the stage column being cut off) */
+[class*="gui_editor-wrapper"] { flex-shrink: 1 !important; min-width: 0; }
+.wl-hidden { display: none !important; }
+.ic { width: 18px; height: 18px; flex: none; }
+
+/* the AI's scripts after a turn: a calm outline, different from the yellow "running" glow */
+.wl-ai { filter: drop-shadow(0 0 3px rgba(11, 114, 133, .95)) drop-shadow(0 0 6px rgba(11, 114, 133, .6)); }
+/* what the AI 學伴 talks about (reply.focus): a whole script, or one block */
+.wl-focus { filter: drop-shadow(0 0 3px rgba(240, 140, 0, 1)) drop-shadow(0 0 7px rgba(240, 140, 0, .7)); }
+path.wl-focus-one, .wl-focus-one { stroke: #f08c00 !important; stroke-width: 3px !important; }
+
+/* ---- the lock while the AI edits: the blocks area and the sprite list are dimmed and take no input ---- */
+.wl-lockpane { position: fixed; z-index: 470; background: rgba(246, 241, 255, .62); cursor: not-allowed;
+  -webkit-backdrop-filter: grayscale(.35); backdrop-filter: grayscale(.35); }
+.wl-lockpane[hidden] { display: none; }
+/* while the blocks are being put in, the student watches: a light tint only (input is still blocked by studio-lab.js) */
+body.wl-animating .wl-lockpane { pointer-events: none; background: rgba(246, 241, 255, .14); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.wl-lockmsg { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px;
+  max-width: calc(100% - 24px); box-sizing: border-box; padding: 8px 14px; border-radius: 999px; background: #fff; border: 1px solid #d9c9f3;
+  box-shadow: 0 6px 18px rgba(60, 30, 110, .18); color: #4b2a8a; font-size: 14px; font-weight: 700; white-space: nowrap; pointer-events: auto; cursor: default; }
+.wl-lockmsg[hidden] { display: none; }
+.wl-spin { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid #d9c9f3; border-top-color: #6a3fc0; animation: wl-spin .8s linear infinite; }
+@keyframes wl-spin { to { transform: rotate(360deg); } }
+/* 執行 next to the green flag: the AI 學伴 says 「按『執行』」 */
+.wl-runlabel { display: inline-flex; align-items: center; margin: 0 6px 0 -2px; padding: 2px 8px; border-radius: 999px; background: #e9f7ef;
+  color: #1e7a45; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.wl-skip { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1px solid #6a3fc0;
+  background: #6a3fc0; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; pointer-events: auto; }
+.wl-skip[hidden] { display: none; }
+.wl-skip .ic { width: 15px; height: 15px; }
+
+/* ---- the small toolbar on the right of the editor's menu bar ---- */
+.wl-tools { position: fixed; top: 0; right: 0; height: 3rem; z-index: 500; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+.wl-tools button { display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 44px; padding: 0 12px; box-sizing: border-box;
+  border-radius: 10px; border: 1px solid rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .16); color: #fff; font: inherit;
+  font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.wl-tools button:hover:not(:disabled):not(.wl-soon) { background: rgba(255, 255, 255, .28); }
+.wl-tools button:disabled { opacity: .45; cursor: default; }
+.wl-tools button[hidden] { display: none; }
+.wl-tools .wl-soon { border-style: dashed; color: rgba(255, 255, 255, .78); background: rgba(255, 255, 255, .06); cursor: not-allowed; font-weight: 600; }
+.wl-tools .wl-soon small { font-size: 11px; font-weight: 500; opacity: .9; }
+.wl-tools .wl-chatbtn { background: #fff; color: #5a2ea0; border-color: #fff; }
+.wl-tools button:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
+.wl-toolnote { position: fixed; top: calc(3rem + 4px); right: 8px; z-index: 505; max-width: min(420px, calc(100% - 16px)); box-sizing: border-box; margin: 0;
+  padding: 8px 12px; border-radius: 10px; background: #f6f1ff; border: 1px solid #d9c9f3; box-shadow: 0 6px 18px rgba(60, 30, 110, .18);
+  color: #4b2a8a; font-size: 13px; line-height: 1.55; }
+.wl-toolnote[hidden] { display: none; }
+/* narrow editor (iPad landscape): icon + short words only */
+@media (max-width: 760px) {
+  .wl-tools .wl-soon small, .wl-tools #wl-tool-undo span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .wl-spin { animation-duration: 2.4s; } }

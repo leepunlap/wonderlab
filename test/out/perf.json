@@ -1,0 +1,167 @@
+{
+ "profiles": {
+  "local": {
+   "ready_ms_median": 1543,
+   "ready_ms": [
+    3122,
+    1483,
+    1543
+   ],
+   "transfer_bytes": 5773242,
+   "decoded_bytes": 17314273,
+   "requests": 26
+  },
+  "wifi_20mbit_40ms": {
+   "ready_ms_median": 3784,
+   "ready_ms": [
+    3776,
+    3865,
+    3784
+   ],
+   "transfer_bytes": 5771552,
+   "decoded_bytes": 17312153,
+   "requests": 24
+  },
+  "wifi_20mbit_cpu4x": {
+   "ready_ms_median": 7451,
+   "ready_ms": [
+    7378,
+    7590,
+    7451
+   ],
+   "transfer_bytes": 5773242,
+   "decoded_bytes": 17314273,
+   "requests": 26
+  },
+  "warm_cache_wifi": {
+   "ready_ms_median": 826,
+   "ready_ms": [
+    798,
+    826,
+    1050
+   ],
+   "transfer_bytes": 30439
+  },
+  "ipad_1024_wifi_cpu4x": {
+   "ready_ms_median": 7150,
+   "ready_ms": [
+    7974,
+    7150,
+    7047
+   ]
+  }
+ },
+ "bundle": {
+  "scratch-gui-standalone.js": {
+   "raw": 17177878,
+   "gzip9": 5714377
+  },
+  "extension-worker.js": {
+   "raw": 66266,
+   "gzip9": 20615
+  },
+  "studio-pre.js": {
+   "raw": 3352,
+   "gzip9": 1521
+  },
+  "studio.js": {
+   "raw": 24307,
+   "gzip9": 8962
+  },
+  "studio-ops.js": {
+   "raw": 15142,
+   "gzip9": 5060
+  },
+  "studio-trace.js": {
+   "raw": 7613,
+   "gzip9": 2872
+  },
+  "studio.css": {
+   "raw": 7233,
+   "gzip9": 2208
+  },
+  "index.html": {
+   "raw": 5745,
+   "gzip9": 2081
+  },
+  "opcodes.json": {
+   "raw": 10230,
+   "gzip9": 2342
+  },
+  "dist_total_without_maps": 119578171
+ },
+ "cold_files": [
+  {
+   "url": "/scratch-gui-standalone.js",
+   "transfer": 5714677,
+   "decoded": 17177878,
+   "ms": 791
+  },
+  {
+   "url": "/studio.js",
+   "transfer": 9262,
+   "decoded": 24307,
+   "ms": 13
+  },
+  {
+   "url": "/static/assets/icon--take-a-break.fac6bba18ebb1fa52d05.svg",
+   "transfer": 5976,
+   "decoded": 16162,
+   "ms": 4
+  },
+  {
+   "url": "/studio-ops.js",
+   "transfer": 5360,
+   "decoded": 15142,
+   "ms": 14
+  },
+  {
+   "url": "/static/assets/icon--ask-for-help.2d8981e9181912da973a.svg",
+   "transfer": 5229,
+   "decoded": 13776,
+   "ms": 7
+  },
+  {
+   "url": "/static/blocks-media/default/sprites.png",
+   "transfer": 4446,
+   "decoded": 4146,
+   "ms": 10
+  },
+  {
+   "url": "/static/assets/icon--timing-and-parallelism.178958615d2e0c30bf57.svg",
+   "transfer": 3961,
+   "decoded": 11502,
+   "ms": 3
+  },
+  {
+   "url": "/studio-trace.js",
+   "transfer": 3172,
+   "decoded": 7613,
+   "ms": 13
+  },
+  {
+   "url": "/chunks/fetch-worker.e3471d9c6e9a213ba1d0.js",
+   "transfer": 3105,
+   "decoded": 8237,
+   "ms": -72
+  },
+  {
+   "url": "/opcodes.json",
+   "transfer": 2642,
+   "decoded": 10230,
+   "ms": 6
+  },
+  {
+   "url": "/studio.css",
+   "transfer": 2508,
+   "decoded": 7233,
+   "ms": 12
+  },
+  {
+   "url": "/studio-pre.js",
+   "transfer": 1821,
+   "decoded": 3352,
+   "ms": 13
+  }
+ ]
+}

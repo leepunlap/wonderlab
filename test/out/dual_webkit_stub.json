@@ -1,0 +1,109 @@
+{
+ "summary": {
+  "checks": 20,
+  "failed": 0
+ },
+ "base": "http://127.0.0.1:8922",
+ "results": [
+  {
+   "check": "[webkit-1024x768] Studio boots in WebKit (iPad landscape)",
+   "ok": true,
+   "info": "3.3s"
+  },
+  {
+   "check": "[webkit-1024x768] AI 學伴 is a drawer, the editor fills the width, no horizontal scroll",
+   "ok": true,
+   "info": "{\"hscroll\":false,\"drawer\":true,\"fr\":[1024,701]}"
+  },
+  {
+   "check": "[webkit-1024x768] drag from the palette builds 當綠旗被點擊 + 移動",
+   "ok": true,
+   "info": "[[{\"op\":\"event_whenflagclicked\"},{\"op\":\"motion_movesteps\",\"STEPS\":10}]]"
+  },
+  {
+   "check": "[webkit-1024x768] tapping the green flag runs it",
+   "ok": true,
+   "info": "-60 -> -50"
+  },
+  {
+   "check": "[webkit-1024x768] AI turn locks the editor, then unlocks",
+   "ok": true,
+   "info": "{\"locked\":true,\"unlock_s\":2.036}"
+  },
+  {
+   "check": "[webkit-1024x768] end state = the reply's program",
+   "ok": true,
+   "info": "照你說的：在你自己砌的那段程式下面，加了「重複無限次」裏面「移動 10 點」。"
+  },
+  {
+   "check": "[webkit-1024x768] request carries mode ai + studio fields",
+   "ok": true,
+   "info": "{\"added\":[{\"sprite\":\"小老鼠\",\"id\":\"h1\"}],\"changed\":[],\"removed\":[]}"
+  },
+  {
+   "check": "[webkit-1024x768] 請助教看看: kind review, mode self, ops [] and the program unchanged",
+   "ok": true,
+   "info": "你在「小老鼠」砌了「當 綠旗 被點擊」，下面是「移動 10 點」。"
+  },
+  {
+   "check": "[webkit-1024x768] no page errors",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1024x768] no request outside the site",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1080x810] Studio boots in WebKit (iPad landscape)",
+   "ok": true,
+   "info": "3.5s"
+  },
+  {
+   "check": "[webkit-1080x810] AI 學伴 is a drawer, the editor fills the width, no horizontal scroll",
+   "ok": true,
+   "info": "{\"hscroll\":false,\"drawer\":true,\"fr\":[1080,743]}"
+  },
+  {
+   "check": "[webkit-1080x810] drag from the palette builds 當綠旗被點擊 + 移動",
+   "ok": true,
+   "info": "[[{\"op\":\"event_whenflagclicked\"},{\"op\":\"motion_movesteps\",\"STEPS\":10}]]"
+  },
+  {
+   "check": "[webkit-1080x810] tapping the green flag runs it",
+   "ok": true,
+   "info": "-60 -> -50"
+  },
+  {
+   "check": "[webkit-1080x810] AI turn locks the editor, then unlocks",
+   "ok": true,
+   "info": "{\"locked\":true,\"unlock_s\":2.033}"
+  },
+  {
+   "check": "[webkit-1080x810] end state = the reply's program",
+   "ok": true,
+   "info": "照你說的：在你自己砌的那段程式下面，加了「重複無限次」裏面「移動 10 點」。"
+  },
+  {
+   "check": "[webkit-1080x810] request carries mode ai + studio fields",
+   "ok": true,
+   "info": "{\"added\":[{\"sprite\":\"小老鼠\",\"id\":\"h1\"}],\"changed\":[],\"removed\":[]}"
+  },
+  {
+   "check": "[webkit-1080x810] 請助教看看: kind review, mode self, ops [] and the program unchanged",
+   "ok": true,
+   "info": "你在「小老鼠」砌了「當 綠旗 被點擊」，下面是「移動 10 點」。"
+  },
+  {
+   "check": "[webkit-1080x810] no page errors",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1080x810] no request outside the site",
+   "ok": true,
+   "info": "[]"
+  }
+ ]
+}

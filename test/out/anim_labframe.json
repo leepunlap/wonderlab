@@ -1,0 +1,266 @@
+{
+ "cases": [
+  {
+   "name": "lab_new_script",
+   "result": {
+    "done": 0,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 2976,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 2.98,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_wrap_and_add",
+   "result": {
+    "done": 1,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 2566,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 2.6,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_other_sprite",
+   "result": {
+    "done": 0,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 3597,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 3.64,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_missing_inputs",
+   "result": {
+    "done": 0,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 3715,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 3.72,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_side_by_side",
+   "result": {
+    "done": 1,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 2287,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 2.32,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_skip_button_under_lock",
+   "result": {
+    "done": 0,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": true,
+    "animated": true,
+    "ms": 1372,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 1.38,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "skip_to_done_s": 0.13,
+   "skip_box": {
+    "x": 473,
+    "y": 123,
+    "w": 112,
+    "h": 44,
+    "hit": "SPAN"
+   },
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_student_drag_under_lock",
+   "result": {
+    "done": 1,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 881,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 1.07,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_short_turn_4500ms_timer",
+   "result": {
+    "done": 0,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 1927,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 1.97,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  },
+  {
+   "name": "lab_next_turn_not_skipped",
+   "result": {
+    "done": 1,
+    "skipped": 0,
+    "sideBySide": 0,
+    "animated": true,
+    "fallback": false
+   },
+   "anim": {
+    "ok": true,
+    "fallback": false,
+    "skipped": false,
+    "animated": true,
+    "ms": 4882,
+    "diffs": []
+   },
+   "equal_reference": true,
+   "wall_s": 4.91,
+   "pointer_seen": true,
+   "skip_seen": true,
+   "bad": [],
+   "page_issues": []
+  }
+ ],
+ "errors": [
+  {
+   "type": "setup",
+   "text": "lab-frame.html has no <!--wl-anim--> placeholder"
+  },
+  {
+   "type": "console",
+   "text": "Access to script at 'http://127.0.0.1:8923/static/assets/runner.e0ba7d73faa96c15441d.js?resource' from origin 'null' has been blocked by CORS policy: Permission was denied for this request to access the `loopback` address space.",
+   "phase": "boot"
+  },
+  {
+   "type": "console",
+   "text": "Failed to load resource: net::ERR_FAILED",
+   "phase": "boot"
+  },
+  {
+   "type": "console",
+   "text": "Access to script at 'http://127.0.0.1:8923/static/assets/paper-core.min.b713dd57159e76223708.js?resource' from origin 'null' has been blocked by CORS policy: Permission was denied for this request to access the `loopback` address space.",
+   "phase": "boot"
+  },
+  {
+   "type": "console",
+   "text": "Failed to load resource: net::ERR_FAILED",
+   "phase": "boot"
+  },
+  {
+   "type": "console",
+   "text": "Access to script at 'http://127.0.0.1:8923/static/assets/paper-import.98ea0ea130297a02a2bc.js?resource' from origin 'null' has been blocked by CORS policy: Permission was denied for this request to access the `loopback` address space.",
+   "phase": "boot"
+  },
+  {
+   "type": "console",
+   "text": "Failed to load resource: net::ERR_FAILED",
+   "phase": "boot"
+  }
+ ],
+ "boot_ms": 2092,
+ "anim_loaded_first": true
+}

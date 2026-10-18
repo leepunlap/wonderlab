@@ -1,0 +1,608 @@
+/*!
+ * Wonder Lab Studio inside an L4 lesson page (dual mode, 2026-10-07). Runs in lab-frame.html, the iframe that lab.js puts
+ * in the lesson page's left area; lab.js (the parent page) owns the AI 學伴 conversation and talks to this file through
+ * window.WLStudio (same origin). Copyright (C) 2026 IITS (工信學堂（香港）). GNU Affero General Public License v3.0 only.
+ * Editor: @scratch/scratch-gui 15.2.0 standalone build (AGPL-3.0-only), consumed as published; branding is changed at run
+ * time (logo, strings, hidden library / extension / tutorial entry points, no File menu). Not affiliated with the Scratch
+ * Foundation or MIT.
+ *
+ * What lives here: the editor boot with the lesson's own stage + sprites (assets/lab/<slug>.json + a/), the student's
+ * program, the lock while the AI edits (§2 of WONDER_LAB_DUAL_MODE_SPEC.md), the reply apply (studio-anim.js WLAnim.play
+ * when present, else instant), the glow on reply.focus, the request snapshot (studio.text etc.) and the run report.
+ */
+(function () {
+  'use strict';
+  var LOCALE = 'zh-tw', STAGE = '舞台';
+  // the prototype page uses the same global name: studio-anim.js may read WLStudio.vm / WLStudio.workspace()
+  var S = window.WLStudio = { ready: false, lab: true };
+  var vm = null, store = null, ops = null, trace = null, spec = null, lesson = null, cfg = {}, booted = null;
+  var applying = false, loading = true, changeT = null, locked = false, animating = false, lessonAssets = {};
+  var $ = function (id) { return document.getElementById(id); };
+  function emit(type, data) { try { if (cfg.onEvent) cfg.onEvent(type, data || null); } catch (e) {} }
+  function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
+  function warn() { try { if (window.console) console.warn.apply(console, ['[wonder-lab studio]'].concat([].slice.call(arguments))); } catch (e) {} }
+
+  /* ---------------- the lesson's stage as a project (no blocks; the program is written in afterwards) ---------------- */
+  function costume(c) {
+    var o = { assetId: c.assetId, name: c.name, md5ext: c.assetId + '.' + c.ext, dataFormat: c.ext, rotationCenterX: c.cx, rotationCenterY: c.cy };
+    if (c.ext !== 'svg') o.bitmapResolution = c.res || 1;
+    return o;
+  }
+  function lessonProject(L) {
+    var stage = { isStage: true, name: 'Stage', variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {}, currentCostume: 0,
+      costumes: ((L.stage || {}).backdrops || []).map(costume), sounds: [], volume: 100, layerOrder: 0, tempo: 60, videoTransparency: 50,
+      videoState: 'off', textToSpeechLanguage: null };
+    var sprites = (L.sprites || []).map(function (s, i) {
+      return { isStage: false, name: s.name, variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {}, currentCostume: 0,
+        costumes: (s.costumes || []).map(costume), sounds: [], volume: 100, layerOrder: i + 1, visible: s.visible !== false,
+        x: s.x || 0, y: s.y || 0, size: s.size || 100, direction: s.direction == null ? 90 : s.direction, draggable: false,
+        rotationStyle: s.rotationStyle || 'all around' };
+    });
+    return { targets: [stage].concat(sprites), monitors: [], extensions: [], meta: { semver: '3.0.0', vm: '15.2.0', agent: 'WonderLab' } };
+  }
+
+  /* ---------------- storage: the project is "0" in the built-in store; costumes from the lesson's asset folder ---------------- */
+  function b64bytes(s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+  function bytesB64(u8) { var s = '', CH = 0x8000; for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
+  function LabStorage(G, projectJSON, base, assets) {
+    var st = this.scratchStorage = new G.ScratchStorage(), enc = new TextEncoder();
+    st.builtinHelper._store(st.AssetType.Project, st.DataFormat.JSON, enc.encode(projectJSON), '0');
+    if (base) st.addWebStore([st.AssetType.ImageVector, st.AssetType.ImageBitmap, st.AssetType.Sound], function (a) { return base + a.assetId + '.' + a.dataFormat; });
+    putAssets(st, assets);
+  }
+  LabStorage.prototype = {
+    setProjectHost: function () {}, setProjectToken: function () {}, setProjectMetadata: function () {}, setAssetHost: function () {},
+    setBackpackHost: function () {}, setTranslatorFunction: function () {},
+    getLibraryAssetUrl: function () { return 'assets/blank.svg'; },          // the asset libraries are not hosted (entry points hidden)
+    saveProject: function () { return Promise.reject(new Error('no server save in the lesson page')); }
+  };
+  function putAssets(st, assets) {        // painted costumes / recorded sounds kept by the page (they are not on the server)
+    Object.keys(assets || {}).forEach(function (id) {
+      var a = assets[id];
+      try { st.builtinHelper._store(st.AssetType[a.type], a.fmt, b64bytes(a.b64), id); } catch (e) { warn('asset', id, e); }
+    });
+  }
+
+  /* ---------------- branding (run-time patches on the published bundle) ---------------- */
+  var REPL = [[/Scratch 3\.0/g, '本編輯器'], [/Scratch Link/g, '裝置連接程式'], [/Scratch 團隊/g, '開發團隊'], [/Scratch/g, '本編輯器']];
+  var ZH_MISSING = {        // strings scratch-gui 15.2.0 has but scratch-l10n 6.1.118 zh-tw does not
+    'gui.aria.aboutMenu': '關於選單', 'gui.aria.accountMenu': '帳戶選單', 'gui.aria.clearButton': '清除', 'gui.aria.editMenu': '編輯選單',
+    'gui.aria.fileMenu': '檔案選單', 'gui.aria.languageMenu': '語言選單', 'gui.aria.modeMenu': '模式選單', 'gui.aria.settingsMenu': '設定選單',
+    'gui.aria.startProjectButton': '開始執行', 'gui.aria.stopProjectButton': '停止執行', 'gui.menuBar.colorMode': '顏色模式', 'gui.menuBar.theme': '主題',
+    'gui.sharedMessages.backdrop': '背景{index}', 'gui.sharedMessages.costume': '造型{index}', 'gui.sharedMessages.sprite': '角色{index}',
+    'gui.sharedMessages.pop': '啵', 'gui.sharedMessages.loadFromComputerTitle': '從你的電腦載入',
+    'gui.sharedMessages.replaceProjectWarning': '要用新的內容取代目前的作品嗎？'
+  };
+  function patchMessages() {
+    var L = store.getState().locales, all = Object.assign({}, L.messagesByLocale);
+    [LOCALE, 'en'].forEach(function (loc) {
+      var m = Object.assign({}, all[loc]);
+      Object.keys(m).forEach(function (k) { if (/Scratch/.test(m[k])) REPL.forEach(function (r) { m[k] = m[k].replace(r[0], r[1]); }); });
+      all[loc] = m;
+    });
+    Object.assign(all[LOCALE], ZH_MISSING);
+    all[LOCALE]['gui.gui.defaultProjectTitle'] = '我的作品';
+    all.en['gui.gui.defaultProjectTitle'] = 'My project';
+    store.dispatch({ type: 'scratch-gui/locales/UPDATE_LOCALES', messagesByLocale: all });
+  }
+  var LIB_LABELS = { '選個角色': '繪畫', '選個背景': '繪畫', '選個造型': '繪畫', '選個音效': '錄音' };
+  var HIDE_LABELS = { '驚喜': 1, '選個角色': 1, '選個背景': 1, '選個造型': 1, '選個音效': 1, '添加擴展': 1, '教程': 1 };
+  function patchDom() {
+    var logo = $('logo_img');
+    if (logo && logo.getAttribute('src') !== 'assets/logo.svg') { logo.setAttribute('src', 'assets/logo.svg'); logo.setAttribute('alt', 'Wonder Lab'); }
+    document.querySelectorAll('button[aria-label]').forEach(function (b) {
+      var lab = b.getAttribute('aria-label');
+      if (/main-button/.test(b.className) && LIB_LABELS[lab]) {
+        b.setAttribute('data-wl-lib', LIB_LABELS[lab]); b.setAttribute('aria-label', LIB_LABELS[lab]); b.setAttribute('data-tip', LIB_LABELS[lab]);
+        var img = b.querySelector('img'); if (img && (lab === '選個角色' || lab === '選個造型')) img.setAttribute('src', 'assets/icon-paint.svg');
+      } else if (HIDE_LABELS[lab] && !b.hasAttribute('data-wl-lib')) {
+        (b.closest('li') || b).classList.add('wl-hidden');
+      }
+    });
+    document.querySelectorAll('.tutorials-button').forEach(function (b) { b.classList.add('wl-hidden'); });
+    document.querySelectorAll('[aria-label="Delete"]').forEach(function (b) { b.setAttribute('aria-label', '刪除'); });
+    // the AI 學伴 says 「按『執行』」: the green flag is labelled 執行 (and the stop sign 停止), as the read-only lab's buttons
+    var flag = document.querySelector('img[class*="green-flag_green-flag"]');
+    if (flag) {
+      if (flag.getAttribute('title') !== '執行') { flag.setAttribute('title', '執行'); flag.setAttribute('aria-label', '執行'); }
+      if (!(flag.nextElementSibling && flag.nextElementSibling.classList.contains('wl-runlabel'))) {
+        var lab = document.createElement('span'); lab.className = 'wl-runlabel'; lab.textContent = '執行'; lab.setAttribute('aria-hidden', 'true');
+        lab.addEventListener('click', function () { flag.click(); });
+        flag.parentNode.insertBefore(lab, flag.nextSibling);
+      }
+    }
+    var stopImg = document.querySelector('img[class*="stop-all_stop-all"]');
+    if (stopImg && stopImg.getAttribute('title') !== '停止') { stopImg.setAttribute('title', '停止'); stopImg.setAttribute('aria-label', '停止'); }
+    // the project title is not used in a lesson (there is no File menu: the program lives with the lesson)
+    document.querySelectorAll('[class*="menu-bar_title-field"], [class*="title-field_title-field"]').forEach(function (e) {
+      var item = e.closest('[class*="menu-bar_menu-bar-item"]') || e; item.classList.add('wl-hidden');
+    });
+  }
+  document.addEventListener('click', function (e) {     // the "choose from library" button of an add-menu paints / records instead
+    var b = e.target && e.target.closest && e.target.closest('[data-wl-lib]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var menu = b.parentElement, alt = menu && menu.querySelector('button[aria-label="' + b.getAttribute('data-wl-lib') + '"]:not([data-wl-lib])');
+    if (alt) alt.click();
+  }, true);
+
+  /* ---------------- boot ---------------- */
+  /** cfg: {lesson, assetBase (absolute), project (vm.toJSON() string, a reload) | program (compact), sids, hand, assets,
+             onEvent(type, data)} -> Promise<{ms}> once the editor shows the lesson and the program */
+  S.boot = function (c) {
+    if (booted) return booted;
+    cfg = c || {}; lesson = cfg.lesson || { stage: { backdrops: [] }, sprites: [] };
+    var t0 = performance.now(), G = window.GUI;
+    var all = ((lesson.stage || {}).backdrops || []).slice();
+    (lesson.sprites || []).forEach(function (s) { all = all.concat(s.costumes || []); });
+    all.forEach(function (x) { if (x && x.assetId) lessonAssets[x.assetId] = 1; });
+    booted = fetch('opcodes.json', { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error('opcodes ' + r.status); return r.json(); })
+      .then(function (sp) {
+        spec = sp; ops = S.ops = new window.StudioOps(spec);
+        var project = cfg.project || JSON.stringify(lessonProject(lesson));
+        var state = new G.EditorState({ locale: LOCALE }, function () { return { storage: new LabStorage(G, project, cfg.assetBase, cfg.assets) }; });
+        store = S.store = state.store;
+        patchMessages();
+        var host = $('wl-editor');
+        G.setAppElement(host);
+        var root = G.createStandaloneRoot(state, host);
+        var done = {}, p = new Promise(function (ok, bad) { done.ok = ok; done.bad = bad; });
+        root.render({
+          projectId: '0', canEditTitle: false, canSave: false, canShare: false, canRemix: false, canCreateCopy: false, canCreateNew: false,
+          canManageFiles: false, canChangeLanguage: false, backpackVisible: false, showComingSoon: false, enableCommunity: false,
+          onVmInit: function (v) { vm = S.vm = v; wireVm(); }
+        });
+        new MutationObserver(function () { patchDom(); }).observe(host, { childList: true, subtree: true });
+        watchLoads(done);
+        setTimeout(function () { done.bad(new Error('editor load timeout')); }, 120000);
+        return p;
+      })
+      .then(function () {
+        S.ready = true; S.readyMs = Math.round(performance.now() - t0);
+        document.documentElement.setAttribute('data-wl-ready', '1');
+        tools();
+        return { ms: S.readyMs };
+      });
+    return booted;
+  };
+
+  function watchLoads(done) {
+    var was = null, first = true;
+    store.subscribe(function () {
+      var ls = store.getState().scratchGui.projectState.loadingState;
+      if (ls === was) return;
+      var prev = was; was = ls;
+      if (/^LOADING/.test(ls)) loading = true;
+      if (/^SHOWING/.test(ls) && (!prev || /^LOADING|^FETCHING/.test(prev))) {
+        setTimeout(function () {
+          if (!first) { loading = false; return; }
+          first = false;
+          firstLoad().then(done.ok, done.bad);
+        }, 0);
+      }
+      if (/^ERROR/.test(ls) && first) { first = false; done.bad(new Error('project load error')); }
+    });
+  }
+  function pen() { return vm.extensionManager.isExtensionLoaded('pen') ? Promise.resolve() : vm.extensionManager.loadExtensionURL('pen'); }
+  /* The editor needs 1024 px for its normal stage (408 px wide). Next to the AI 學伴 pane it often has less (1280 and 1366 px
+     screens): then it starts with its own small stage, so nothing is cut off; the student can still switch the stage size
+     with the editor's buttons (a choice the student made is kept on resize). */
+  var stageAuto = null;
+  function fitStage() {
+    if (!store) return;
+    var cur = ((store.getState().scratchGui || {}).stageSize || {}).stageSize, want = window.innerWidth < 1024 ? 'small' : 'large';
+    if (!cur || cur === want) { stageAuto = want; return; }
+    if (stageAuto === null || cur === stageAuto) { store.dispatch({ type: 'scratch-gui/StageSize/SET_STAGE_SIZE', stageSize: want }); stageAuto = want; }
+  }
+  window.addEventListener('resize', function () { if (S.ready) fitStage(); });
+  function firstLoad() {
+    loading = true;
+    fitStage();
+    ops.sids = {}; ops.hand = 0;
+    if (cfg.project && cfg.sids) { ops.sids = clone(cfg.sids); ops.hand = +cfg.hand || 0; }
+    return pen().then(function () {
+      if (!cfg.project && cfg.program) return writeProgram(cfg.program);
+    }).then(function () {
+      var first = vm.runtime.targets.filter(function (t) { return t.isOriginal && !t.isStage; })[0];
+      if (first && vm.editingTarget !== first) vm.setEditingTarget(first.id); else vm.emitWorkspaceUpdate();
+      ops.snapshot(vm);                  // every script gets its id now (hand-made ids stay stable from here on)
+      loading = false;
+    }, function (e) { loading = false; throw e; });
+  }
+  /** Write a whole compact program into the (block-less) lesson project: each script into a column, in program order. */
+  function writeProgram(program) {
+    var col = {}, list = [];
+    Object.keys((program && program.sprites) || {}).forEach(function (n) {
+      Object.keys(((program.sprites[n] || {}).scripts) || {}).forEach(function (id) { list.push({ 'do': 'set_script', sprite: n, id: id }); });
+    });
+    Object.keys(((program && program.stage) || {}).scripts || {}).forEach(function (id) { list.push({ 'do': 'set_script', sprite: STAGE, id: id }); });
+    if (!list.length) return Promise.resolve();
+    return ops.apply(vm, { program: program, ops: list }, function (target, n) {
+      var k = target.id, y = col[k] || 30; col[k] = y + 80 + 52 * n; return { x: 30, y: y };
+    }).then(function (res) { if (res.skipped.length) warn('program scripts not written', res.skipped.length); });
+  }
+
+  function wireVm() {
+    trace = S.trace = new window.StudioTrace(vm);
+    trace.colors = (lesson && lesson.colors) || null;
+    trace.mapScript = function (name, top) { return ops ? ops.scriptIdOf(name, top) : null; };
+    trace.onRun = function (what) { emit('run', { what: what }); };
+    vm.on('PROJECT_RUN_START', function () { emit('run', { what: 'activity' }); });
+    vm.on('PROJECT_CHANGED', function () {
+      if (trace) trace.dirty = true;        // the next start is a new run (of the changed program)
+      if (applying || loading) return;
+      clearTimeout(changeT);
+      changeT = setTimeout(function () { if (!applying && !loading) emit('change'); }, 1200);
+    });
+    vm.on('workspaceUpdate', function () { setTimeout(function () { patchDom(); reglow(); }, 0); });
+  }
+
+  /* ---------------- the workspace (scratch-gui keeps it on its Blocks container; found through React's fiber) ---------------- */
+  function blocksInstance() {
+    var el = document.querySelector('.injectionDiv');
+    for (var node = el; node; node = node.parentElement) {
+      var key = Object.keys(node).filter(function (k) { return k.indexOf('__reactFiber$') === 0 || k.indexOf('__reactInternalInstance$') === 0; })[0];
+      if (!key) continue;
+      for (var f = node[key]; f; f = f['return']) { var s = f.stateNode; if (s && s.workspace && s.ScratchBlocks) return s; }
+    }
+    return null;
+  }
+  S.workspace = function () { var b = blocksInstance(); return b && b.workspace; };
+  S.blocks = function () { var b = blocksInstance(); return (b && b.ScratchBlocks) || window.ScratchBlocks || null; };
+  S.root = function () { return $('wl-editor'); };
+
+  /** Where a new AI script goes: a free spot in the visible part of the workspace, never on top of the student's blocks. */
+  function place(target, n) {
+    var h = 70 + 52 * n, w = 320, ws = S.workspace();
+    if (ws && vm.editingTarget === target && ws.getMetricsManager) {
+      var v = ws.getMetricsManager().getViewMetrics(true);
+      var rects = ws.getTopBlocks(false).map(function (b) { return b.getBoundingRectangle(); });
+      var free = function (x, y) { return rects.every(function (r) { return x + w < r.left - 20 || x > r.right + 20 || y + h < r.top - 20 || y > r.bottom + 20; }); };
+      for (var x = v.left + 40; x < v.left + Math.max(v.width - 100, 60); x += 120)
+        for (var y = v.top + 40; y < v.top + Math.max(v.height - 80, 60); y += 40) if (free(x, y)) return { x: x, y: y };
+      var maxB = rects.reduce(function (m, r) { return Math.max(m, r.bottom); }, v.top);
+      return { x: v.left + 40, y: maxB + 60 };
+    }
+    var B = target.blocks._blocks, bottom = 0;
+    target.blocks.getScripts().forEach(function (id) { var b = B[id]; if (b) bottom = Math.max(bottom, (b.y || 0) + 60 + 52 * stackLen(B, id)); });
+    return { x: 40, y: bottom + 40 };
+  }
+  function stackLen(B, id) { var n = 0; for (var g = 0; id && B[id] && g < 500; g++) { n++; id = B[id].next; } return n; }
+  S.place = place;
+
+  /* ---------------- what the parent sends with a turn ---------------- */
+  function nameOf(t) { return t.isStage ? STAGE : t.getName(); }
+  function targetsInfo() {            // the service keeps at most 20 sprites with 30 costumes each (+ the stage, isStage true)
+    var all = vm.runtime.targets.filter(function (t) { return t.isOriginal; });
+    var list = all.filter(function (t) { return t.isStage; }).concat(all.filter(function (t) { return !t.isStage; }).slice(0, 20));
+    return list.map(function (t) {
+      return { name: nameOf(t), isStage: t.isStage, costumes: t.getCostumes().slice(0, 30).map(function (c) { return c.name; }),
+        x: Math.round(t.x || 0), y: Math.round(t.y || 0), visible: t.visible !== false };
+    });
+  }
+  S.program = function () { return ops.snapshot(vm).program; };
+  /** The snapshot a turn sends (taken at send time): program, unsupported scripts, targets, editing sprite, script text. */
+  S.request = function () {
+    var snap = ops.snapshot(vm), text = {};
+    try { text = ops.texts(vm, S.blocks(), 6000); } catch (e) { warn('texts', e); }
+    return { program: snap.program, blocks: snap.blocks, unsupported: snap.unsupported.map(function (u) { return { sprite: u.sprite, id: u.id }; }),
+      targets: targetsInfo(), editing: vm.editingTarget ? nameOf(vm.editingTarget) : null, text: text };
+  };
+  S.report = function () { if (!trace || !trace.trace) return null; return trace.report(ops.snapshot(vm).program); };
+  S.ran = function () { return !!(trace && trace.ranSinceTurn); };
+  S.sig = function () { return trace ? clone(trace.sig) : { runs: 0, stops: 0, undo: 0 }; };
+  S.turnDone = function () { if (trace) trace.turnDone(); };
+  S.diff = function (a, b) { return window.StudioOps.diff(a, b); };
+  S.stop = function () { try { if (vm) vm.stopAll(); } catch (e) {} };
+  S.running = function () { return !!(vm && vm.runtime.threads.some(function (t) { return !t.updateMonitor; })); };
+
+  /* ---------------- keep / restore (sessionStorage in the parent; a reload restores everything) ---------------- */
+  /** {project: vm.toJSON(), sids, hand, assets: painted costumes / recorded sounds (base64, at most capBytes)} */
+  S.state = function (capBytes) {
+    var cap = capBytes || 1500000, used = 0, assets = {};
+    ops.snapshot(vm);
+    vm.runtime.targets.forEach(function (t) {
+      if (!t.isOriginal) return;
+      t.getCostumes().concat(t.getSounds()).forEach(function (a) {
+        var as = a.asset; if (!as || !as.assetId || lessonAssets[as.assetId] || assets[as.assetId] || !as.data) return;
+        var b64 = bytesB64(as.data); if (used + b64.length > cap) return;
+        used += b64.length; assets[as.assetId] = { type: (as.assetType && as.assetType.name) || 'ImageVector', fmt: as.dataFormat, b64: b64 };
+      });
+    });
+    return { project: vm.toJSON(), sids: clone(ops.sids), hand: ops.hand, assets: assets };
+  };
+  function cacheAssets() {               // painted costumes live only in memory: keep them where a reload of a state finds them
+    var st = vm.runtime.storage; if (!st) return;
+    vm.runtime.targets.forEach(function (t) {
+      if (!t.isOriginal) return;
+      t.getCostumes().concat(t.getSounds()).forEach(function (a) {
+        if (a.asset && a.asset.data && a.asset.assetId) try { st.builtinHelper._store(a.asset.assetType, a.asset.dataFormat, a.asset.data, a.asset.assetId); } catch (e) {}
+      });
+    });
+  }
+  function keepEditing(fn) {
+    var name = vm.editingTarget ? nameOf(vm.editingTarget) : null;
+    return fn().then(function (r) {
+      var t = name && ops.targetByName(vm, name);
+      t = t || vm.runtime.targets.filter(function (x) { return x.isOriginal && !x.isStage; })[0] || vm.runtime.getTargetForStage();
+      if (t) vm.setEditingTarget(t.id);
+      return r;
+    });
+  }
+  /** Load a kept state (上一步 = the project before the last AI change). */
+  S.loadState = function (state) {
+    if (!state || !state.project) return Promise.resolve(false);
+    cacheAssets();
+    if (state.assets && vm.runtime.storage) putAssets(vm.runtime.storage, state.assets);
+    loading = true; applying = true; vm.stopAll();
+    return keepEditing(function () { return vm.loadProject(state.project).then(pen); }).then(function () {
+      ops.sids = clone(state.sids || {}); ops.hand = Math.max(ops.hand, +state.hand || 0);
+      ops.snapshot(vm); loading = false; applying = false; return true;
+    }, function (e) { loading = false; applying = false; warn('loadState', e); return false; });
+  };
+  /** Replace everything with the lesson's stage + a compact program (the 「載入你上次的程式」 chip). */
+  S.loadProgram = function (program) {
+    loading = true; applying = true; vm.stopAll();
+    return keepEditing(function () {
+      return vm.loadProject(JSON.stringify(lessonProject(lesson))).then(pen).then(function () { ops.sids = {}; return writeProgram(program); });
+    }).then(function () { vm.emitWorkspaceUpdate(); ops.snapshot(vm); loading = false; applying = false; return true; },
+      function (e) { loading = false; applying = false; warn('loadProgram', e); return false; });
+  };
+
+  /* ---------------- the lock while the AI edits (spec §2) ---------------- */
+  var LOCK_AREAS = ['[class*="gui_editor-wrapper"]', '[class*="gui_target-wrapper"]'];
+  var POPUPS = '.blocklyWidgetDiv, .blocklyDropDownDiv, .blocklyContextMenu, .blocklyMenu, [class*="context-menu_context-menu"], .react-contextmenu';
+  function areas() { return LOCK_AREAS.map(function (s) { return document.querySelector(s); }).filter(Boolean); }
+  function inArea(el) {
+    if (!el || !el.closest) return false;
+    if (el.closest('.wl-lockmsg')) return false;          // 跳過動畫
+    if (el.closest('.wl-lockpane')) return true;
+    if (el.closest(POPUPS)) return true;
+    return LOCK_AREAS.some(function (s) { return !!el.closest(s); });
+  }
+  function closeEditors() {
+    var SB = S.blocks(), ws = S.workspace();
+    try { if (ws && ws.cancelCurrentGesture) ws.cancelCurrentGesture(); } catch (e) {}
+    try { if (SB && SB.WidgetDiv) SB.WidgetDiv.hide(); } catch (e) {}
+    try { if (SB && SB.DropDownDiv) (SB.DropDownDiv.hideWithoutAnimation || SB.DropDownDiv.hide).call(SB.DropDownDiv); } catch (e) {}
+    try { if (SB && SB.ContextMenu && SB.ContextMenu.hide) SB.ContextMenu.hide(); } catch (e) {}
+    try { var sel = SB && (SB.getSelected ? SB.getSelected() : (SB.common && SB.common.getSelected && SB.common.getSelected())); if (sel && sel.unselect) sel.unselect(); } catch (e) {}
+    var a = document.activeElement; if (a && a !== document.body && inArea(a)) try { a.blur(); } catch (e) {}
+  }
+  var KEYS_EDIT = /^(Delete|Backspace)$/;
+  function blocker(e) {
+    if (e.target && e.target.closest && e.target.closest('.wl-anim-skip, .wl-lockmsg')) return;      // 跳過動畫 (studio-anim.js) stays usable
+    if (!locked || !e.isTrusted) return;         // the animation drives the editor with its own (untrusted) events
+    var t = e.target;
+    if (e.type === 'keydown' || e.type === 'keypress' || e.type === 'keyup') {
+      var edit = KEYS_EDIT.test(e.key) || ((e.ctrlKey || e.metaKey) && /^[zyxcvdZYXCVD]$/.test(e.key));
+      if (!(edit || inArea(t))) return;           // stage keys (space, arrows, letters) still reach the program
+    } else if (!inArea(t)) {
+      var x = e.clientX, y = e.clientY;
+      if (x == null && e.touches && e.touches[0]) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+      if (x == null || !areas().some(function (a) { var r = a.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; })) return;
+    }
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  }
+  ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchmove', 'touchend', 'click', 'dblclick', 'contextmenu',
+    'wheel', 'keydown', 'keypress', 'keyup', 'dragstart', 'drop', 'input', 'change', 'focusin'].forEach(function (type) {
+    window.addEventListener(type, function (e) {
+      if (type === 'pointermove' || type === 'touchmove') { if (locked && e.isTrusted && inArea(e.target) && (e.buttons || e.touches)) blocker(e); return; }
+      if (type === 'focusin') { if (locked && !animating && inArea(e.target)) try { e.target.blur(); } catch (x) {} return; }
+      blocker(e);
+    }, { capture: true, passive: false });
+  });
+  var lockRaf = null;
+  function placePanes() {
+    var as = areas(), panes = [$('wl-lock-a'), $('wl-lock-b')];
+    panes.forEach(function (p, i) {
+      var a = as[i]; if (!p) return;
+      if (!a || !locked) { p.hidden = true; return; }
+      var r = a.getBoundingClientRect();
+      p.hidden = false; p.style.left = r.left + 'px'; p.style.top = r.top + 'px'; p.style.width = r.width + 'px'; p.style.height = r.height + 'px';
+    });
+    if (locked) lockRaf = requestAnimationFrame(placePanes);
+  }
+  /** on: dim + block the blocks area, sprite list and tabs; the stage, green flag and stop stay usable. */
+  S.lock = function (on, text) {
+    on = !!on;
+    if (on) closeEditors();
+    locked = on;
+    document.body.classList.toggle('wl-locked', on);
+    var m = $('wl-lockmsg'); if (m) { m.hidden = !on; $('wl-locktext').textContent = text || 'AI 正在改積木…'; }
+    cancelAnimationFrame(lockRaf); placePanes();
+    if (!on) setAnimating(false);
+    setTools({});
+    return locked;
+  };
+  S.isLocked = function () { return locked; };
+  function setAnimating(on) {             // (studio-anim.js shows its own 跳過動畫 button while it plays)
+    animating = !!on;
+    document.body.classList.toggle('wl-animating', animating);
+  }
+
+  /* ---------------- apply a reply (AI mode), animated when studio-anim.js is there ---------------- */
+  function scriptCount(t) { var B = t.blocks._blocks; return t.blocks.getScripts().filter(function (id) { return B[id] && !B[id].shadow; }).length; }
+  /** how many scripts each touched sprite should have after the ops (instant-apply rules: a script with blocks outside the
+      whitelist is never replaced, the AI version goes next to it) */
+  function expectCounts(d, beforeSnap) {
+    var want = {}, bad = {};
+    (beforeSnap.unsupported || []).forEach(function (u) { bad[u.sprite + '\u0000' + u.id] = 1; });
+    (d.ops || []).forEach(function (o) {
+      var t = ops.targetByName(vm, o.sprite); if (!t) return;
+      var n = nameOf(t); if (want[n] == null) want[n] = scriptCount(t);
+      var p = o.sprite === STAGE ? beforeSnap.program.stage : (beforeSnap.program.sprites[o.sprite] || { scripts: {} });
+      var had = !!(p && p.scripts && p.scripts[o.id]) || !!bad[o.sprite + '\u0000' + o.id];
+      if (o['do'] === 'set_script') { if (!had || bad[o.sprite + '\u0000' + o.id]) want[n] += 1; }
+      else if (had && !bad[o.sprite + '\u0000' + o.id]) want[n] -= 1;
+    });
+    return want;
+  }
+  function countsOk(want) { return Object.keys(want).every(function (n) { var t = ops.targetByName(vm, n); return t && scriptCount(t) === want[n]; }); }
+  function showChanged(done, d, inSync) {
+    var focusName = typeof d.focus_sprite === 'string' ? d.focus_sprite : (typeof d.focus === 'string' ? d.focus : null);
+    var show = (focusName && ops.targetByName(vm, focusName)) || (done.length ? done[0].target : null);
+    if (show && vm.editingTarget !== show) vm.setEditingTarget(show.id); else if (!inSync) vm.emitWorkspaceUpdate();
+    vm.emitTargetsUpdate(false);
+    setTimeout(function () { outline(done); }, 60);
+  }
+  function outline(done) {
+    var ws = S.workspace(); if (!ws) return;
+    var first = null;
+    done.forEach(function (x) {
+      if (!x.top || x.target !== vm.editingTarget) return;
+      var b = ws.getBlockById(x.top); if (!b) return;
+      var root = b.getSvgRoot && b.getSvgRoot(); if (root) { root.classList.add('wl-ai'); setTimeout(function () { root.classList.remove('wl-ai'); }, 8000); }
+      if (!first) first = b;
+    });
+    if (first) try { if (ws.scrollBoundsIntoView) ws.scrollBoundsIntoView(first.getBoundingRectangle()); else ws.centerOnBlock(first.id); } catch (e) {}
+  }
+  function doneList(d) {
+    var out = [];
+    (d.ops || []).forEach(function (o) {
+      var hit = o['do'] === 'set_script' && ops.topOf(vm, o.sprite, o.id);
+      if (hit) out.push({ op: o, top: hit.top, target: hit.target });
+    });
+    return out;
+  }
+  function instant(d) {
+    return ops.apply(vm, d, place).then(function (res) {
+      showChanged(res.done, d);
+      return { done: res.done.length, skipped: res.skipped.length, sideBySide: res.sideBySide.length };
+    });
+  }
+  /** opt: {animate: bool}. Resolves {done, skipped, sideBySide, animated, fallback}; never rejects (a failure is logged). */
+  S.apply = function (d, opt) {
+    opt = opt || {};
+    if (!d || !(d.ops || []).length) return Promise.resolve({ done: 0, skipped: 0, sideBySide: 0, animated: false, fallback: false });
+    applying = true;
+    var A = window.WLAnim, use = opt.animate !== false && A && typeof A.play === 'function';
+    try { if (use && typeof A.enabled === 'function' && !A.enabled()) use = false; } catch (e) { use = false; }
+    var beforeSnap = ops.snapshot(vm), beforeJSON = vm.toJSON(), sidsBefore = clone(ops.sids), handBefore = ops.hand;
+    var want = expectCounts(d, beforeSnap);
+    var p;
+    if (use) {
+      setAnimating(true);
+      // safety: skip after maxMs, give up 3 s later unless WLAnim is still busy (both timers cleared when play ends)
+      var t1 = 0, t2 = 0, stopT = function () { clearTimeout(t1); clearTimeout(t2); };
+      var dead = new Promise(function (ok, bad) {
+        t1 = setTimeout(function () {
+          try { if (A.skip) A.skip(); } catch (e) {}
+          t2 = setTimeout(function () { if (!(A.busy && A.busy())) bad(new Error('animation timeout')); }, 3000);
+        }, opt.maxMs || 20000);
+      });
+      p = Promise.race([Promise.resolve().then(function () {
+        return A.play({ vm: vm, before: clone(beforeSnap.program), after: clone(d.program), ops: clone(d.ops), root: S.root(),
+          onProgress: function (i, n, what) { progress(i, n, what); }, workspace: S.workspace(), studio: S, studioOps: ops, place: place,
+          focus: typeof d.focus_sprite === 'string' ? d.focus_sprite : (typeof d.focus === 'string' ? d.focus : undefined), budgetMs: 8000 });
+      }), dead]).then(function (res) {
+        stopT(); setAnimating(false);
+        // WLAnim checks its own end state against the instant apply (build + decompile); only without that check do we compare
+        var exact = !!(res && res.ok), bad = exact ? [] : ops.settle(vm, d);
+        if (!exact && (bad.length || !countsOk(want))) {
+          warn('animation result differs from the reply: applied instantly', bad.length, JSON.stringify(want));
+          return fallback(res);
+        }
+        showChanged(doneList(d), d, true);          // the animation changed the editor itself: it already shows the blocks
+        return { done: doneList(d).length, skipped: 0, sideBySide: 0, animated: true, fallback: false, anim: res || null };
+      }, function (e) { stopT(); setAnimating(false); warn('animation failed: applied instantly', e && e.message); return fallback(null); });
+    } else {
+      p = instant(d).then(function (r) { r.animated = false; r.fallback = false; return r; });
+    }
+    function fallback(res) {
+      cacheAssets();
+      return vm.loadProject(beforeJSON).then(pen).then(function () {
+        ops.sids = sidsBefore; ops.hand = handBefore;
+        return instant(d);
+      }).then(function (r) { r.animated = !!res; r.fallback = true; return r; });
+    }
+    // the AI's edit ends with nothing selected and no field editor open: a Delete key afterwards must not remove an AI block
+    return p.then(function (r) { applying = false; S.lastApply = r; deselect(); return r; },
+      function (e) { applying = false; deselect(); warn('apply failed', e); S.lastApply = { error: String(e && e.message || e) }; return { done: 0, skipped: (d.ops || []).length, sideBySide: 0, animated: false, fallback: true, error: true }; });
+  };
+  function deselect() {
+    var SB = S.blocks();
+    try { if (SB && SB.WidgetDiv) SB.WidgetDiv.hide(); } catch (e) {}
+    try { if (SB && SB.DropDownDiv) (SB.DropDownDiv.hideWithoutAnimation || SB.DropDownDiv.hide).call(SB.DropDownDiv); } catch (e) {}
+    try { var sel = SB && (SB.getSelected ? SB.getSelected() : (SB.common && SB.common.getSelected && SB.common.getSelected())); if (sel && sel.unselect) sel.unselect(); } catch (e) {}
+    try { if (SB && SB.common && SB.common.setSelected) SB.common.setSelected(null); } catch (e) {}
+  }
+  function progress(i, n, what) {
+    var t = $('wl-locktext'); if (!t) return;
+    t.textContent = 'AI 正在改積木…' + (n ? '（' + Math.min(i, n) + '/' + n + '）' : '');
+    emit('progress', { i: i, n: n, what: what || null });
+  }
+  S.anim = function () {
+    var A = window.WLAnim, ok = !!(A && typeof A.play === 'function'), on = false;
+    try { on = ok && (typeof A.enabled !== 'function' || !!A.enabled()); } catch (e) { on = false; }
+    return { available: ok, enabled: on };
+  };
+  S.setAnim = function (on) { try { if (window.WLAnim && window.WLAnim.setEnabled) window.WLAnim.setEnabled(!!on); } catch (e) {} return S.anim(); };
+  S.skip = function () { try { if (window.WLAnim && window.WLAnim.skip) window.WLAnim.skip(); } catch (e) {} };
+
+  /* ---------------- glow on the scripts / blocks the reply talks about (reply.focus) ---------------- */
+  var glowing = [], glowT = null, glowList = null;
+  function clearGlow() { glowing.forEach(function (e) { e.classList.remove('wl-focus', 'wl-focus-one'); }); glowing = []; }
+  function reglow() { if (glowList) setTimeout(function () { paintGlow(glowList, false); }, 30); }
+  function paintGlow(list, scroll) {
+    clearGlow();
+    var ws = S.workspace(); if (!ws || !vm.editingTarget) return 0;
+    var name = nameOf(vm.editingTarget), B = vm.editingTarget.blocks._blocks, first = null, n = 0;
+    list.forEach(function (f) {
+      if (!f || f.sprite !== name) return;
+      var hit = ops.topOf(vm, f.sprite, f.id); if (!hit) return;
+      var id = f.n ? ops.blockAt(B, hit.top, +f.n) : hit.top, b = id && ws.getBlockById(id); if (!b) return;
+      var root = b.getSvgRoot && b.getSvgRoot(); if (!root) return;
+      if (f.n) {
+        var path = root.querySelector(':scope > .blocklyPath, :scope > path'); if (path) { path.classList.add('wl-focus-one'); glowing.push(path); }
+      } else { root.classList.add('wl-focus'); glowing.push(root); }
+      n += 1; if (!first) first = b;
+    });
+    if (first && scroll) try { if (ws.scrollBoundsIntoView) ws.scrollBoundsIntoView(first.getBoundingRectangle()); else ws.centerOnBlock(first.id); } catch (e) {}
+    return n;
+  }
+  /** focus: [{sprite, id, n?}] (a sprite name string = only show that sprite); focusSprite: the sprite to show when no
+      script glows. Returns how many blocks / scripts glow. */
+  S.glow = function (focus, focusSprite) {
+    clearTimeout(glowT); glowList = null; clearGlow();
+    if (vm && (!focus || (Array.isArray(focus) && !focus.length)) && typeof focusSprite === 'string') focus = focusSprite;
+    if (!vm || !focus) return 0;
+    if (typeof focus === 'string') { var t0 = ops.targetByName(vm, focus); if (t0 && vm.editingTarget !== t0) vm.setEditingTarget(t0.id); return 0; }
+    var list = (Array.isArray(focus) ? focus : []).filter(function (f) { return f && typeof f.sprite === 'string' && f.id != null; }).slice(0, 8)
+      .map(function (f) { return { sprite: f.sprite, id: String(f.id), n: f.n }; });
+    if (!list.length) return 0;
+    ops.snapshot(vm);
+    var known = list.filter(function (f) { return ops.topOf(vm, f.sprite, f.id); });
+    if (!known.length) return 0;
+    var t = ops.targetByName(vm, known[0].sprite);
+    glowList = known;
+    glowT = setTimeout(function () { glowList = null; clearGlow(); }, 12000);
+    if (t && vm.editingTarget !== t) { vm.setEditingTarget(t.id); setTimeout(function () { paintGlow(known, true); }, 150); return known.length; }
+    return paintGlow(known, true) || known.length;
+  };
+
+  /* ---------------- the small toolbar on the menu bar: 上一步 · Export sb3 (coming soon) · AI 學伴 (drawer) ---------------- */
+  var toolState = { undo: false, drawer: false, busy: false };
+  function setTools(st) {
+    Object.keys(st || {}).forEach(function (k) { toolState[k] = st[k]; });
+    var u = $('wl-tool-undo'), c = $('wl-tool-chat');
+    if (u) u.disabled = !toolState.undo || locked || !!toolState.busy;
+    if (c) c.hidden = !toolState.drawer;
+  }
+  S.setTools = setTools;
+  var noteT = null;
+  function toolNote(msg) {
+    var n = $('wl-toolnote'); if (!n) return;
+    n.textContent = msg; n.hidden = false; clearTimeout(noteT);
+    noteT = setTimeout(function () { n.hidden = true; }, 8000);
+  }
+  function tools() {
+    var u = $('wl-tool-undo'), x = $('wl-tool-export'), c = $('wl-tool-chat');
+    if (u) u.onclick = function () { if (!u.disabled) emit('undo'); };
+    if (x) x.onclick = function () { toolNote(x.getAttribute('data-note') || ''); emit('export'); };
+    if (c) c.onclick = function () { emit('chat'); };
+    setTools({});
+  }
+  S.toolNote = toolNote;
+
+  window.addEventListener('pagehide', function () { S.lock(false); });
+})();

@@ -1,0 +1,932 @@
+{
+ "checks": {
+  "editor ready, VM has the neutral default sprite": {
+   "ok": true,
+   "detail": null
+  },
+  "hand-dragged script is in the program snapshot": {
+   "ok": true,
+   "detail": {
+    "h1": [
+     {
+      "op": "event_whenflagclicked"
+     },
+     {
+      "op": "motion_movesteps",
+      "STEPS": 10
+     }
+    ]
+   }
+  },
+  "request carries the hand-built program": {
+   "ok": true,
+   "detail": null
+  },
+  "request carries a run report from the green-flag run": {
+   "ok": true,
+   "detail": {
+    "start": [
+     0,
+     0
+    ],
+    "end": [
+     10,
+     0
+    ],
+    "secs": 1.9
+   }
+  },
+  "request lists the student's hand edits since the last AI turn": {
+   "ok": true,
+   "detail": [
+    {
+     "sprite": "角色1",
+     "id": "h1",
+     "change": "added"
+    }
+   ]
+  },
+  "AI ops landed in the live workspace (same script, extended)": {
+   "ok": true,
+   "detail": [
+    [
+     {
+      "op": "event_whenflagclicked"
+     },
+     {
+      "op": "motion_movesteps",
+      "STEPS": 10
+     },
+     {
+      "op": "control_forever",
+      "SUBSTACK": [
+       {
+        "op": "motion_movesteps",
+        "STEPS": 10
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  "workspace shows the AI blocks": {
+   "ok": true,
+   "detail": null
+  },
+  "hand edit inside the AI's loop is captured": {
+   "ok": true,
+   "detail": [
+    {
+     "op": "motion_movesteps",
+     "STEPS": 10
+    },
+    {
+     "op": "motion_turnright",
+     "DEGREES": 15
+    }
+   ]
+  },
+  "2nd request carries the hand edit to the AI's script": {
+   "ok": true,
+   "detail": [
+    {
+     "sprite": "角色1",
+     "id": "h1",
+     "change": "changed"
+    }
+   ]
+  },
+  "2nd AI turn kept the student's edit": {
+   "ok": true,
+   "detail": [
+    [
+     "event_whenflagclicked",
+     "motion_movesteps",
+     "looks_sayforsecs",
+     "control_forever"
+    ]
+   ]
+  },
+  "version history has start, hand, AI, hand, AI": {
+   "ok": true,
+   "detail": [
+    "start",
+    "hand",
+    "hand",
+    "ai",
+    "hand",
+    "ai"
+   ]
+  },
+  "the run report is kept with the version it ran": {
+   "ok": true,
+   "detail": null
+  },
+  "上一步 restores the program before the last AI turn": {
+   "ok": true,
+   "detail": [
+    [
+     "event_whenflagclicked",
+     "motion_movesteps",
+     "control_forever"
+    ]
+   ]
+  },
+  "the next request tells the AI about 上一步": {
+   "ok": true,
+   "detail": null
+  },
+  "a non-whitelisted block is reported, not sent as a block": {
+   "ok": true,
+   "detail": [
+    {
+     "sprite": "角色1",
+     "id": "h1",
+     "ops": [
+      "sound_stopallsounds"
+     ]
+    }
+   ]
+  },
+  "AI's version is placed next to a script it cannot fully read; the student's script is unchanged": {
+   "ok": true,
+   "detail": [
+    [
+     "event_whenflagclicked",
+     "sound_stopallsounds",
+     "motion_movesteps",
+     "control_forever",
+     "motion_movesteps",
+     "motion_turnright"
+    ],
+    [
+     "event_whenflagclicked",
+     "motion_movesteps",
+     "motion_movesteps",
+     "control_forever",
+     "motion_movesteps",
+     "motion_turnright"
+    ]
+   ]
+  },
+  ".sb3 downloaded from 檔案 > 下載到你的電腦": {
+   "ok": true,
+   "detail": {
+    "file": "/home/blee/wonderlab-studio/test/out/roundtrip.sb3",
+    "bytes": 2333,
+    "suggested": "我的作品.sb3"
+   }
+  },
+  ".sb3 round trip keeps the program": {
+   "ok": true,
+   "detail": {
+    "before": {
+     "角色1": [
+      "[{\"op\": \"event_whenflagclicked\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"SUBSTACK\": [{\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"DEGREES\": 15, \"op\": \"motion_turnright\"}], \"op\": \"control_forever\"}]",
+      "[{\"op\": \"event_whenflagclicked\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"SUBSTACK\": [{\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"DEGREES\": 15, \"op\": \"motion_turnright\"}], \"op\": \"control_forever\"}]"
+     ],
+     "舞台": []
+    },
+    "after": {
+     "角色1": [
+      "[{\"op\": \"event_whenflagclicked\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"SUBSTACK\": [{\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"DEGREES\": 15, \"op\": \"motion_turnright\"}], \"op\": \"control_forever\"}]",
+      "[{\"op\": \"event_whenflagclicked\"}, {\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"SUBSTACK\": [{\"STEPS\": 10, \"op\": \"motion_movesteps\"}, {\"DEGREES\": 15, \"op\": \"motion_turnright\"}], \"op\": \"control_forever\"}]"
+     ],
+     "舞台": []
+    }
+   }
+  },
+  ".sb3 round trip keeps the project title": {
+   "ok": true,
+   "detail": "roundtrip"
+  },
+  "programmatic vm.saveProjectSb3 -> loadProject round trip": {
+   "ok": true,
+   "detail": {
+    "same": true,
+    "bytes": 2357
+   }
+  },
+  "no 'Scratch' text / scratch.mit.edu link visible (blocks, costumes, sounds, debug modal)": {
+   "ok": true,
+   "detail": []
+  },
+  "iPad width: no horizontal page scroll": {
+   "ok": true,
+   "detail": null
+  },
+  "iPad width: AI turn applies blocks": {
+   "ok": true,
+   "detail": null
+  },
+  "no console errors": {
+   "ok": true,
+   "detail": []
+  },
+  "no requests outside this server": {
+   "ok": true,
+   "detail": []
+  }
+ },
+ "console": [
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Blockly.Workspace.getVariablesOfType was deprecated in v12 and will be deleted in v13.\nUse Blockly.Workspace.getVariableMap().getVariablesOfType instead."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "There are no variable blocks, but there is a variable category."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Scroll position not recorded for category Motion"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_menu_colorParam\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_clear\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_stamp\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_penDown\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_penUp\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorToColor\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenColorParamBy\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorParamTo\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenSizeBy\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenSizeTo\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenShadeToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenShadeBy\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenHueToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenHueBy\" overwrites previous definition."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "desktop",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Blockly.Workspace.getVariablesOfType was deprecated in v12 and will be deleted in v13.\nUse Blockly.Workspace.getVariableMap().getVariablesOfType instead."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "There are no variable blocks, but there is a variable category."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Scroll position not recorded for category Motion"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_menu_colorParam\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_clear\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_stamp\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_penDown\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_penUp\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorToColor\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenColorParamBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorParamTo\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenSizeBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenSizeTo\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenShadeToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenShadeBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenHueToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenHueBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_menu_colorParam\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_clear\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_stamp\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_penDown\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_penUp\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorToColor\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenColorParamBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenColorParamTo\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenSizeBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenSizeTo\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenShadeToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenShadeBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_setPenHueToNumber\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Block definition \"pen_changePenHueBy\" overwrites previous definition."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "reload",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Blockly.Workspace.getVariablesOfType was deprecated in v12 and will be deleted in v13.\nUse Blockly.Workspace.getVariableMap().getVariablesOfType instead."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "There are no variable blocks, but there is a variable category."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Unable to find [category][flyoutinflater] in the registry."
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Scroll position not recorded for category Motion"
+  },
+  {
+   "page": "ipad",
+   "type": "warning",
+   "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  }
+ ],
+ "external_requests": [],
+ "timing": {
+  "desktop_ready_s": 6.04,
+  "desktop_cold": {
+   "ready_ms": 3803,
+   "dcl_ms": 1879,
+   "transfer_bytes": 5778491,
+   "decoded_bytes": 17330785,
+   "requests": 27
+  },
+  "ipad_ready_s": 2.45
+ },
+ "versions": [
+  {
+   "n": 1,
+   "source": "start",
+   "blocks": 0,
+   "run": false,
+   "has_project": true
+  },
+  {
+   "n": 2,
+   "source": "hand",
+   "blocks": 1,
+   "run": false,
+   "has_project": true
+  },
+  {
+   "n": 3,
+   "source": "hand",
+   "blocks": 2,
+   "run": true,
+   "has_project": true
+  },
+  {
+   "n": 4,
+   "source": "ai",
+   "blocks": 4,
+   "run": false,
+   "has_project": true
+  },
+  {
+   "n": 5,
+   "source": "hand",
+   "blocks": 5,
+   "run": false,
+   "has_project": true
+  },
+  {
+   "n": 6,
+   "source": "ai",
+   "blocks": 6,
+   "run": false,
+   "has_project": true
+  }
+ ],
+ "sb3": {
+  "file": "/home/blee/wonderlab-studio/test/out/roundtrip.sb3",
+  "bytes": 2333,
+  "suggested": "我的作品.sb3"
+ },
+ "warnings": [
+  "Block definition \"pen_changePenColorParamBy\" overwrites previous definition.",
+  "Block definition \"pen_changePenHueBy\" overwrites previous definition.",
+  "Block definition \"pen_changePenShadeBy\" overwrites previous definition.",
+  "Block definition \"pen_changePenSizeBy\" overwrites previous definition.",
+  "Block definition \"pen_clear\" overwrites previous definition.",
+  "Block definition \"pen_menu_colorParam\" overwrites previous definition.",
+  "Block definition \"pen_penDown\" overwrites previous definition.",
+  "Block definition \"pen_penUp\" overwrites previous definition.",
+  "Block definition \"pen_setPenColorParamTo\" overwrites previous definition.",
+  "Block definition \"pen_setPenColorToColor\" overwrites previous definition.",
+  "Block definition \"pen_setPenHueToNumber\" overwrites previous definition.",
+  "Block definition \"pen_setPenShadeToNumber\" overwrites previous definition.",
+  "Block definition \"pen_setPenSizeTo\" overwrites previous definition.",
+  "Block definition \"pen_stamp\" overwrites previous definition.",
+  "Blockly.Workspace.getVariablesOfType was deprecated in v12 and will be deleted in v13.\nUse Blockly.Workspace.getVariable",
+  "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. ",
+  "FieldColourSlider.updateDom_: slider/readout DOM is not fully initialized",
+  "FieldColourSlider.updateSliderHandles_: slider DOM is not fully initialized",
+  "Scroll position not recorded for category Motion",
+  "There are no variable blocks, but there is a variable category.",
+  "Unable to find [category][flyoutinflater] in the registry."
+ ]
+}

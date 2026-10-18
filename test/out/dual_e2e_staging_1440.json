@@ -1,0 +1,220 @@
+{
+ "summary": {
+  "checks": 42,
+  "failed": 0
+ },
+ "base": "http://127.0.0.1:8961",
+ "when": "2026-10-07 21:14:27",
+ "results": [
+  {
+   "check": "[1440x900] Studio boots on a ready lesson (lab GET studio:true, >= 1024 px)",
+   "ok": true,
+   "info": "4.11s"
+  },
+  {
+   "check": "[1440x900] the lesson's own sprites and backdrop are in the editor",
+   "ok": true,
+   "info": "{\"editor\": [\"舞台\", \"小老鼠\", \"長頸鹿\", \"蛇\", \"大象\"], \"lesson\": [\"小老鼠\", \"長頸鹿\", \"蛇\", \"大象\"]}"
+  },
+  {
+   "check": "[1440x900] read-only lab hidden, the editor frame shown",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] AI 學伴 pane on the right, editor on the left",
+   "ok": true,
+   "info": "{\"frame\": {\"l\": 12, \"r\": 1060, \"t\": 69, \"b\": 890}, \"chat\": {\"l\": 1060, \"r\": 1428, \"t\": 69, \"b\": 890}, \"chatVisible\": true, \"hscroll\": false}"
+  },
+  {
+   "check": "[1440x900] no horizontal scroll",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] 「執行」 label next to the green flag",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] real mouse drag from the palette: 當綠旗被點擊 + 移動 snapped into one script",
+   "ok": true,
+   "info": "[[\"舞台\", []], [\"小老鼠\", [[\"event_whenflagclicked\", \"motion_movesteps\"]]], [\"長頸鹿\", []], [\"蛇\", []], [\"大象\", []]]"
+  },
+  {
+   "check": "[1440x900] green flag runs the hand-built script (sprite moved)",
+   "ok": true,
+   "info": "x -60 -> -50"
+  },
+  {
+   "check": "[1440x900] AI-mode turn locks the blocks area (overlay 「AI 正在改積木…」)",
+   "ok": true,
+   "info": "AI 正在改積木…"
+  },
+  {
+   "check": "[1440x900] a drag + Delete while locked change nothing",
+   "ok": true,
+   "info": "blocks 2 -> 2"
+  },
+  {
+   "check": "[1440x900] request: mode ai + studio.targets / editing / hand_edits / unsupported / text",
+   "ok": true,
+   "info": "{\"editing\": \"小老鼠\", \"hand_edits\": {\"added\": [{\"sprite\": \"小老鼠\", \"id\": \"h1\"}], \"changed\": [], \"removed\": []}, \"text\": {\"小老鼠\": {\"h1\": \"當 綠旗 被點擊\\n移動 10 點\"}}}"
+  },
+  {
+   "check": "[1440x900] hand_edits are {sprite, id} objects",
+   "ok": true,
+   "info": "{\"added\": [{\"sprite\": \"小老鼠\", \"id\": \"h1\"}], \"changed\": [], \"removed\": []}"
+  },
+  {
+   "check": "[1440x900] text <= 6000 chars, one block per line",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] run report has per-script events (run.scripts)",
+   "ok": true,
+   "info": "[{\"sprite\": \"小老鼠\", \"id\": \"h1\", \"started\": 0, \"stopped\": 0, \"running_at_end\": false}]"
+  },
+  {
+   "check": "[1440x900] reply received",
+   "ok": true,
+   "info": "200 照你說的：小老鼠重複無限次向前移動 10 點。開始的事件你未講，暫時用「當綠旗被點擊」。"
+  },
+  {
+   "check": "[1440x900] unlocked after the edits",
+   "ok": true,
+   "info": "2.5s after the reply"
+  },
+  {
+   "check": "[1440x900] animation: a pointer is shown and blocks appear one by one",
+   "ok": true,
+   "info": "pointer True, block counts [3, 4, 5]"
+  },
+  {
+   "check": "[1440x900] end state = the reply's program",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] applied without fallback",
+   "ok": true,
+   "info": "{\"animated\": true, \"fallback\": false, \"done\": 0}"
+  },
+  {
+   "check": "[1440x900] 跳過動畫: the turn finishes at once with the reply's program",
+   "ok": true,
+   "info": "{\"at\": 0.01}"
+  },
+  {
+   "check": "[1440x900] 上一步 restores the program before the last AI change",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] 「我自己砌」 shows 請助教看看 and is remembered per lesson",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] built by hand: 當角色被點擊 + 重複無限次 {定位到 鼠標} and 當 空白 鍵被按下 + 停止 這個程式",
+   "ok": true,
+   "info": "[[\"event_whenthisspriteclicked\", \"control_forever\", [\"motion_goto\"]], [\"event_whenkeypressed\", \"control_stop\"]]"
+  },
+  {
+   "check": "[1440x900] studio.text shows the scripts as the editor does",
+   "ok": true,
+   "info": "{\"h2\": \"當角色被點擊\\n重複無限次\\n  定位到 鼠標 位置\", \"h3\": \"當 空白 鍵被按下\\n停止 這個程式\"}"
+  },
+  {
+   "check": "[1440x900] run: after space the loop kept going (run.scripts: one running at the end, the key script started and stopped)",
+   "ok": true,
+   "info": "[{\"sprite\": \"小老鼠\", \"id\": \"h2\", \"started\": 0, \"stopped\": null, \"running_at_end\": true}, {\"sprite\": \"小老鼠\", \"id\": \"h3\", \"started\": 1.1, \"stopped\": 1.1, \"running_at_end\": false}]"
+  },
+  {
+   "check": "[1440x900] after a run with hand changes: the 「想助教看看？」 chip (no automatic AI call)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] 助教 (self): request mode self with the run's script events",
+   "ok": true,
+   "info": "[{\"sprite\": \"小老鼠\", \"id\": \"h2\", \"started\": 0, \"stopped\": null, \"running_at_end\": true}, {\"sprite\": \"小老鼠\", \"id\": \"h3\", \"started\": 1.1, \"stopped\": 1.1, \"running_at_end\": false}]"
+  },
+  {
+   "check": "[1440x900] 助教 reply: ops [] and the program unchanged",
+   "ok": true,
+   "info": "ops=[]"
+  },
+  {
+   "check": "[1440x900] 助教 says what happened and asks exactly one question",
+   "ok": true,
+   "info": "{\"say\": \"你砌咗「當 空白 鍵被按下」，下面係「停止 這個程式」。按空白鍵之後，小老鼠仲係不停咁跟住滑鼠郁。\", \"question\": \"「當 空白 鍵被按下」嗰段同「當角色被點擊」嗰段，按空白鍵嗰陣邊一段停咗？\"}"
+  },
+  {
+   "check": "[1440x900] 助教 talks about the loop that kept going (real model)",
+   "ok": true,
+   "info": "你砌咗「當 空白 鍵被按下」，下面係「停止 這個程式」。按空白鍵之後，小老鼠仲係不停咁跟住滑鼠郁。"
+  },
+  {
+   "check": "[1440x900] the blocks in reply.focus glow",
+   "ok": true,
+   "info": "{\"focus\": [{\"sprite\": \"小老鼠\", \"id\": \"h3\", \"n\": 2}, {\"sprite\": \"小老鼠\", \"id\": \"h2\"}], \"glowing\": 2}"
+  },
+  {
+   "check": "[1440x900] block question answered, no build",
+   "ok": true,
+   "info": "「停止 這個程式」只會停佢自己所在嗰一段程式，其他段程式會照行。"
+  },
+  {
+   "check": "[1440x900] 請助教看看 = kind review with no text, mode self",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] review comment names a block the student really placed + one question",
+   "ok": true,
+   "info": "{\"say\": \"你砌咗「當角色被點擊」，下面係「重複無限次」同「定位到 鼠標 位置」。另外仲有「當 空白 鍵被按下」，下面係「停止 這個程式」。\", \"quoted\": [\"當角色被點擊\", \"重複無限次\", \"定位到 鼠標 位置\", \"當 空白 鍵被按下\", \"停止 這個程式\", \"執行\"]}"
+  },
+  {
+   "check": "[1440x900] reload: Wonder Lab reopens with the editor",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] reload restores the program",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] reload keeps the conversation and the mode",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] 課堂教材 and back: material shown, then the same editor and program (no reload)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "check": "[1440x900] no page errors",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[1440x900] no request outside the site (no scratch.mit.edu)",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[1440x900] no trademark text in the editor",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[1440x900] no emoji anywhere on the page",
+   "ok": true,
+   "info": "[]"
+  }
+ ]
+}

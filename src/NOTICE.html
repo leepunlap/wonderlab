@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>版權聲明及原始碼</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #ffffff; --text: #1d2733; --muted: #5b6876; --line: #dfe3e8; --accent: #0b7285; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 "Helvetica Neue", Helvetica, Arial, "PingFang HK", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 28px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  p, li { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  a { color: var(--accent); }
+  .table { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f7f8fa; }
+  code { font-size: .85em; background: #f1f3f5; padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>版權聲明及原始碼</h1>
+  <p class="muted">Wonder Lab Studio（原型）· Notices and Corresponding Source</p>
+
+  <h2>本頁的授權</h2>
+  <p>Wonder Lab Studio 原型 Copyright (C) 2026 IITS（工信學堂（香港））。以 <a href="LICENSE.txt">GNU Affero General Public License v3.0 only</a> 發布。</p>
+  <p>依照 AGPL-3.0 第 13 條，使用本頁的人可以下載本頁的完整原始碼：<a href="source.tar.gz">wonderlab-studio-source.tar.gz</a>（本頁自己的程式、模擬伺服器、測試，以及鎖定上游版本的 <code>package-lock.json</code>）。</p>
+
+  <h2>第三方軟件</h2>
+  <div class="table">
+  <table>
+    <thead><tr><th>元件</th><th>版本</th><th>授權</th><th>原始碼</th></tr></thead>
+    <tbody>
+      <tr><td>@scratch/scratch-gui（standalone build，原封不動提供）</td><td>15.2.0</td><td>AGPL-3.0-only</td><td><a href="https://github.com/scratchfoundation/scratch-editor">github.com/scratchfoundation/scratch-editor</a>，commit <code>970132883d63286762783448d4d487dcefedabf8</code>；npm <code>@scratch/scratch-gui@15.2.0</code></td></tr>
+      <tr><td>@scratch/scratch-vm, scratch-render, scratch-storage, scratch-paint, scratch-svg-renderer（已打包在上面）</td><td>15.2.0</td><td>AGPL-3.0-only</td><td>同一個 monorepo</td></tr>
+      <tr><td>scratch-blocks（已打包；以 Blockly 12 為基礎）</td><td>2.1.19</td><td>Apache-2.0</td><td><a href="https://github.com/scratchfoundation/scratch-blocks">github.com/scratchfoundation/scratch-blocks</a></td></tr>
+      <tr><td>scratch-l10n（介面翻譯）</td><td>6.1.118</td><td>AGPL-3.0-only</td><td><a href="https://github.com/scratchfoundation/scratch-l10n">github.com/scratchfoundation/scratch-l10n</a></td></tr>
+      <tr><td>scratch-audio</td><td>2.0.268</td><td>AGPL-3.0-only</td><td><a href="https://github.com/scratchfoundation/scratch-audio">github.com/scratchfoundation/scratch-audio</a></td></tr>
+      <tr><td>scratch-render-fonts</td><td>1.0.252</td><td>Apache-2.0；字型 SIL OFL 1.1</td><td><a href="https://github.com/scratchfoundation/scratch-render-fonts">github.com/scratchfoundation/scratch-render-fonts</a></td></tr>
+      <tr><td>React, Redux 等（已打包）</td><td>見下方清單</td><td>MIT 等</td><td><a href="scratch-gui-standalone.js.LICENSE.txt">上游打包檔的第三方授權清單</a></td></tr>
+      <tr><td>Lucide 圖示（arrow-up, bot, download, undo-2, x, pencil）</td><td>lucide-static 1.52.0</td><td>ISC</td><td><a href="https://lucide.dev">lucide.dev</a></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">Lucide: ISC License. Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.</p>
+
+  <h2>對上游的改動</h2>
+  <p>上游檔案（<code>scratch-gui-standalone.js</code>、<code>chunks/</code>、<code>static/</code>、<code>extension-worker.js</code>）與 npm 套件 <code>@scratch/scratch-gui@15.2.0</code> 完全相同，沒有修改。以下改動全部在本頁自己的檔案裏、在執行時進行（2026-10-07，IITS）：</p>
+  <ul>
+    <li><code>studio-pre.js</code>：把編輯器的寬度媒體查詢（JavaScript 及 CSS）改為以編輯器本身的寬度計算（旁邊有 AI 學伴窗格）。</li>
+    <li><code>studio-core.js</code>：自訂的預設作品及角色（不使用上游的預設角色）；介面文字中的商標名稱換成中性字眼；替換標誌；隱藏素材庫、「驚喜」、擴展庫及教程入口（它們會連到上游的線上素材庫）。</li>
+    <li><code>studio-ops.js</code>、<code>studio-trace.js</code>：AI 學伴把積木寫進編輯器、讀回學生的程式及執行結果。</li>
+  </ul>
+
+  <h2>商標</h2>
+  <p>本產品與 Scratch Foundation、麻省理工學院（MIT）或 Raspberry Pi Foundation 沒有關係，亦未獲其贊助或認可。「Scratch」、Scratch 標誌、Scratch Cat、Gobo、Pico、Nano、Tera 及 Giga 是其擁有者的商標；本產品不使用這些商標。</p>
+  <p class="muted">Wonder Lab Studio is not affiliated with, sponsored by or endorsed by the Scratch Foundation, MIT or the Raspberry Pi Foundation.</p>
+
+  <p><a href="./">返回 Wonder Lab Studio</a></p>
+</main>
+</body>
+</html>

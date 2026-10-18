@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wonder Lab · shell</title>
+<!--
+  A minimal page over studio-app.js: the proof that ONE shell can mount the editor.
+
+  It exists to answer a single question — does the shell boot the gui, wire the VM, and mount the
+  modules on its own? — without touching index.html, which now runs the same shell
+  is being verified. Everything the old page did in its own boot is gone from here: no EditorState,
+  no storage class, no render call, no VM hook. It asks for a root element and says what it wants.
+-->
+<link rel="stylesheet" href="studio.css">
+<style>
+  html,body{margin:0;height:100%;font-family:'Noto Sans TC',system-ui,sans-serif}
+  body{display:flex;flex-direction:column}
+  #wl-editor{flex:1;min-height:0;position:relative}
+  #log{height:110px;overflow:auto;background:#0b0f14;color:#9fb3c8;
+    font:12px/1.5 ui-monospace,Menlo,monospace;padding:7px 12px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<main id="wl-editor" aria-label="積木編輯器"></main>
+<div id="bar" style="display:flex;gap:8px;padding:8px 12px;background:#5b21b6"><select id="board" style="padding:7px 10px;border:0;border-radius:6px"><option value="UC-Mind300">UC-Mind300</option><option value="UC-Mind100">UC-Mind100</option></select><button id="conn" style="padding:7px 14px;border:0;border-radius:6px;background:#0ea5e9;color:#fff;font-weight:700">連接</button><span id="cstate" style="color:#fff;font-size:13px;align-self:center">未連接</span><input id="say" placeholder="說出你想舞台發生的事" style="flex:1;padding:7px 10px;border:0;border-radius:6px"><button id="go" style="padding:7px 16px;border:0;border-radius:6px;background:#22c55e;color:#fff;font-weight:700">送出</button></div>
+<div id="log"></div>
+
+<script src="studio-pre.js"></script>
+<script src="scratch-gui-standalone.js"></script>
+<script src="studio-core.js"></script>
+<script src="studio-ops.js"></script>
+<script src="studio-trace.js"></script>
+<script src="ucmake-blocks.js"></script>
+<script src="studio-anim.js"></script>
+<script src="studio-assist.js"></script>
+<script src="studio-app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var logEl = document.getElementById('log');
+  function log(m) {
+    logEl.textContent += m + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+    if (window.console) console.log('[shell]', m);
+  }
+  log('studio-app.js present: ' + (typeof StudioApp !== 'undefined'));
+
+  var S = StudioApp.create({
+    root: '#wl-editor',
+    api: '/api/ai/lab/studio',
+    library: true,
+    locale: 'zh-tw',
+    ucmake: true,
+    onLoaded: function () {
+      var ws = S.workspace();
+      log('loaded · workspace: ' + (ws ? 'yes' : 'no') +
+          ' · palette blocks: ' + (ws ? ws.getAllBlocks(false).length : 0));
+      log('ucmake blocks: ' + S.ucmakeBlocks + ' (0 = parked)');
+    },
+    onProjectChanged: function () { log('project changed'); },
+    onRun: function () { log('run'); }
+  });
+
+  document.getElementById('go').addEventListener('click', function () {
+    var v = document.getElementById('say').value.trim();
+    if (!v) return;
+    document.getElementById('say').value = '';
+    log('→ ' + v);
+    S.send(v).then(function (r) {
+      log('← applied: ' + (r ? (r.animated ? 'animated' : 'instant') : 'no change'));
+    });
+  });
+  document.getElementById('conn').addEventListener('click', function () {
+    var st = document.getElementById('cstate');
+    var type = document.getElementById('board').value;
+    st.textContent = '連接中 …';
+    S.connect(type).then(function (sess) {
+      st.textContent = (sess && sess.type ? sess.type : type) + ' · ' + (sess && sess.protocol ? sess.protocol : '?') +
+                       (sess && sess.firmware ? ' · ' + sess.firmware : '');
+      log('connected: ' + st.textContent);
+    }, function (e) { st.textContent = '連接失敗'; log('connect FAILED: ' + (e && e.message)); });
+  });
+  log('WLAnim present: ' + (typeof WLAnim !== 'undefined'));
+
+  S.boot().then(function () { log('boot() resolved'); },
+                function (e) { log('boot() FAILED: ' + (e && e.message)); });
+}());
+</script>
+</body>
+</html>

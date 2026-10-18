@@ -1,0 +1,25 @@
+Wonder Lab Studio
+=================
+
+Based on Scratch (https://scratch.mit.edu/)
+Original work Copyright (C) MIT Media Lab
+Modifications Copyright (C) 2024-2026 IITS
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3.
+
+Key modifications:
+- Full Scratch editor integration
+- Dual mode (AI builds / Student builds)
+- Teaching assistant interface
+- Lesson page integration
+
+This repo does NOT contain:
+- AI teaching logic (proprietary, in separate iits-repo)
+- Lesson content (proprietary)
+- Pedagogy guards (proprietary)
+
+The studio server imports pedagogy from a separate service.
+
+See LICENSE for full terms.

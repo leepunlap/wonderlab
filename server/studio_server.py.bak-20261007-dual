@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""Wonder Lab Studio prototype server (static files + a STUB of the Wonder Lab AI endpoint).
+
+    python3 server/studio_server.py [--port 8920]          # canned AI turns (default, no model calls)
+    (set -a; . ~/.deepseek; set +a; WL_REAL=1 WL_REAL_MAX=2 python3 server/studio_server.py --port 8921)
+                                                            # real DeepSeek turns through lab_core.lab_turn (max WL_REAL_MAX)
+
+Static:  /            -> src/index.html; other paths from src/, then node_modules/@scratch/scratch-gui/dist/
+         text files are gzipped on the fly (level 9, cached) when the browser accepts gzip, as nginx gzip_static would.
+API:     POST /api/ai/lab/<anything>   same request/response shape as lesson-ai lab_core.post():
+         {text, history, program, run, note, signals, studio} -> {ok, say, question, ops, errors, program, focus, ...}
+         `studio` (prototype extension) = {targets: [{name, isStage, costumes, x, y, visible}], unsupported, hand_edits}
+         lets the stub build the lesson context (sprite names, costumes, backdrops) from the student's live project.
+
+The validation (sanitize_program, apply_ops, sanitize_run) is lab_core.py copied unchanged from
+ycltesthk-portals/lesson-ai (2026-10-07), so the ops this stub returns are exactly what the real service would accept.
+Copyright (C) 2026 IITS. AGPL-3.0-only.
+"""
+import argparse, gzip, io, json, mimetypes, os, re, sys, tarfile, threading, time
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, unquote
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+SRC = os.path.join(ROOT, "src")
+DIST = os.path.join(ROOT, "node_modules", "@scratch", "scratch-gui", "dist")
+sys.path.insert(0, HERE)
+import lab_core as LC  # noqa: E402  (stdlib only; reads lab_opcodes.json next to it)
+
+STAGE = LC.STAGE_NAME
+TEXT_EXT = {".js", ".css", ".html", ".json", ".svg", ".txt", ".map", ".md"}
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("image/svg+xml", ".svg")
+mimetypes.add_type("application/wasm", ".wasm")
+_gz, _gz_lock = {}, threading.Lock()
+REAL = os.environ.get("WL_REAL") == "1"
+REAL_MAX = int(os.environ.get("WL_REAL_MAX", "3"))
+_real_used = 0
+LOG = []          # last requests to the AI endpoint (for the e2e test: what the browser actually sent)
+
+
+def resolve(path):
+    p = unquote(urlparse(path).path)
+    if p in ("/", ""):
+        p = "/index.html"
+    rel = os.path.normpath(p.lstrip("/"))
+    if rel.startswith(".."):
+        return None
+    for base in (SRC, DIST):
+        f = os.path.join(base, rel)
+        if os.path.isfile(f) and os.path.realpath(f).startswith(os.path.realpath(base)):
+            return f
+    return None
+
+
+SOURCE_FILES = ["README.md", "NOTICE.md", "LICENSE", "package.json", "package-lock.json", "src", "server", "test/e2e.py", "test/perf.py",
+                "test/real_turns.py", "test/webkit_ipad.cjs"]
+
+
+def source_tar():
+    """AGPL-3.0 section 13: the Corresponding Source of what this server sends (our files; upstream = npm tarballs in package-lock.json)."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for rel in SOURCE_FILES:
+            f = os.path.join(ROOT, rel)
+            if os.path.exists(f):
+                tar.add(f, arcname="wonderlab-studio/" + rel,
+                        filter=lambda ti: None if "__pycache__" in ti.name else ti)
+    return buf.getvalue()
+
+
+def gz_bytes(f):
+    m = os.stat(f).st_mtime
+    with _gz_lock:
+        hit = _gz.get(f)
+        if hit and hit[0] == m:
+            return hit[1]
+    with open(f, "rb") as fh:
+        data = gzip.compress(fh.read(), 9)
+    with _gz_lock:
+        _gz[f] = (m, data)
+    return data
+
+
+# ------------------------------------------------------------------ stub "AI"
+def lesson_from(studio):
+    """The lab_core lesson context, built from the live project the browser describes (students add sprites here)."""
+    targets = (studio or {}).get("targets") or []
+    sprites, backdrops = [], []
+    for t in targets[:30]:
+        if not isinstance(t, dict):
+            continue
+        costumes = [{"name": str(c)[:40]} for c in (t.get("costumes") or [])[:50]]
+        if t.get("isStage"):
+            backdrops = costumes
+        else:
+            sprites.append({"name": str(t.get("name") or "")[:40], "costumes": costumes or [{"name": ""}],
+                            "x": t.get("x", 0), "y": t.get("y", 0), "visible": t.get("visible", True)})
+    return {"title": "自由創作（Studio 原型）", "sprites": sprites, "stage": {"backdrops": backdrops or [{"name": "背景1"}]},
+            "brief": {"goal": "學生自由創作；跟隨學生的想法。", "questions": [], "colors": {}, "limits": "—"}}
+
+
+def scripts_of(program, sprite):
+    t = program["stage"] if sprite == STAGE else (program.get("sprites") or {}).get(sprite) or {}
+    return t.get("scripts") or {}
+
+
+def describe(block, depth=0):
+    names = {"event_whenflagclicked": "當綠旗被點擊", "motion_movesteps": "移動", "motion_turnright": "右轉",
+             "control_forever": "重複無限次", "control_repeat": "重複", "looks_sayforsecs": "說", "looks_say": "說",
+             "event_whenkeypressed": "當鍵被按下", "motion_changexby": "x 改變", "motion_changeyby": "y 改變",
+             "control_if": "如果", "motion_ifonedgebounce": "碰到邊緣就反彈", "control_wait": "等待"}
+    return names.get(block.get("op"), block.get("op"))
+
+
+def canned(text, program, run, studio, lesson):
+    """Return lab_core-shaped raw model output {intent, say, question, ops, focus}. Builds on the student's own scripts."""
+    t = text or ""
+    sprites = [s["name"] for s in lesson["sprites"]]
+    focus = (studio or {}).get("focus") if (studio or {}).get("focus") in sprites else (sprites[0] if sprites else STAGE)
+    mine = scripts_of(program, focus)
+    hand = [e for e in (studio or {}).get("hand_edits") or [] if e.get("sprite") == focus]
+    # the student's own green-flag script (hand-made or edited): build on it instead of starting a new one
+    flag_sid = next((sid for sid, bl in mine.items() if bl and bl[0].get("op") == "event_whenflagclicked"), None)
+    seen = ""
+    if mine:
+        first = next(iter(mine.values()))
+        seen = f"我看到「{focus}」現在有 {len(mine)} 段程式（第一段：{'、'.join(describe(b) for b in first[:4])}{'…' if len(first) > 4 else ''}）。"
+    if hand:
+        seen += f"你自己改過 {len(hand)} 段。"
+    ran = ""
+    if run and isinstance(run.get("sprites"), dict) and focus in run["sprites"]:
+        r = run["sprites"][focus]
+        ran = f"上次執行：{focus} 由 {tuple(r.get('start') or [])} 去到 {tuple(r.get('end') or [])}。"
+
+    def put(extra, say, q):
+        base = list(mine[flag_sid]) if flag_sid else [{"op": "event_whenflagclicked"}]
+        sid = flag_sid or "s1"
+        # keep the student's blocks (and mistakes); add only what they asked for, before a cap block
+        if base and LC.OPS.get(base[-1]["op"], {}).get("shape") in ("cap", "c-cap"):
+            base = base[:-1] + extra + [base[-1]]
+        else:
+            base = base + extra
+        how = "在你自己砌的那段程式下面" if flag_sid else "用「當綠旗被點擊」開始"
+        return {"intent": "build", "say": f"照你說的：{how}{say}", "question": q,
+                "ops": [{"do": "set_script", "sprite": focus, "id": sid, "blocks": base}], "focus": focus}
+
+    if re.search(r"(刪|delete|清除程式)", t):
+        if not mine:
+            return {"intent": "ask", "say": "現在沒有程式可以刪。", "question": "你想角色先做甚麼？", "ops": [], "focus": focus}
+        sid = list(mine)[-1]
+        return {"intent": "build", "say": f"照你說的：刪去了「{focus}」最後一段程式。", "question": "刪了之後，按「執行」會發生甚麼？",
+                "ops": [{"do": "delete_script", "sprite": focus, "id": sid}], "focus": focus}
+    if re.search(r"(一直|重複|不停|forever|loop)", t, re.I):
+        return put([{"op": "control_forever", "SUBSTACK": [{"op": "motion_movesteps", "STEPS": 10}]}],
+                   "，加了「重複無限次」裏面「移動 10 點」。", "按「執行」之前猜猜：角色走到舞台邊之後會怎樣？")
+    if re.search(r"(移|走|行|move|動)", t, re.I):
+        return put([{"op": "motion_movesteps", "STEPS": 10}], "，加了「移動 10 點」。", "按「執行」之前猜猜：角色會向哪一邊走？")
+    if re.search(r"(說|講|say|hello|你好)", t, re.I):
+        return put([{"op": "looks_sayforsecs", "MESSAGE": "你好！", "SECS": 2}], "，加了「說 你好！ 2 秒」。", "你想角色說完之後做甚麼？")
+    if re.search(r"(轉|turn)", t, re.I):
+        return put([{"op": "motion_turnright", "DEGREES": 15}], "，加了「右轉 15 度」。", "轉完之後，角色面向哪一邊？")
+    return {"intent": "observe", "say": (seen + ran) or "我們從你的想法開始。", "question": "你想角色接下來做甚麼？", "ops": [], "focus": focus}
+
+
+def stub_turn(body):
+    studio = body.get("studio") if isinstance(body.get("studio"), dict) else {}
+    lesson = lesson_from(studio)
+    program = LC.sanitize_program(body.get("program"), lesson)
+    run = LC.sanitize_run(body.get("run"), lesson)
+    text = str(body.get("text") or "")[:300]
+    t0 = time.time()
+    global _real_used
+    if REAL and _real_used < REAL_MAX:
+        _real_used += 1
+        key = os.environ.get("DEEPSEEK_API_KEY", "")      # from the environment only (set -a; . ~/.deepseek; set +a); never logged
+        if not key:
+            raise RuntimeError("WL_REAL=1 needs DEEPSEEK_API_KEY in the environment")
+        hist = [m for m in (body.get("history") or [])[-8:] if isinstance(m, dict) and m.get("role") in ("user", "assistant")]
+        out = LC.lab_turn(lesson, hist, program, run, text, key, os.environ.get("WL_MODEL", "deepseek-chat"), body.get("note") or None)
+        say, question, applied, errors, new_prog, focus = out["say"], out["question"], out["ops"], out["errors"], out["program"], out["focus"]
+        src = "deepseek"
+    else:
+        raw = canned(text, program, run, studio, lesson)
+        new_prog, applied, errors = LC.apply_ops(program, raw["ops"], lesson)
+        built = bool(applied)
+        say, question, focus = LC.tidy_say(raw["say"], built), LC.tidy_question(raw["question"]), raw["focus"]
+        src = "stub"
+    return {"ok": True, "say": say, "question": question, "ops": applied, "errors": errors, "program": new_prog, "focus": focus,
+            "left": 99, "in_class": False, "masked": False, "ms": int((time.time() - t0) * 1000), "checks": [], "source": src}
+
+
+def mask(s):
+    return re.sub(r"(sk-|Bearer\s+)\S+", r"\1***", s)
+
+
+class H(BaseHTTPRequestHandler):
+    server_version = "WonderLabStudio/0.1"
+
+    def log_message(self, fmt, *a):
+        if os.environ.get("WL_LOG"):
+            sys.stderr.write("%s %s\n" % (self.address_string(), fmt % a))
+
+    def _j(self, code, obj):
+        b = json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(b)
+
+    def do_GET(self):
+        p = urlparse(self.path).path
+        if p == "/api/ai/lab/_log":                      # test hook: the last request bodies the stub received
+            return self._j(200, {"ok": True, "log": LOG[-10:]})
+        if p == "/source.tar.gz":
+            data = source_tar()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/gzip")
+            self.send_header("Content-Disposition", 'attachment; filename="wonderlab-studio-source.tar.gz"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        f = os.path.join(ROOT, "LICENSE") if p == "/LICENSE.txt" else resolve(self.path)
+        if not f:
+            self.send_error(404)
+            return
+        ext = os.path.splitext(f)[1].lower()
+        ctype = mimetypes.guess_type(f)[0] or ("text/plain" if f.endswith("LICENSE") else "application/octet-stream")
+        if ext in (".js", ".css", ".html", ".json", ".svg", ".txt", ".md") or f.endswith("LICENSE"):
+            ctype += "; charset=utf-8"
+        use_gz = ext in TEXT_EXT and "gzip" in (self.headers.get("Accept-Encoding") or "")
+        data = gz_bytes(f) if use_gz else open(f, "rb").read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        if use_gz:
+            self.send_header("Content-Encoding", "gzip")
+        own = f.startswith(SRC)
+        self.send_header("Cache-Control", "no-cache" if own else "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        p = urlparse(self.path).path
+        if not p.startswith("/api/ai/lab/"):
+            self.send_error(404)
+            return
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+            if n > LC.MAX_BODY:
+                return self._j(413, {"ok": False, "reason": "程式太大了。"})
+            body = json.loads(self.rfile.read(n) or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError
+        except Exception:
+            return self._j(400, {"ok": False, "reason": "訊息格式不對。"})
+        if not str(body.get("text") or "").strip():
+            return self._j(400, {"ok": False, "reason": "請先說說你的想法。"})
+        LOG.append({"ts": time.time(), "bytes": n, "body": body})
+        del LOG[:-20]
+        try:
+            out = stub_turn(body)
+        except Exception as e:
+            print("stub error", type(e).__name__, mask(str(e))[:200], flush=True)
+            return self._j(502, {"ok": False, "retry": True, "reason": "AI 學伴暫時連不上，請稍後再試。"})
+        LOG[-1]["reply"] = out
+        self._j(200, out)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=8920)
+    a = ap.parse_args()
+    if not 8920 <= a.port <= 8929:
+        sys.exit("port must be 8920-8929")
+    srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    print(f"Wonder Lab Studio on http://127.0.0.1:{a.port}/  (AI: {'DeepSeek x%d' % REAL_MAX if REAL else 'stub'})", flush=True)
+    srv.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

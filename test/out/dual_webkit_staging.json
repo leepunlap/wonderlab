@@ -1,0 +1,109 @@
+{
+ "summary": {
+  "checks": 20,
+  "failed": 0
+ },
+ "base": "http://127.0.0.1:8961",
+ "results": [
+  {
+   "check": "[webkit-1024x768] Studio boots in WebKit (iPad landscape)",
+   "ok": true,
+   "info": "4.0s"
+  },
+  {
+   "check": "[webkit-1024x768] AI 學伴 is a drawer, the editor fills the width, no horizontal scroll",
+   "ok": true,
+   "info": "{\"hscroll\":false,\"drawer\":true,\"fr\":[1024,701]}"
+  },
+  {
+   "check": "[webkit-1024x768] drag from the palette builds 當綠旗被點擊 + 移動",
+   "ok": true,
+   "info": "[[{\"op\":\"event_whenflagclicked\"},{\"op\":\"motion_movesteps\",\"STEPS\":10}]]"
+  },
+  {
+   "check": "[webkit-1024x768] tapping the green flag runs it",
+   "ok": true,
+   "info": "-60 -> -50"
+  },
+  {
+   "check": "[webkit-1024x768] AI turn locks the editor, then unlocks",
+   "ok": true,
+   "info": "{\"locked\":true,\"unlock_s\":3.283}"
+  },
+  {
+   "check": "[webkit-1024x768] end state = the reply's program",
+   "ok": true,
+   "info": "照你說的：小老鼠一直向前行，每次行 10 點。開始的事件你未講，暫時用「當綠旗被點擊」。"
+  },
+  {
+   "check": "[webkit-1024x768] request carries mode ai + studio fields",
+   "ok": true,
+   "info": "{\"added\":[{\"sprite\":\"小老鼠\",\"id\":\"h1\"}],\"changed\":[],\"removed\":[]}"
+  },
+  {
+   "check": "[webkit-1024x768] 請助教看看: kind review, mode self, ops [] and the program unchanged",
+   "ok": true,
+   "info": "你砌咗兩段程式：一段係「當 綠旗 被點擊」下面「移動 10 點」，另一段係「當 綠旗 被點擊」下面「重複無限次」再「移動 10 點」。你仲未按「執行」。"
+  },
+  {
+   "check": "[webkit-1024x768] no page errors",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1024x768] no request outside the site",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1080x810] Studio boots in WebKit (iPad landscape)",
+   "ok": true,
+   "info": "4.3s"
+  },
+  {
+   "check": "[webkit-1080x810] AI 學伴 is a drawer, the editor fills the width, no horizontal scroll",
+   "ok": true,
+   "info": "{\"hscroll\":false,\"drawer\":true,\"fr\":[1080,743]}"
+  },
+  {
+   "check": "[webkit-1080x810] drag from the palette builds 當綠旗被點擊 + 移動",
+   "ok": true,
+   "info": "[[{\"op\":\"event_whenflagclicked\"},{\"op\":\"motion_movesteps\",\"STEPS\":10}]]"
+  },
+  {
+   "check": "[webkit-1080x810] tapping the green flag runs it",
+   "ok": true,
+   "info": "-60 -> -50"
+  },
+  {
+   "check": "[webkit-1080x810] AI turn locks the editor, then unlocks",
+   "ok": true,
+   "info": "{\"locked\":true,\"unlock_s\":3.281}"
+  },
+  {
+   "check": "[webkit-1080x810] end state = the reply's program",
+   "ok": true,
+   "info": "照你說的：小老鼠一直重複向前移動 10 點。開始的事件你未講，暫時用「當綠旗被點擊」。"
+  },
+  {
+   "check": "[webkit-1080x810] request carries mode ai + studio fields",
+   "ok": true,
+   "info": "{\"added\":[{\"sprite\":\"小老鼠\",\"id\":\"h1\"}],\"changed\":[],\"removed\":[]}"
+  },
+  {
+   "check": "[webkit-1080x810] 請助教看看: kind review, mode self, ops [] and the program unchanged",
+   "ok": true,
+   "info": "你砌咗兩段程式：一段係「當 綠旗 被點擊」下面「移動 10 點」，另一段係「當 綠旗 被點擊」下面「重複無限次」再「移動 10 點」。呢個版本你仲未按「執行」。"
+  },
+  {
+   "check": "[webkit-1080x810] no page errors",
+   "ok": true,
+   "info": "[]"
+  },
+  {
+   "check": "[webkit-1080x810] no request outside the site",
+   "ok": true,
+   "info": "[]"
+  }
+ ]
+}
