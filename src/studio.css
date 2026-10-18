@@ -20,6 +20,10 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 #wl-editor { position: relative; min-width: 0; height: 100%; overflow: hidden; }
 .wl-hidden { display: none !important; }
 
+/* Inline icons. Every svg the page or the modules draw carries class="ic". Without a size they
+   fall back to the SVG default box, which is how the export button grew to 88px tall. */
+.ic { width: 16px; height: 16px; flex: none; }
+
 /* the AI's scripts after a turn: a calm outline, different from the yellow "running" glow */
 .wl-ai { filter: drop-shadow(0 0 3px rgba(11, 114, 133, .95)) drop-shadow(0 0 6px rgba(11, 114, 133, .6)); }
 
