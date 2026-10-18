@@ -1,0 +1,32 @@
+{
+  "name": "@wonderlab/program-model",
+  "version": "0.1.0",
+  "description": "Shared program model and validation for Wonder Lab Studio",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./validators": {
+      "import": "./dist/validators.js",
+      "types": "./dist/validators.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test tests/*.test.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.0.0"
+  },
+  "keywords": ["scratch", "education", "program-model"],
+  "author": "IITS Team",
+  "license": "MIT"
+}
