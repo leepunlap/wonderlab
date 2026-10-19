@@ -25,7 +25,8 @@ const run = promisify(execFile);
 const PORT = process.env.WL_PORT || '8920';
 const PAGES = [
   { file: '_drive-check.html', out: 'wl-drive-out', what: '由零開始 的匯入示範' },
-  { file: '_mode-check.html', out: 'wl-mode-out', what: '新手 / 熟手 的步數' }
+  { file: '_mode-check.html', out: 'wl-mode-out', what: '新手 / 熟手 的步數' },
+  { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' }
 ];
 
 const CHROME = [

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does 「選擇一個角色」 have pictures in it, or just names above white boxes?
+
+  scratch-gui asks the storage for each library asset's URL: storage.getLibraryAssetUrl(assetId,
+  dataFormat). Ours answered 'assets/blank.svg' for every one of them - a real, always-200 file - so
+  the picker drew a grid of empty tiles with the right names underneath. Nothing errored, the sprites
+  imported fine, and the library simply looked broken.
+
+  So the check is: resolve every thumbnail exactly the way the picker does, and load it as an image.
+  That is the whole failure mode - a URL that is well-formed, returns 200, and is not a sprite.
+
+  It reads the lists the picker itself reads (/libraries/sprites.json, /libraries/backdrops.json), so
+  a library that grows is covered without touching this file.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920   (the library 404s without it)
+      npm run check:pages        (or Chrome --headless=new --dump-dom on this URL, budget 900000)
+  Read #wl-lib-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>library check</title>
+<style>html,body{margin:0}iframe{width:100%;height:80vh;border:0}pre{margin:0;padding:8px;font:13px/1.5 monospace}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-lib-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-lib-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function win() { return document.getElementById('app').contentWindow; }
+
+  /** What the picker asks for: the first costume of each item, as (assetId, dataFormat). */
+  function firstAsset(item) {
+    var cos = (item.json && item.json.costumes) || item.costumes || [];
+    var c = cos[0];
+    if (!c) return null;
+    var m = c.md5ext || c.md5;
+    if (!m) return null;
+    var parts = String(m).split('.');
+    return { id: parts[0], fmt: parts[1], name: item.name };
+  }
+
+  /** Load it the way an <img> in the picker would. */
+  function loads(url) {
+    return new Promise(function (done) {
+      var img = new Image();
+      img.onload = function () { done(img.naturalWidth > 0 && img.naturalHeight > 0); };
+      img.onerror = function () { done(false); };
+      img.src = url;
+    });
+  }
+
+  /** A dozen at a time: 400 images at once is how a check becomes a timeout. */
+  function inBatches(list, size, each) {
+    var i = 0;
+    function next() {
+      if (i >= list.length) return Promise.resolve();
+      var slice = list.slice(i, i + size);
+      i += size;
+      return Promise.all(slice.map(each)).then(next);
+    }
+    return next();
+  }
+
+  var tries = 0;
+  (function tick() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var storage = S && typeof S.storage === 'function' ? S.storage() : null;
+    if (!storage || !storage.getLibraryAssetUrl) {
+      if (tries < 60) return setTimeout(tick, 500);
+      log('RESULT FAIL: the editor never booted (or WLStudio.storage is gone)');
+      return;
+    }
+
+    Promise.all(['libraries/sprites.json', 'libraries/backdrops.json'].map(function (u) {
+      return fetch(u).then(function (r) { return r.json(); });
+    })).then(function (both) { try {
+      var items = [];
+      both.forEach(function (list) {
+        list.forEach(function (it) { var a = firstAsset(it); if (a) items.push(a); });
+      });
+      log(items.length + ' thumbnails to resolve');
+
+      /* Step one is the bug itself: every URL has to point at the library, not at a placeholder.
+         All of them are checked because it costs nothing. */
+      var wrongUrl = [];
+      items.forEach(function (a) {
+        var url = storage.getLibraryAssetUrl(a.id, a.fmt);
+        if (!/^\/lab-library\/a\/[0-9a-f]+\.[a-z0-9]+$/i.test(url) && wrongUrl.length < 5) {
+          wrongUrl.push(a.name + ' -> ' + url);
+        }
+      });
+      log('first: ' + items[0].name + ' -> ' + storage.getLibraryAssetUrl(items[0].id, items[0].fmt));
+      wrongUrl.forEach(function (b) { log('  wrong URL: ' + b); });
+
+      /* Step two: a sample has to decode. Every fifteenth item, so one broken corner of the library
+         cannot hide behind a good first page. */
+      var sampleItems = items.filter(function (x, i) { return i % 15 === 0; });
+      var broken = 0, bad = [];
+      return inBatches(sampleItems, 8, function (a) {
+        var url = storage.getLibraryAssetUrl(a.id, a.fmt);
+        return loads(url).then(function (ok) {
+          if (ok) return;
+          broken++;
+          if (bad.length < 8) bad.push(a.name + ' -> ' + url);
+        });
+      }).then(function () {
+        bad.forEach(function (b) { log('  empty: ' + b); });
+        log('decoded ' + (sampleItems.length - broken) + ' of ' + sampleItems.length + ' sampled thumbnails');
+        var ok = !wrongUrl.length && !broken;
+        log(ok ? 'RESULT PASS' : 'RESULT FAIL');
+      });
+    } catch (err) { log('RESULT FAIL threw: ' + (err && err.message)); }
+    }, function (e) { log('RESULT FAIL ' + (e && e.message)); });
+  })();
+}());
+</script>
+</body>
+</html>

@@ -96,6 +96,9 @@
   }
 
   function StudioStorage(G, project, assets, libBase, locale) {
+      /* The prototype below is a module-level object literal, so it cannot see this function's
+         parameters - the library base has to live on the instance for getLibraryAssetUrl to reach it. */
+      this.libBase = libBase || '/lab-library/a/';
       var st = this.scratchStorage = new G.ScratchStorage();
       var enc = new TextEncoder();
       // the built-in helper is where scratch-gui's own LegacyStorage keeps its default project (id "0").
@@ -117,7 +120,14 @@
     StudioStorage.prototype = {
       setProjectHost: function () {}, setProjectToken: function () {}, setProjectMetadata: function () {},
       setAssetHost: function () {}, setBackpackHost: function () {}, setTranslatorFunction: function () {},
-      getLibraryAssetUrl: function () { return 'assets/blank.svg'; },
+      /* The picker's thumbnails. scratch-gui asks the storage for each library asset's URL
+         (getLibraryAssetUrl(assetId, dataFormat)) and this answered 'assets/blank.svg' for all of
+         them, so 「選擇一個角色」 listed the right names above empty white boxes: the library was
+         working and looked broken. It is the same file the web store above serves, so a sprite that
+         can be imported can also be seen. */
+      getLibraryAssetUrl: function (assetId, dataFormat) {
+        return assetUrl(this.libBase, { assetId: assetId, dataFormat: dataFormat });
+      },
       saveProject: function () {
         return Promise.reject(new Error('Wonder Lab: no server save — use 「儲存到你的電腦」'));
       }
@@ -206,10 +216,16 @@
         var fetched = res.slice(1);   // DEFAULT_ASSETS + any the page supplied, now with .text
         ops = new root.StudioOps(spec);
 
+        var madeStorage = null;
         var state = new G.EditorState({ locale: cfg.locale || LOCALE }, function () {
-          return { storage: new StudioStorage(G, cfg.project, fetched, cfg.libraryUrl ? cfg.libraryUrl + 'a/' : null, cfg.locale || LOCALE) };
+          madeStorage = new StudioStorage(G, cfg.project, fetched, cfg.libraryUrl ? cfg.libraryUrl + 'a/' : null, cfg.locale || LOCALE);
+          return { storage: madeStorage };
         });
         store = state.store;
+        /* The object the editor asks for asset URLs. Exposed because "where does this costume come
+           from" is a question the driver, the lesson page and _library-check.html all end up asking,
+           and the answer must be the one the picker's thumbnails use or it is not the same answer. */
+        S.storage = function () { return madeStorage; };
 
         // Locale first: the toolbox is built from these strings, and patching them after the gui
         // has mounted rebuilds it underneath the user.
