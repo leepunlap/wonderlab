@@ -38,11 +38,24 @@ sandbox.StudioI18n = {
 };
 for (const [, file] of LOCALES) load(file);
 load('studio-guide-topics.js');
+load('studio-guide-lessons.js');
+load('studio-guide-refs.js');
 
-const topics = sandbox.StudioGuideTopics || [];
+/* Three shelves in one course: the lessons, the cards, and the basics. They are checked as one
+   list because they are checked by the same rules — only the shelf they sit on differs. */
+const topics = [].concat(sandbox.StudioGuideLessons || [], sandbox.StudioGuideRefs || [], sandbox.StudioGuideTopics || []);
 const spec = JSON.parse(readFileSync(join(SRC, 'opcodes.json'), 'utf8')).opcodes;
-const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar']);
+const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar',
+  'addSprite', 'addBackdrop']);
 const SHAPES = new Set(['square', 'circle', 'arrow']);
+const KINDS = new Set(['lesson', 'ref', 'basic']);
+/* The library is outside this repo, so a missing file is a skip, not a failure: what it guards is
+   "the demonstration asks for an actor the library does not have", which cannot be checked offline. */
+let LIB_NAMES = null;
+try {
+  const LIBRARY = JSON.parse(readFileSync(resolve(SRC, '..', '..', '..', 'local-lab', 'lab-library', 'library.json'), 'utf8'));
+  LIB_NAMES = new Set([...(LIBRARY.sprites || []), ...(LIBRARY.backdrops || [])].map((e) => e.name));
+} catch (e) { LIB_NAMES = null; }
 
 let failures = 0;
 const check = (what, ok, detail = '') => {
@@ -62,13 +75,21 @@ const required = new Set(['guide.intro', 'guide.stepCount', 'guide.back', 'guide
   'guide.stepOf', 'guide.demo', 'guide.replay', 'guide.running', 'guide.starting', 'guide.progress',
   'guide.failed', 'guide.notReady', 'guide.practice', 'guide.prev', 'guide.next', 'guide.nextTopic',
   'guide.demoHolding', 'guide.stop', 'guide.restore', 'guide.narrating', 'guide.showing',
+  'guide.mode', 'guide.mode.new', 'guide.mode.pro',
+  'guide.section.lesson', 'guide.section.ref', 'guide.section.basic',
   'chat.tabs', 'chat.tab.chat', 'chat.tab.guide']);
 
 const seenTopic = new Set();
 for (const t of topics) {
   check(`topic ${t.id} has a unique id`, !seenTopic.has(t.id));
   seenTopic.add(t.id);
+  check(`topic ${t.id} sits on a known shelf`, KINDS.has(t.kind || 'basic'), String(t.kind));
   ['title', 'intro'].forEach((k) => required.add(`guide.${t.id}.${k}`));
+  /* a lesson or a card may carry a `sub` (which lesson it is) and a `tip` (what to watch for);
+     they are optional in structure, but once written they must exist in every language. */
+  for (const [id] of LOCALES) {
+    for (const extra of ['sub', 'tip']) if (has(id, `guide.${t.id}.${extra}`)) required.add(`guide.${t.id}.${extra}`);
+  }
 
   const steps = t.steps || [];
   check(`topic ${t.id} has steps`, steps.length > 0);
@@ -100,11 +121,25 @@ for (const t of topics) {
       check(`  ${t.id}/${s.id} script ${sc.id} is not empty`, (sc.blocks || []).length > 0);
     }
 
+    /* the imports: an actor or a backdrop brought in from the library, which is the whole of a
+       "from scratch" step. A name the library does not have fails silently at run time — the sprite
+       simply never arrives — so it is checked here instead. */
+    for (const a of d.add || []) {
+      check(`  ${t.id}/${s.id} import is add_sprite or add_backdrop`,
+        a['do'] === 'add_sprite' || a['do'] === 'add_backdrop', String(a['do']));
+      check(`  ${t.id}/${s.id} import names something`, !!a.name, JSON.stringify(a));
+      if (LIB_NAMES) check(`  ${t.id}/${s.id} import ${a.name} is in the library`, LIB_NAMES.has(a.name), String(a.name));
+      if (a.sprite && String(a.sprite).startsWith('@')) required.add(`guide.sprite.${String(a.sprite).slice(1)}`);
+    }
+
     if (d.focus) check(`  ${t.id}/${s.id} focus is a sprite ref`, String(d.focus).startsWith('@'), String(d.focus));
     for (const sp of (d.project && d.project.sprites) || []) {
       if (sp.ref) required.add(`guide.sprite.${String(sp.ref).slice(1)}`);
     }
-    check(`  ${t.id}/${s.id} project has a sprite`, !d.project || (d.project.sprites || []).length > 0);
+    /* A lesson that starts from nothing has an empty project on purpose; every other step needs an
+       actor to build on. */
+    check(`  ${t.id}/${s.id} project has a sprite`,
+      !d.project || d.project.empty === true || (d.project.sprites || []).length > 0, 'no sprites and not empty');
     if (d.point) {
       check(`  ${t.id}/${s.id} points at a known region`, REGIONS.has(d.point), d.point);
       required.add(`guide.point.${d.point}`);
@@ -132,6 +167,9 @@ for (const t of topics) {
       if (m.label) required.add(m.label);
     }
   }
+  /* a reader in 熟手 mode sees the steps that are not `basic`: a lesson made only of imports would
+     vanish for them, which is the one way this feature can lose a lesson entirely. */
+  check(`topic ${t.id} still has steps in 熟手 mode`, steps.some((s) => !s.basic));
 }
 
 /* every required key, in every language */

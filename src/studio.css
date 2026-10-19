@@ -189,6 +189,15 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-g-index, .wl-g-topic-page { display: flex; flex-direction: column; gap: 10px; }
 .wl-g-intro { margin: 0; font-size: .82rem; line-height: 1.55; color: var(--wl-muted); }
 
+/* 新手 / 熟手: two buttons, because the reader knows which one they are */
+.wl-g-mode { display: flex; gap: 4px; padding: 3px; background: var(--wl-pane);
+  border: 1px solid var(--wl-line); border-radius: 999px; }
+.wl-g-mbtn { flex: 1 1 0; font: inherit; font-size: .8rem; font-weight: 600; padding: 6px 10px; min-height: 32px;
+  border: 0; border-radius: 999px; background: none; color: var(--wl-muted); cursor: pointer; }
+.wl-g-mbtn.is-on { background: var(--wl-accent); color: var(--wl-accent-ink); }
+
+.wl-g-sec { margin: 4px 0 0; font-size: .74rem; font-weight: 700; letter-spacing: .04em; color: var(--wl-muted); }
+
 .wl-g-list { display: flex; flex-direction: column; gap: 6px; }
 .wl-g-topic { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; font: inherit; text-align: left;
   color: var(--wl-text); background: var(--wl-pane); border: 1px solid var(--wl-line); border-radius: 10px; cursor: pointer; }

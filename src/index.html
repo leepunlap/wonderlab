@@ -60,6 +60,8 @@
 <script src="studio-chat.js"></script>
 <script src="studio-guide.js"></script>
 <script src="studio-guide-topics.js"></script>
+<script src="studio-guide-lessons.js"></script>
+<script src="studio-guide-refs.js"></script>
 <script src="studio-guide-drive.js"></script>
 <script src="studio-guide-marks.js"></script>
 <script src="studio-guide-voice.js"></script>
@@ -215,9 +217,22 @@
   var marks = StudioGuideMarks.create({ i18n: I });
   drive = StudioGuideDrive.create({ i18n: I, marks: function () { return marks; } });
   var voice = StudioGuideVoice.create({ i18n: I });
+  /* 新手 / 熟手. The same course with the "which button is that" steps taken out of it, remembered
+     for next time: a child who has used this before should not be re-taught where the sprite button
+     is every time they open the pane. */
+  var MODE_KEY = 'wl.guide.mode';
+  var guideMode = 'new';
+  try { guideMode = localStorage.getItem(MODE_KEY) === 'pro' ? 'pro' : 'new'; } catch (e) { guideMode = 'new'; }
   guide = StudioGuide.create({
     i18n: I,
-    topics: StudioGuideTopics,
+    topics: (window.StudioGuideLessons || []).concat(window.StudioGuideRefs || [], StudioGuideTopics),
+    mode: function (set) {
+      if (set === 'new' || set === 'pro') {
+        guideMode = set;
+        try { localStorage.setItem(MODE_KEY, set); } catch (e) { /* private mode: this visit only */ }
+      }
+      return guideMode;
+    },
     prepare: function (step, topic) { return drive.prepare(step, topic); },
     explain: function (step) { drive.explain(step); },
     perform: function (step, onProgress) { return drive.perform(onProgress); },

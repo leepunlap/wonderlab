@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does the guide's 「由零開始」 opening really work on the real editor?
+
+  A lesson's first steps are the ones no lesson material ever writes down: an empty stage, the actors
+  brought in, a background put behind them. They are data (studio-guide-lessons.js) plus a driver
+  (studio-guide-drive.js), and a data bug there looks exactly like a working feature until somebody
+  presses the button - so this page presses it, on the real editor, and says PASS or FAIL.
+
+  It loads index.html in an iframe rather than copying it, so the page under test is the page the
+  students get and this file cannot drift out of step with it.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920   (the library 404s without it)
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+          --virtual-time-budget=120000 --dump-dom http://127.0.0.1:8920/_drive-check.html
+  then read the text of #wl-drive-out (the last line is RESULT PASS or RESULT FAIL).
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>drive check</title>
+<style>html,body{margin:0}iframe{width:100%;height:80vh;border:0}pre{margin:0;padding:8px;font:13px/1.5 monospace}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-drive-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-drive-out');
+  function log(s) { out.textContent += '\n' + s; }
+
+  /* Mouse1 / Giraffe / Forest are what 501-bp01's opening asks for; the aliases stand in for the
+     names the locale resolves '@mouse' / '@giraffe' to, which is the driver's job, not this page's. */
+  var ADDS = [
+    { do: 'add_sprite', name: 'Mouse1', alias: 'T-mouse' },
+    { do: 'add_sprite', name: 'Giraffe', alias: 'T-giraffe' },
+    { do: 'add_backdrop', name: 'Forest' }
+  ];
+
+  var tries = 0;
+  (function tick() {
+    tries++;
+    var win = document.getElementById('app').contentWindow;
+    var S = win && win.WLStudio, vm = S && S.vm;
+    if (!vm || !vm.runtime || !vm.runtime.targets.length) {
+      if (tries < 60) return setTimeout(tick, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+    log('before: ' + vm.runtime.targets.map(function (t) { return t.getName(); }).join(', '));
+
+    var p = Promise.resolve();
+    ADDS.forEach(function (o) {
+      p = p.then(function () {
+        return o.do === 'add_sprite' ? S.addLibrarySprite(o.name, o.alias) : S.addLibraryBackdrop(o.name);
+      }).then(function (r) { log(o.do + ' ' + o.name + ' -> ' + (r === undefined ? 'ok' : String(r))); },
+        function (e) { log(o.do + ' ' + o.name + ' -> ERROR ' + (e && e.message)); });
+    });
+
+    p.then(function () {
+      var names = vm.runtime.targets.map(function (t) { return t.getName(); });
+      var stage = vm.runtime.targets[0];
+      var cos = stage.getCostumes().map(function (c) { return c.name; });
+      log('after: ' + names.join(', '));
+      log('stage: ' + cos.join(' | ') + '  [current ' + stage.currentCostume + ']');
+      var ok = ADDS.every(function (o) {
+        return o.do === 'add_sprite' ? names.indexOf(o.alias) >= 0 : cos.indexOf(o.name) >= 0;
+      }) && cos[stage.currentCostume] === 'Forest';
+      log(ok ? 'RESULT PASS' : 'RESULT FAIL');
+    }, function (e) { log('RESULT FAIL ' + (e && e.message)); });
+  })();
+}());
+</script>
+</body>
+</html>

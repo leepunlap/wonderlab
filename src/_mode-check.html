@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does 新手 / 熟手 actually change the walk?
+
+  The two buttons are the answer to "give the newcomer the whole thing and let the child who has used
+  Scratch before skip the parts they know". What has to be true is not that the buttons render, but
+  that the same lesson really has fewer steps in 熟手 - the three 「由零開始」 steps are `basic`, and a
+  single missing `basic` anywhere would quietly give the experienced child the newcomer's course.
+
+  Like _drive-check.html it drives the real page in an iframe and prints one line: RESULT PASS/FAIL.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+          --virtual-time-budget=120000 --dump-dom http://127.0.0.1:8920/_mode-check.html
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>mode check</title>
+<style>html,body{margin:0}iframe{width:100%;height:80vh;border:0}pre{margin:0;padding:8px;font:13px/1.5 monospace}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-mode-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-mode-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function frame() { return document.getElementById('app').contentWindow; }
+  function doc() { return document.getElementById('app').contentDocument; }
+
+  /** Resolve with the first thing `pick` returns. Virtual time makes long waits cheap. */
+  function until(pick, tries) {
+    tries = tries || 40;
+    return new Promise(function (done) {
+      (function tick() {
+        var v = null;
+        try { v = pick(); } catch (e) {}
+        if (v) return done(v);
+        if (--tries > 0) return setTimeout(tick, 300);
+        done(null);
+      })();
+    });
+  }
+  /** `steps` in sequence; each returns a value or a promise, and the last gets the lot. */
+  function seq(steps, done) {
+    var outv = [];
+    steps.reduce(function (p, f) {
+      return p.then(function (v) { outv.push(v); return f(); });
+    }, Promise.resolve()).then(function (v) { outv.push(v); done(outv); },
+      function (e) { log('RESULT FAIL ' + (e && e.message)); });
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* Count the rail's dots on the lesson the walk is currently showing. */
+  function dots() { return doc().querySelectorAll('.wl-g-dot').length; }
+  function click(sel, n) {
+    var el = doc().querySelectorAll(sel)[n || 0];
+    if (!el) throw new Error('no ' + sel);
+    el.click();
+    return wait(300);
+  }
+  function openFirstLesson() {
+    return click('.wl-g-topic', 0).then(function () {
+      return until(function () { return doc().querySelector('.wl-g-rail') ? true : null; });
+    }).then(function () { return dots(); });
+  }
+
+  seq([
+    function () {
+      return until(function () {
+        var w = frame();
+        return (w.WLStudio && w.WLStudio.vm && w.WLStudio.vm.runtime.targets.length) ? true : null;
+      }, 60).then(function (ok) {
+        if (!ok) return null;
+        return click('[id$="-guide"]');
+      });
+    },
+    function () {
+      return until(function () { return doc().querySelector('.wl-g-index') ? true : null; });
+    },
+    /* 新手: every step, including the three the lesson material never writes down. */
+    function () { return openFirstLesson(); },
+    function () { return click('.wl-g-back'); },
+    function () {
+      return until(function () { return doc().querySelector('.wl-g-mode') ? true : null; })
+        .then(function () { return click('.wl-g-mbtn', 1); });
+    },
+    /* 熟手: the same lesson without 開新專案 / 匯入角色 / 設定背景. */
+    function () { return openFirstLesson(); }
+  ], function (v) {
+    /* v[0] is the value before the first step, so the nth step's result is v[n + 1]. */
+    var nNew = v[3], nPro = v[6];
+    log('新手 steps: ' + nNew);
+    log('熟手 steps: ' + nPro);
+    var ok = nNew > nPro && nPro >= 1;
+    log(ok ? 'RESULT PASS' : 'RESULT FAIL');
+  });
+}());
+</script>
+</body>
+</html>

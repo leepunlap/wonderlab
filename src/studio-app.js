@@ -549,12 +549,14 @@
      * Costumes come from the two seeded vector assets, so a demo costs no network and works offline.
      *
      *   spec.sprites = [{ name, x, y, size, costume: 0 | 1 }]
+     *   spec.empty   = true -> the stage and nothing else, which is where a lesson that starts
+     *                  "from scratch" has to start: the actors are imported step by step.
      */
     S.blankProject = function (spec) {
       spec = spec || {};
       var base = defaultProject(cfg.locale || LOCALE);
       var stage = base.targets[0], tpl = base.targets[1];
-      var list = (spec.sprites && spec.sprites.length) ? spec.sprites : [{ name: tpl.name }];
+      var list = spec.empty ? [] : ((spec.sprites && spec.sprites.length) ? spec.sprites : [{ name: tpl.name }]);
       base.targets = [stage].concat(list.map(function (s, i) {
         var t = JSON.parse(JSON.stringify(tpl));
         t.name = String(s.name || tpl.name);

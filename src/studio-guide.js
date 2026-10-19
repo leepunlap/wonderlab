@@ -14,6 +14,13 @@
  * word is `guide.<topic>.<step>.title` or `.body`, resolved through StudioI18n at paint time, which
  * is what makes a language change mid-topic re-render instead of reload.
  *
+ * TWO KINDS OF READER, ONE COURSE
+ * A topic has a `kind`: a lesson walkthrough, a reference card, or the plain basics. A step may be
+ * marked `basic`, which means "this is only here for someone who has never opened the editor" —
+ * importing an actor, choosing a backdrop. In 熟手 mode those steps are not in the course at all:
+ * the child who knows where the sprite button is starts at the blocks. The choice is the reader's,
+ * remembered, and it changes the steps, never the words.
+ *
  * THE ORDER OF A STEP, WHICH IS THE POINT OF THIS FILE
  * Say it, then do it. A demonstration that starts its blocks while the voice is still on the heading
  * is two explanations at once, and the student follows neither. So: prepare the stage, point at the
@@ -90,6 +97,9 @@
     var speak = cfg.speak || function () { return Promise.resolve(false); };
     var hush = cfg.hush || noop;
     var voice = cfg.voice || null;      // get/set the mute; absent = no toggle is offered
+    /* `mode` is 'new' (every step, including the ones that name a button) or 'pro' (skip those).
+       Absent = the caller has no preference, and nothing is skipped. */
+    var mode = cfg.mode || function () { return 'new'; };
 
     /* Where the student is. Kept out of the DOM so a language change, a resize or returning from a
        demonstration re-paints the same place rather than the beginning. */
@@ -123,11 +133,29 @@
     function keyStep(t, s, name) { return 'guide.' + t.id + '.' + s.id + '.' + name; }
     function stepKey(t, s) { return t.id + '/' + s.id; }
 
-    function stepCount(t) { return (t.steps || []).length; }
+    /* The order the index shows them in: a lesson the student is in first, then the cards they look
+       up, then the basics. A kind with nothing in it is not offered. */
+    var SECTIONS = [
+      { id: 'lesson', key: 'guide.section.lesson' },
+      { id: 'ref', key: 'guide.section.ref' },
+      { id: 'basic', key: 'guide.section.basic' }
+    ];
+    function kindOf(t) { return (t && t.kind) || 'basic'; }
+    function inSection(id) {
+      return topics.map(function (t, i) { return { t: t, i: i }; })
+        .filter(function (x) { return kindOf(x.t) === id; });
+    }
+
+    /** The steps this reader is walking: 熟手 mode leaves the `basic` ones out of the course. */
+    function stepsOf(t) {
+      var pro = mode() === 'pro';
+      return (t.steps || []).filter(function (s) { return !(pro && s && s.basic); });
+    }
+    function stepCount(t) { return stepsOf(t).length; }
     function currentTopic() { return topics[view.topic] || null; }
     function currentStep() {
       var t = currentTopic();
-      return t ? (t.steps || [])[view.step] || null : null;
+      return t ? stepsOf(t)[view.step] || null : null;
     }
 
     /* ---------- painting ---------- */
@@ -140,36 +168,74 @@
       return b;
     }
 
+    /**
+     * 新手 or 熟手. Two buttons, not a checkbox: a nine-year-old does not know what a "beginner
+     * mode" is, but knows whether they have used this before. The choice is honoured everywhere at
+     * once — the index counts fewer steps and the rail has fewer dots — because it is the course
+     * that changed, not a filter over it.
+     */
+    function renderMode() {
+      var pro = mode() === 'pro';
+      var wrap = h('div', 'wl-g-mode');
+      wrap.setAttribute('role', 'group');
+      wrap.setAttribute('aria-label', T('guide.mode'));
+      [{ id: 'new', key: 'guide.mode.new' }, { id: 'pro', key: 'guide.mode.pro' }].forEach(function (o) {
+        var b = h('button', 'wl-g-mbtn' + ((o.id === 'pro') === pro ? ' is-on' : ''));
+        b.type = 'button';
+        b.textContent = T(o.key);
+        b.setAttribute('aria-pressed', String((o.id === 'pro') === pro));
+        b.addEventListener('click', function () {
+          if ((o.id === 'pro') === pro) return;
+          halt();
+          mode(o.id);
+          /* The step you were on may not exist in the other mode — a 熟手 course is shorter — so
+             the walk restarts from the beginning of the same topic rather than landing nowhere. */
+          view = { kind: view.kind, topic: view.topic, step: 0 };
+          paint();
+        });
+        wrap.appendChild(b);
+      });
+      return wrap;
+    }
+
     function renderIndex() {
       var box = h('div', 'wl-g-index');
       box.appendChild(h('p', 'wl-g-intro', T('guide.intro')));
+      box.appendChild(renderMode());
 
-      var list = h('div', 'wl-g-list');
-      topics.forEach(function (t, i) {
-        var b = h('button', 'wl-g-topic');
-        b.type = 'button';
-        var badge = h('span', 'wl-g-ico');
-        badge.appendChild(ic(t.icon || ICON_CHEV));
-        b.appendChild(badge);
+      SECTIONS.forEach(function (sec) {
+        var items = inSection(sec.id);
+        if (!items.length) return;
+        box.appendChild(h('h3', 'wl-g-sec', T(sec.key)));
+        var list = h('div', 'wl-g-list');
+        items.forEach(function (x) {
+          var t = x.t;
+          var b = h('button', 'wl-g-topic');
+          b.type = 'button';
+          var badge = h('span', 'wl-g-ico');
+          badge.appendChild(ic(t.icon || ICON_CHEV));
+          b.appendChild(badge);
 
-        var main = h('span', 'wl-g-tmain');
-        main.appendChild(h('span', 'wl-g-ttitle', T(keyTopic(t, 'title'))));
-        main.appendChild(h('span', 'wl-g-tsub', T('guide.stepCount', { n: stepCount(t) })));
-        b.appendChild(main);
+          var main = h('span', 'wl-g-tmain');
+          main.appendChild(h('span', 'wl-g-ttitle', T(keyTopic(t, 'title'))));
+          var sub = keyTopic(t, 'sub'), subText = T(sub);
+          main.appendChild(h('span', 'wl-g-tsub', subText === sub ? T('guide.stepCount', { n: stepCount(t) }) : subText));
+          b.appendChild(main);
 
-        var chev = h('span', 'wl-g-chev');
-        chev.appendChild(ic(ICON_CHEV));
-        b.appendChild(chev);
+          var chev = h('span', 'wl-g-chev');
+          chev.appendChild(ic(ICON_CHEV));
+          b.appendChild(chev);
 
-        b.addEventListener('click', function () { go(i, 0); });
-        list.appendChild(b);
+          b.addEventListener('click', function () { go(x.i, 0); });
+          list.appendChild(b);
+        });
+        box.appendChild(list);
       });
-      box.appendChild(list);
       return box;
     }
 
     function renderTopic() {
-      var t = currentTopic(), steps = (t && t.steps) || [], s = steps[view.step] || null;
+      var t = currentTopic(), steps = stepsOf(t), s = steps[view.step] || null;
       var box = h('div', 'wl-g-topic-page');
 
       var bar = h('div', 'wl-g-bar');

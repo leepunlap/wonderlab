@@ -22,6 +22,13 @@
  * are two verbs and not one, and why `run` (prepare then perform, with nothing in between) still
  * exists for a caller that has nothing to say.
  *
+ * THE FIRST STEPS OF A LESSON ARE NOT BLOCKS
+ * "From scratch" means the stage is empty and the student has to bring the actors in, so a step can
+ * carry `add: [{do:'add_sprite', name, sprite}]` or `[{do:'add_backdrop', name}]` instead of scripts.
+ * Those are the two things a newcomer cannot guess and an experienced child is tired of being shown,
+ * which is why the lesson data marks them `basic` and the guide's own mode decides whether they are
+ * walked through at all. `project.empty` is what makes the stage start bare.
+ *
  * WHAT IT DOES NOT OWN
  * Navigation and wording: those are studio-guide.js's and the locale files'. Nor the shapes themselves:
  * `explain` hands the step's annotations to studio-guide-marks.js, which knows where the palette is.
@@ -43,7 +50,11 @@
     flag: ['[class*="green-flag_green-flag-button"]', '[aria-label="Start project"]'],
     stage: ['[class*="stage-wrapper_stage-wrapper"]', '[aria-label="舞台"]'],
     sprites: ['[class*="sprite-selector_sprite-selector"]'],
-    palette: ['[class*="blocks_blocks"]']
+    palette: ['[class*="blocks_blocks"]'],
+    /* The two buttons a newcomer is looking for and cannot name. They are what "import a sprite" and
+       "set a background" mean, so the ring goes round the button, not round the pane. */
+    addSprite: ['[class*="sprite-selector_add-button"]', '[aria-label*="選擇角色"]', '[aria-label*="Choose a Sprite"]'],
+    addBackdrop: ['[class*="stage-selector_add-button"]', '[aria-label*="選擇背景"]', '[aria-label*="Choose a Backdrop"]']
   };
 
   function create(cfg) {
@@ -95,10 +106,13 @@
       return o;
     }
 
-    /** The clean stage a topic starts from. */
+    /** The clean stage a topic starts from. `spec.empty` is a stage with nothing on it, which is
+        where a lesson that begins "from scratch" has to begin. */
     function projectOf(spec) {
-      var list = (spec && spec.sprites && spec.sprites.length) ? spec.sprites : [{ ref: '@pico' }];
+      var empty = !!(spec && spec.empty);
+      var list = empty ? [] : ((spec && spec.sprites && spec.sprites.length) ? spec.sprites : [{ ref: '@pico' }]);
       return S().blankProject({
+        empty: empty,
         sprites: list.map(function (s) {
           return { name: spriteName(s.ref || s.name), costume: s.costume || 0,
                    x: s.x || 0, y: s.y || 0, size: s.size || 100 };
@@ -191,26 +205,55 @@
     }
 
     /**
+     * Bring an actor or a backdrop in from the library, and wait for it to be really there.
+     *
+     * Not animated: the library is a modal with a hundred thumbnails, and driving it would be a
+     * demonstration of the picker rather than of the idea. What the student needs to see is which
+     * button opens it (the ring, drawn by `explain`) and that the actor arrives — the same two things
+     * they are told to do by hand.
+     */
+    function addThings(list) {
+      var s = S();
+      return (list || []).reduce(function (p, o) {
+        return p.then(function () {
+          if (o['do'] === 'add_sprite') return Promise.resolve(s.addLibrarySprite(o.name, spriteName(o.sprite || o.name)));
+          if (o['do'] === 'add_backdrop') return Promise.resolve(s.addLibraryBackdrop(o.name));
+          return null;
+        }).then(function () { return wait(o.after || 450); }, function (e) {
+          if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
+        });
+      }, Promise.resolve());
+    }
+
+    /**
      * Put an earlier step's outcome back, without animating it.
      *
      * Replaying step three has to start where step three started, which is: a clean stage with steps
      * one and two already built. Rebuilding those the short way is the whole point — the student has
      * seen them built once, and watching them again would make "再看一次" a rewind of the topic rather
      * than of the step.
+     *
+     * Earlier steps can have imported actors as well as built blocks, and a script that addresses an
+     * actor which is not on the stage builds nothing — so the imports are redone first, in order, and
+     * only then the blocks.
      */
     function applyPrefix(earlier) {
       var vm = VM(), ops = OPS();
       if (!vm || !ops) return Promise.resolve();
-      var scripts = [];
+      var adds = [], scripts = [];
       (earlier || []).forEach(function (st) {
+        ((st && st.demo && st.demo.add) || []).forEach(function (a) { adds.push(a); });
         ((st && st.demo && st.demo.scripts) || []).forEach(function (s) {
           scripts.push({ sprite: s.sprite, id: s.id, blocks: (s.blocks || []).map(resolveBlock) });
         });
       });
-      if (!scripts.length) return Promise.resolve();
-      var before = JSON.parse(JSON.stringify(ops.snapshot(vm).program));
+      if (!adds.length && !scripts.length) return Promise.resolve();
       // a prefix that cannot be rebuilt must not take the step itself down with it
-      return applyInstant(setScripts(before, scripts)).then(noop, function (e) {
+      return addThings(adds).then(function () {
+        if (!scripts.length) return;
+        var before = JSON.parse(JSON.stringify(ops.snapshot(vm).program));
+        return applyInstant(setScripts(before, scripts));
+      }).then(noop, function (e) {
         if (root.console) console.info('[guide] could not rebuild the earlier steps:', e && e.message);
       });
     }
@@ -350,6 +393,7 @@
       return prep.then(function () {
         prepared = {
           step: step, demo: demo, idx: idx, token: token,
+          adds: demo.add || [],
           scripts: (demo.scripts || []).map(function (s) {
             return { sprite: s.sprite, id: s.id, blocks: (s.blocks || []).map(resolveBlock) };
           })
@@ -370,15 +414,19 @@
       var st = prepared;
       prepared = null;
       if (!st || st.token !== take) { busyNow = false; return Promise.resolve(false); }
-      var demo = st.demo, scripts = st.scripts, vm = VM(), ops = OPS();
+      var demo = st.demo, scripts = st.scripts, adds = st.adds || [], vm = VM(), ops = OPS();
       if (!vm || !ops) { busyNow = false; return Promise.resolve(false); }
 
       // the words are finished; from here the animation is the pointer
       clearMarks();
 
-      var chain = scripts.length
-        ? build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress })
-        : Promise.resolve({ ok: true });
+      /* Imports first, in the order the lesson asked for them: a script can only be built on an
+         actor that is already on the stage. */
+      var chain = addThings(adds).then(function () {
+        return scripts.length
+          ? build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress })
+          : { ok: true };
+      });
 
       return chain.then(function (res) {
         if (!res || res.ok === false) return false;

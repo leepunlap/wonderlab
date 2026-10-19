@@ -1,0 +1,1212 @@
+{
+ "generated": "2026-10-19",
+ "classfiles": "/Users/blee/src/iits/iits-local/classfiles",
+ "lab": "/Users/blee/src/iits/iits-local/local-lab/lab",
+ "levels": [
+  {
+   "level": "L1",
+   "lessons": 30,
+   "taggedProgramming": 0,
+   "hasPracticeSteps": 0,
+   "wonderLab": 0,
+   "hardware": 0
+  },
+  {
+   "level": "L2",
+   "lessons": 30,
+   "taggedProgramming": 22,
+   "hasPracticeSteps": 0,
+   "wonderLab": 0,
+   "hardware": 0
+  },
+  {
+   "level": "L3",
+   "lessons": 30,
+   "taggedProgramming": 30,
+   "hasPracticeSteps": 0,
+   "wonderLab": 0,
+   "hardware": 0
+  },
+  {
+   "level": "L4",
+   "lessons": 32,
+   "taggedProgramming": 26,
+   "hasPracticeSteps": 20,
+   "wonderLab": 10,
+   "hardware": 17
+  }
+ ],
+ "studioSupports": {
+  "sound": true,
+  "collision": true,
+  "color": true,
+  "backdrop": true,
+  "broadcast": true,
+  "clones": true,
+  "pen": true,
+  "procedures": false
+ },
+ "conceptCoverage": {
+  "sound": 1,
+  "costume": 5,
+  "motion": 6,
+  "control": 9,
+  "input": 3,
+  "collision": 3,
+  "colorDetect": 1,
+  "operators": 5,
+  "switchScene": 2,
+  "procedures": 5,
+  "variables": 5,
+  "clones": 2
+ },
+ "lessons": [
+  {
+   "level": "L4",
+   "slug": "501-bp01",
+   "status": "ready",
+   "starter": {
+    "sprites": 4,
+    "backdrops": 2,
+    "sounds": 1,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "是誰吃了我的蘋果",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "並行程序的使用及多角色的互動實現；運動、外觀、聲音模組積木的使用。",
+    "難點"
+   ],
+   "hard": [
+    "教師引導學生對角色行為進行分析，完成角色的移動、動畫切換、角色對話等效果。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：小老鼠的移動",
+    "任務二：小老鼠的爬行效果",
+    "任務三：小老鼠的聲音",
+    "任務四：長頸鹿的回應",
+    "任務四劇情：小老鼠詢問長頸鹿",
+    "任務五：蛇的出現（並行程序）",
+    "任務五劇情：蛇從舞台邊緣走出",
+    "任務六：大象會說什麼（開放想象）",
+    "任務六：大象會說什麼？（開放想象）"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 19,
+   "concepts": {
+    "sound": 11,
+    "costume": 1,
+    "motion": 4,
+    "control": 4,
+    "input": 3
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp02",
+   "status": "ready",
+   "starter": {
+    "sprites": 4,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": true,
+    "colors": 1
+   },
+   "title": "穿越迷宮",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識鍵盤控制角色的移動方法；認識條件判斷積木〔如果…那麼〕；學習偵測積木的使用；條件判斷的綜合運用。",
+    "難點"
+   ],
+   "hard": [
+    "能使用條件判斷積木對不同情況做出不同的處理；能利用顏色偵測積木實現對迷宮道路的判別。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：鍵盤控制移動",
+    "任務二：迷宮內的移動限制",
+    "任務二：迷宮中充滿不能穿越的牆",
+    "任務三：傳送點的生成",
+    "任務三：史萊姆被傳送回起點之謎",
+    "任務四：碰到傳送點的效果",
+    "任務四：碰到傳送點被送回起點",
+    "任務五：到達迷宮終點",
+    "任務五：到達迷宮終點並說出話語"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [
+    "如果…那麼",
+    "某鍵",
+    "條件",
+    " ",
+    "1",
+    "起點"
+   ],
+   "images": 21,
+   "concepts": {
+    "collision": 6,
+    "colorDetect": 2,
+    "costume": 2,
+    "motion": 11,
+    "control": 7,
+    "operators": 1,
+    "input": 5
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp03",
+   "status": "ready",
+   "starter": {
+    "sprites": 5,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "煙花綻放",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "廣播積木的使用；角色的運動分析。",
+    "難點"
+   ],
+   "hard": [
+    "多個廣播的綜合使用；學習角色的複製方法。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：小男孩點燃煙花筒",
+    "任務一情境：小男孩舉火準備點燃煙花筒",
+    "任務一腳本參考：碰到煙花筒則說準備放煙花咯~",
+    "任務二：煙花的出現（廣播）",
+    "任務二情境：怎樣才能讓煙花出現在舞台上？",
+    "任務二腳本參考：煙花筒廣播放煙花、煙花接收後顯示",
+    "任務三：煙花的綻放（運動分析）",
+    "任務三腳本參考：上升＋綻放完整腳本",
+    "任務四：多煙花的綻放（角色複製）"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 18,
+   "concepts": {
+    "switchScene": 9,
+    "collision": 2,
+    "motion": 2,
+    "control": 1,
+    "input": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp04",
+   "status": "ready",
+   "starter": {
+    "sprites": 2,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "位置與坐標",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "平面中角色位置的定位；平面中角色坐標的定位；多種坐標積木的使用。",
+    "難點"
+   ],
+   "hard": [
+    "能使用平面直角坐標系定位平面位置；能使用多種坐標積木完成角色移動；能用絕對位置與相對位置描述物體位置。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：白鴿的定位",
+    "任務一：白鴿的定位（回到原點0,0）",
+    "任務二／三：追逐目標點（相對移動）",
+    "任務二：追逐目標點（相對移動）",
+    "任務二腳本：將x坐標增加100",
+    "任務三腳本：連續相對移動追逐目標點",
+    "任務四：追逐禮物盒（絕對滑行）",
+    "任務四腳本：滑行到禮物盒(100,-100)",
+    "任務五：打開禮物盒",
+    "任務五：打開禮物盒（碰到白鴿換造型）"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 12,
+   "concepts": {
+    "collision": 1,
+    "costume": 4,
+    "motion": 18
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp05",
+   "status": "hw",
+   "starter": null,
+   "title": "瘋狂賽車",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識〔碰到邊緣就反彈〕積木；認識陀螺儀及其在程序中的使用；認識倒計時的使用。",
+    "難點"
+   ],
+   "hard": [
+    "能利用陀螺儀不同軸的數值進行程序設計；能使用倒計時完善遊戲的功能。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [
+    "碰到邊緣就反彈"
+   ],
+   "images": 9,
+   "concepts": {
+    "collision": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp06",
+   "status": "hw",
+   "starter": null,
+   "title": "打地鼠",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識四位按鍵模塊及其使用；變量的認識與使用。",
+    "難點"
+   ],
+   "hard": [
+    "能使用按鍵模塊進行事件發生與否的判斷；能利用控制指令控制腳本的運行；能利用變量存儲得分並適時變化。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 3,
+   "concepts": {
+    "variables": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp07",
+   "status": "ready",
+   "starter": {
+    "sprites": 4,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "美麗的圖形",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "旋轉圖形的繪製；繪製旋轉圖形的角度關係；正多邊形的特點及繪製方法。",
+    "難點"
+   ],
+   "hard": [
+    "旋轉圖形的繪製；繪製旋轉圖形的角度關係；正多邊形的特點及繪製方法。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一 平移圖形",
+    "任務一腳本：平移圖形（魚）",
+    "任務二 旋轉圖形",
+    "任務二腳本：旋轉圖形（月牙）",
+    "任務三 軸對稱圖形",
+    "任務三腳本：畫軸對稱圖形（蝴蝶）",
+    "任務四／五 畫正多邊形",
+    "任務四腳本：畫正方形（重複執行 4 次）",
+    "任務五腳本：畫正三角形與正五邊形",
+    "任務六 畫旋轉圖形",
+    "任務六腳本：畫旋轉組合圖形"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 20,
+   "concepts": {
+    "costume": 13,
+    "motion": 1,
+    "control": 3,
+    "procedures": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp08",
+   "status": "hw",
+   "starter": null,
+   "title": "小羊跑跑",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識變量及使用變量進行數據統計計算；搖桿模塊的認識及其使用。",
+    "難點"
+   ],
+   "hard": [
+    "認識變量及使用變量進行數據統計計算。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 6,
+   "concepts": {
+    "variables": 4
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp09",
+   "status": "hw",
+   "starter": null,
+   "title": "鏡像挑戰",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "克隆體的使用；角色的鏡像對稱移動。",
+    "難點"
+   ],
+   "hard": [
+    "克隆體的使用；角色的鏡像對稱移動。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 5,
+   "concepts": {
+    "motion": 2,
+    "clones": 4
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp10",
+   "status": "ready",
+   "starter": {
+    "sprites": 3,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "數字猜大小",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識運算模塊內的積木並能進行數據運算；認識事物發生的可能性。",
+    "難點"
+   ],
+   "hard": [
+    "認識運算模塊內的積木並能進行數據運算。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：生成隨機數",
+    "任務一要求：生成隨機數（新建變量「數字」）",
+    "任務二：互動效果的生成",
+    "任務三：數字範圍的修改提示",
+    "任務四：個、十位數的拆解",
+    "任務分析：把兩位數拆成個位、十位（各 10 造型）",
+    "任務五：正確答案的顯現"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 20,
+   "concepts": {
+    "switchScene": 2,
+    "costume": 4,
+    "variables": 2,
+    "control": 3,
+    "operators": 11
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp11",
+   "status": "hw",
+   "starter": null,
+   "title": "射擊氣球",
+   "tags": [],
+   "focus": [
+    "陀螺儀和按鍵模組的綜合使用；多個角色克隆體的交互；私有變量的認識與使用。",
+    "難點"
+   ],
+   "hard": [
+    "私有變量的認識與其在克隆體中的使用；多個角色克隆體的交互；能使用私有變量控制多個氣球克隆體的上升速度。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 3,
+   "concepts": {
+    "variables": 3,
+    "clones": 8
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp12",
+   "status": "hw",
+   "starter": null,
+   "title": "舞動音符",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識列表及其相關操作。",
+    "難點"
+   ],
+   "hard": [
+    "能夠對列表進行增加項目、查找項目等操作；能夠利用主控板實現播放音調的音樂效果；能夠使用邏輯與、邏輯或組成複合判斷條件。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 3,
+   "concepts": {
+    "variables": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp13",
+   "status": "ready",
+   "starter": {
+    "sprites": 4,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "雞兔同籠",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識穷舉法，並能利用穷舉法解決實際問題。",
+    "難點"
+   ],
+   "hard": [
+    "能夠綜合使用運算類積木完成複雜運算條件的設置，利用穷舉法列舉雞兔同籠問題中的所有可能。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一 隨機生成數量",
+    "任務一腳本：隨機生成雞與兔子的數量",
+    "任務二 生成雞和兔子",
+    "任務二完整腳本：隱藏本體、克隆體顯示",
+    "任務三 腳的總數判斷",
+    "任務三完整腳本：腳的總數判斷",
+    "任務四 猜數字密碼（認識穷舉法）",
+    "任務四完整腳本：穷舉破解四位數密碼"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 15,
+   "concepts": {
+    "variables": 1,
+    "clones": 4,
+    "control": 2,
+    "operators": 6,
+    "procedures": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp14",
+   "status": "hw",
+   "starter": null,
+   "title": "飛機大戰 1.0",
+   "tags": [],
+   "focus": [
+    "角色控制、事件響應、簡單變量與碰撞檢測等知識點的綜合使用；克隆體的使用。",
+    "難點"
+   ],
+   "hard": [
+    "角色控制、事件響應、簡單變量與碰撞檢測等知識點的綜合使用。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：搭建遊戲手柄",
+    "任務二：我方戰機的移動",
+    "任務三：我方子彈的發射",
+    "任務四：敵機的生成",
+    "任務五：碰撞與遊戲失敗",
+    "任務六：添加得分系統"
+   ],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 14,
+   "concepts": {
+    "collision": 4,
+    "variables": 2,
+    "motion": 3,
+    "clones": 6
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp15",
+   "status": "soon",
+   "starter": null,
+   "title": "飛機大戰 2.0",
+   "tags": [],
+   "focus": [
+    "角色控制、事件響應、變量控制與碰撞檢測等知識點的綜合使用。",
+    "難點"
+   ],
+   "hard": [
+    "角色控制、事件響應、變量控制與碰撞檢測等知識點的綜合使用；利用私有變量為克隆體敵機獨立存儲血量，並用變量傳遞克隆體座標。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務二要求：道具系統開發（戰機＋道具＝效果）",
+    "任務三要求：敵機技能升級（Boss 發射子彈）"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 22,
+   "concepts": {
+    "switchScene": 1,
+    "collision": 5,
+    "costume": 3,
+    "variables": 7,
+    "motion": 5,
+    "clones": 9,
+    "control": 1,
+    "operators": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "501-bp16",
+   "status": "hw",
+   "starter": null,
+   "title": "創意無限",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "模型設計搭建；任務分析及編程；課程內容分享。",
+    "難點"
+   ],
+   "hard": [
+    "綜合運用本學期所學知識，獨立構思並完成一個可交互的原創創意作品。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 4,
+   "concepts": {}
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp01",
+   "status": "hw",
+   "starter": null,
+   "title": "守衛大作戰（上）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "光線傳感器的認識與運用；電機與光線傳感器的綜合運用；狀態變量的綜合運用。",
+    "難點"
+   ],
+   "hard": [
+    "電機與光線傳感器的綜合運用；利用狀態變量區分角色的多個狀態。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 28,
+   "concepts": {
+    "variables": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp02",
+   "status": "soon",
+   "starter": null,
+   "title": "守衛大作戰（下）",
+   "tags": [],
+   "focus": [
+    "狀態變量與存儲變量的綜合運用；多角色之間的交互。",
+    "難點"
+   ],
+   "hard": [
+    "多角色的交互分析與腳本編寫；能夠通過狀態變量控制存儲變量的變化；能夠進行多角色之間交互關係的分析與腳本編寫。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：角色的移動",
+    "任務二：角色反擊",
+    "任務三：陽光的掉落",
+    "任務四：能量的收集",
+    "任務五：失敗的結果"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 16,
+   "concepts": {
+    "collision": 1,
+    "variables": 4,
+    "motion": 4,
+    "clones": 3,
+    "operators": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp03",
+   "status": "ready",
+   "starter": {
+    "sprites": 1,
+    "backdrops": 2,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "植樹問題",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識線路總距離、間隔長度與植樹棵數之間的規律；認識帶參數的自製積木的製作與參數調用。",
+    "難點"
+   ],
+   "hard": [
+    "能夠使用帶參數的自製積木實現腳本的複用；以一個自製積木通過條件判斷通用地解決植樹問題的三種栽種情況。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一 栽種數量（數學運算）",
+    "任務一要求 · 栽種數量（運算模塊算術計算）",
+    "任務一腳本：說「一共需要 40/2 棵樹」",
+    "任務二 栽種小樹（克隆呈現）",
+    "任務二要求 · 栽種小樹（克隆，1米=10步）",
+    "任務二腳本：移到→重複克隆→將x坐標增加 20",
+    "任務三 花園周邊栽樹（轉角與移動）",
+    "任務三要求 · 花園周邊栽樹（30m×20m，間隔 5m，四角都栽）",
+    "任務三腳本：不可旋轉、重複 2 次×（長邊／短邊 + 右轉 90 度）",
+    "任務四 自製帶參數積木（腳本複用）",
+    "任務四要求 · 自製栽種積木（複用任務二、任務三腳本）",
+    "任務四腳本：一排栽種＋長方形栽種共用自製積木",
+    "任務五 通用栽種積木（條件判斷）",
+    "任務五要求 · 栽種的三種情況（優化自製函數）",
+    "任務五腳本：含端數判斷的通用栽種積木與調用"
+   ],
+   "wonderlab": true,
+   "hardware": true,
+   "blocks": [],
+   "images": 20,
+   "concepts": {
+    "variables": 1,
+    "motion": 2,
+    "clones": 4,
+    "control": 6,
+    "operators": 2,
+    "procedures": 11
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp04",
+   "status": "hw",
+   "starter": null,
+   "title": "擊鼓小達人（上）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "觸摸傳感器的認識及使用；克隆體的應用；理解遊戲交互邏輯。",
+    "難點"
+   ],
+   "hard": [
+    "遊戲交互邏輯的設置（擊中判斷、克隆體控制與遊戲結束時長控制）。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 26,
+   "concepts": {
+    "clones": 4
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp05",
+   "status": "soon",
+   "starter": null,
+   "title": "擊鼓小達人（下）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "進度條均分的計算設置；關卡的設置。",
+    "難點"
+   ],
+   "hard": [
+    "進度條均分的計算設置。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：擊中提示",
+    "任務一參考：擊中提示完整脚本",
+    "任務二：記錄連擊數",
+    "任務三：進度條設置",
+    "任務四：遊戲評分",
+    "任務五：關卡選擇"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 22,
+   "concepts": {
+    "switchScene": 1,
+    "costume": 1,
+    "variables": 1,
+    "clones": 2,
+    "control": 1,
+    "procedures": 3
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp06",
+   "status": "ready",
+   "starter": {
+    "sprites": 2,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "質數與合數",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識質數與合數，能通過窮舉法完成質數的判定；認識質因數的分解，並能通過程式的方式完成分解。",
+    "難點"
+   ],
+   "hard": [
+    "使用程式的方式完成合數的質因數分解。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：判斷質數與合數（算法）",
+    "任務一：判斷質數與合數（程式）",
+    "任務一要求：判斷質數與合數（兩角色互動）",
+    "任務一完整腳本參考（小女孩詢問＋小男孩判斷）",
+    "任務二：輸入合法性驗證",
+    "任務二完整腳本參考：輸入合法性驗證",
+    "任務三：找100以內所有質數和合數",
+    "任務三完整腳本參考：找100內所有質數和合數",
+    "任務四：分解質因數",
+    "任務四完整腳本參考：分解質因數",
+    "任務拓展 · 優化判斷質數程序"
+   ],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 23,
+   "concepts": {
+    "variables": 2,
+    "control": 4,
+    "operators": 1,
+    "procedures": 8
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp07",
+   "status": "hw",
+   "starter": null,
+   "title": "貪吃蛇（上）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "蛇身移動的邏輯實現（每節身體跟隨上一節坐標）；列表的插入、刪除操作在蛇身移動中的應用。",
+    "難點"
+   ],
+   "hard": [
+    "蛇身移動的邏輯實現（每節身體跟隨上一節坐標）；列表的插入、刪除操作在蛇身移動中的應用；手勢識別傳感器的使用與方向判斷。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 27,
+   "concepts": {
+    "variables": 2,
+    "motion": 6
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp08",
+   "status": "soon",
+   "starter": null,
+   "title": "貪吃蛇（下）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "遊戲結束判斷邏輯（撞牆、撞身）；狀態變量的使用（加速狀態、穿越狀態）。",
+    "難點"
+   ],
+   "hard": [
+    "撞身判斷時排除蛇頭後一節身體坐標的處理；穿越效果對邊緣坐標的特殊處理。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：遊戲結束判斷",
+    "任務一參考：自製積木【遊戲結束判斷】",
+    "任務二：特殊食物設計（延長與縮短）",
+    "任務二參考：星星與毒蘋果的完整腳本",
+    "任務三：特殊食物設計（加速）"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 18,
+   "concepts": {
+    "importSprite": 1,
+    "switchScene": 1,
+    "collision": 1,
+    "costume": 5,
+    "variables": 6,
+    "motion": 7,
+    "control": 1,
+    "operators": 1,
+    "procedures": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp09",
+   "status": "ready",
+   "starter": {
+    "sprites": 3,
+    "backdrops": 1,
+    "sounds": 0,
+    "keys": false,
+    "colors": 0
+   },
+   "title": "繩子算法",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識最大公約數；理解窮舉法與輾轉相除法的思路，並用 Scratch 積木腳本實現求兩數最大公約數。",
+    "難點"
+   ],
+   "hard": [
+    "理解輾轉相除法並能用其求得兩數的最大公約數；掌握多種程序求兩數最大公約數的方式。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [],
+   "wonderlab": true,
+   "hardware": false,
+   "blocks": [],
+   "images": 14,
+   "concepts": {
+    "variables": 1,
+    "control": 1,
+    "procedures": 3
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp10",
+   "status": "hw",
+   "starter": null,
+   "title": "航海尋寶（上）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "認識電子羅盤；自製積木的使用；廣播協調多角色之間的腳本運行。",
+    "難點"
+   ],
+   "hard": [
+    "電子羅盤傳感器與軟件界面上指南針畫面的對應設置；電子羅盤的綜合運用；廣播協調角色之間腳本的運行。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 22,
+   "concepts": {
+    "switchScene": 2,
+    "procedures": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp11",
+   "status": "hw",
+   "starter": null,
+   "title": "航海尋寶（下）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "利用數學方法生成有規律的數字；認識腳本測試的重要性；邊緣判斷的方法。",
+    "難點"
+   ],
+   "hard": [
+    "能夠分析相同間隔數字的規律並利用數學計算得到所需數字；能通過腳本測試發現項目問題並找到解決方案；能通過座標解決角色移動到邊緣後不再提示越界的指向。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 19,
+   "concepts": {
+    "switchScene": 3,
+    "variables": 1,
+    "motion": 3,
+    "control": 3,
+    "operators": 5,
+    "procedures": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp12",
+   "status": "soon",
+   "starter": null,
+   "title": "兔子數列",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "遞歸的認識及其使用。",
+    "難點"
+   ],
+   "hard": [
+    "遞歸的使用——掌握遞歸三要素並以此寫出遞歸程式。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一腳本：自製積木重複調用自身",
+    "任務二參考腳本：計算第n項數值",
+    "任務三參考腳本：兔子數列（求第n月兔子對數）",
+    "任務四參考腳本：兔子數量呈現"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 19,
+   "concepts": {
+    "costume": 1,
+    "variables": 1,
+    "control": 2,
+    "procedures": 5
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp13",
+   "status": "hw",
+   "starter": null,
+   "title": "收集水源（上）",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "理解私有變量和公有變量的區別；掌握小地圖拼合成大地圖的方法；掌握大型地圖移動的坐標計算。",
+    "難點"
+   ],
+   "hard": [
+    "利用克隆體及私有變量實現大地圖拼合；根據地圖移動變化計算各小地圖克隆體位置以實現地圖移動；解決地圖移動出界問題。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 20,
+   "concepts": {
+    "variables": 3,
+    "motion": 5,
+    "clones": 4
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp14",
+   "status": "soon",
+   "starter": null,
+   "title": "收集水源（下）",
+   "tags": [],
+   "focus": [
+    "多角色同步移動的控制；相對方位的計算。",
+    "難點"
+   ],
+   "hard": [
+    "能夠通過計算得出物體間的相對方位；能夠在地圖坐標位置變換時合理分析水滴生成位置的變化；能夠協調多個角色之間的聯動關係。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務一：水滴的生成",
+    "任務一參考腳本：水滴的生成",
+    "任務二：水滴相對地圖的靜止效果",
+    "任務二參考腳本：水滴相對地圖靜止",
+    "任務三：水滴位置的提示",
+    "任務三參考腳本：水滴位置的提示",
+    "任務四：收集水滴",
+    "任務四參考腳本：收集水滴",
+    "任務五：解決水滴生成位置有誤問題",
+    "任務五參考腳本：修正生成位置"
+   ],
+   "wonderlab": false,
+   "hardware": false,
+   "blocks": [],
+   "images": 16,
+   "concepts": {
+    "switchScene": 1,
+    "motion": 6,
+    "control": 2,
+    "operators": 1
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp15",
+   "status": "hw",
+   "starter": null,
+   "title": "智能感應家居",
+   "tags": [],
+   "focus": [
+    "掌握多傳感器（觸摸、手勢識別、電機）的綜合運用；認識智能感應家居的交互設置；變量狀態控制與數值存儲功能的綜合使用。",
+    "難點"
+   ],
+   "hard": [
+    "能夠編寫總控腳本，實現模式切換與家電控制；能夠實現頂燈亮度調節、風扇擋位調節、窗簾開合動畫效果；變量狀態控制與數值存儲功能的綜合使用。",
+    "搭建步驟"
+   ],
+   "practice": false,
+   "tasks": [],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 65,
+   "concepts": {
+    "variables": 2
+   }
+  },
+  {
+   "level": "L4",
+   "slug": "502-bp16",
+   "status": "hw",
+   "starter": null,
+   "title": "創意無限",
+   "tags": [
+    "編程"
+   ],
+   "focus": [
+    "主題設定；硬件傳感器的選定；任務分析及編程；課程內容分享。",
+    "難點"
+   ],
+   "hard": [
+    "由學生自主分析項目所需角色與角色行為，繪製思維導圖，並合理選用傳感器、列表、自製積木與變量，獨立完成可交互的創意作品。",
+    "動手實踐"
+   ],
+   "practice": true,
+   "tasks": [
+    "任務要求：構思項目→選傳感器→繪思維導圖→整理腳本→實現交互功能"
+   ],
+   "wonderlab": false,
+   "hardware": true,
+   "blocks": [],
+   "images": 4,
+   "concepts": {
+    "costume": 2,
+    "variables": 2,
+    "procedures": 1
+   }
+  }
+ ]
+}
