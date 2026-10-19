@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does the guide actually SHOW where the elephant is?
+
+  A lesson's first steps say "press the plus, the library opens, pick the elephant" — and until now
+  the demonstration imported the actors behind the student's back: the words pointed at nothing, and
+  the thing being taught (which button, which tile, how far down) was the one thing not shown.
+
+  So the driver now walks the picker: press the plus, wait for the library, scroll to the tile, ring
+  it, press it. This page runs that on the real page, with the real lesson data, and checks the four
+  visible facts along the way:
+
+    1. a ring appeared on the plus button while the library was still closed
+    2. the library opened
+    3. a ring appeared on a tile inside the library
+    4. every actor the step names is on the stage afterwards, under the lesson's own name
+
+  plus the same for a backdrop, whose picker is a different button and a different list.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-import-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>import check</title>
+<style>html,body{margin:0}iframe{width:100%;height:78vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-import-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-import-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+
+  var seen = { plus: 0, tile: 0, picker: 0 };
+  /** While a step runs, remember every ring that appears and whether the library was open then. */
+  function sample() {
+    var open = doc().querySelectorAll('[class*="library-item_library-item"]').length > 0;
+    var rings = doc().querySelectorAll('.wl-point').length;
+    if (open) seen.picker++;
+    if (rings && open) seen.tile++;
+    if (rings && !open) seen.plus++;
+  }
+  function watch(untilDone) {
+    var timer = setInterval(sample, 120);
+    return untilDone.then(function (v) { clearInterval(timer); return v; },
+      function (e) { clearInterval(timer); throw e; });
+  }
+
+  function names() {
+    var vm = win().WLStudio.vm;
+    return vm.runtime.targets.map(function (t) { return t.getName(); });
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading || !w.StudioGuideDrive) {
+      if (tries < 60) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+
+    var topics = (w.StudioGuideLessons || []);
+    var topic = topics.filter(function (t) { return t.id === '501-bp01'; })[0];
+    if (!topic || !topic.steps || topic.steps.length < 3) {
+      log('RESULT FAIL: 501-bp01 is not in the guide data');
+      return;
+    }
+    var drive = w.StudioGuideDrive.create({ i18n: w.StudioI18n });
+    /* the driver reports what went wrong to the console, and a headless run has no console */
+    ['warn', 'info', 'log'].forEach(function (k) {
+      var orig = w.console[k];
+      w.console[k] = function () {
+        var line = [].slice.call(arguments).map(function (a) { return String(a && a.message || a); }).join(' ');
+        if (/guide|picker|add/i.test(line)) log('  [console.' + k + '] ' + line);
+        try { orig.apply(w.console, arguments); } catch (e) {}
+      };
+    });
+    log('isLoading=' + (typeof w.WLStudio.isLoading === 'function' ? w.WLStudio.isLoading() : 'n/a'));
+    var actors = (topic.steps[1].demo.add || []).map(function (o) { return o.name; });
+    var backdrop = (topic.steps[2].demo.add || [])[0].name;
+    log('step 1 imports: ' + actors.join(', ') + '   step 2 backdrop: ' + backdrop);
+
+    watch(drive.run(topic.steps[1], null, topic)).then(function (ok) {
+      log('step 1 finished: ' + ok + '   targets now: ' + names().join(', '));
+      log('  rings seen on the plus: ' + seen.plus + ', inside the library: ' + seen.tile +
+          ', library open samples: ' + seen.picker);
+      log('  library closed afterwards: ' + (doc().querySelectorAll('[class*="library-item_library-item"]').length === 0));
+
+      var withAlias = actors.map(function (n) {
+        var add = (topic.steps[1].demo.add || []).filter(function (o) { return o.name === n; })[0];
+        var ref = add && add.sprite ? String(add.sprite).replace('@', '') : null;
+        var key = 'guide.sprite.' + ref;
+        var alias = ref ? w.StudioI18n.t(key) : n;
+        return alias === key ? n : alias;
+      });
+      var absent = withAlias.filter(function (a) { return names().indexOf(a) < 0; });
+      log('  expected on stage: ' + withAlias.join(', '));
+      log(absent.length ? '  MISSING: ' + absent.join(', ') : '  all actors present under the lesson\'s names');
+
+      seen.plus = 0; seen.tile = 0; seen.picker = 0;
+      return watch(drive.run(topic.steps[2], null, topic)).then(function (ok2) {
+        var stage = w.WLStudio.vm.runtime.targets[0];
+        var costumes = (stage.getCostumes() || []).map(function (c) { return c.name; });
+        var showing = costumes[stage.currentCostume];
+        log('step 2 finished: ' + ok2 + '   rings on the backdrop button: ' + seen.plus +
+            ', in the backdrop library: ' + seen.tile);
+        log('  backdrops now: ' + costumes.join(', ') + '   showing: ' + showing);
+        var okAll = absent.length === 0 &&
+                    seen.plus > 0 && seen.tile > 0 && seen.picker > 0 &&
+                    costumes.indexOf(backdrop) >= 0 && showing === backdrop;
+        log(okAll ? 'RESULT PASS' : 'RESULT FAIL');
+      });
+    }).then(null, function (e) {
+      log('RESULT FAIL threw: ' + (e && e.message));
+    });
+  }());
+}());
+</script>
+</body>
+</html>

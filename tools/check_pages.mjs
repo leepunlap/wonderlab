@@ -3,9 +3,10 @@
  * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
  *
  * WHAT THIS IS
- * `_drive-check.html` and `_mode-check.html` load the real page in a frame, press the real buttons
- * and print one line: RESULT PASS or RESULT FAIL. This is the runner, so the checks are one command
- * and not a paragraph of Chrome flags nobody will remember.
+ * `_drive-check.html`, `_mode-check.html`, `_library-check.html` and `_import-check.html` load the
+ * real page in a frame, press the real buttons and print one line: RESULT PASS or RESULT FAIL. This
+ * is the runner, so the checks are one command and not a paragraph of Chrome flags nobody will
+ * remember.
  *
  * It does NOT start the studio server: the server needs WL_LIBRARY (the sprite library is not in
  * this checkout) and a port that is already free, and guessing either would turn a missing library
@@ -26,7 +27,8 @@ const PORT = process.env.WL_PORT || '8920';
 const PAGES = [
   { file: '_drive-check.html', out: 'wl-drive-out', what: '由零開始 的匯入示範' },
   { file: '_mode-check.html', out: 'wl-mode-out', what: '新手 / 熟手 的步數' },
-  { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' }
+  { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' },
+  { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' }
 ];
 
 const CHROME = [
@@ -45,8 +47,11 @@ if (!CHROME) die('找不到 Chrome：把路徑加進 tools/check_pages.mjs 的 C
 
 async function dump(file) {
   const url = `http://127.0.0.1:${PORT}/${file}`;
+  /* No --disable-gpu: the editor refuses to draw without WebGL and puts a dialog over the gui, which
+     then swallows the clicks these checks are made of. SwiftShader is the software renderer. */
   const { stdout } = await run(CHROME, [
-    '--headless=new', '--disable-gpu', '--no-sandbox', '--noproxy-server',
+    '--headless=new', '--no-sandbox', '--noproxy-server',
+    '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--virtual-time-budget=900000', '--dump-dom', url
   ], { maxBuffer: 64 * 1024 * 1024 });
   return stdout;

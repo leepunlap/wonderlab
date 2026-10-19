@@ -97,6 +97,8 @@
     'guide.point.stage': 'Stage',
     'guide.point.sprites': 'Sprites',
     'guide.point.palette': 'Blocks',
+    'guide.point.addSprite': 'Add a sprite',
+    'guide.point.addBackdrop': 'Add a backdrop',
 
     'guide.sprite.pico': 'Pico',
     'guide.sprite.lumo': 'Lumo',

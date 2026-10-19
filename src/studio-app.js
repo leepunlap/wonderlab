@@ -681,6 +681,21 @@
       });
     };
 
+    /**
+     * Report a library entry's missing files, for a caller that imported it some other way.
+     *
+     * The guide drives the real picker now, and the picker is the VM's own path: it never tells
+     * anyone that a costume 404'd, it just draws a blank. This keeps the one warning we had before
+     * that change, for the one path that no longer runs through `addLibrarySprite`.
+     */
+    S.checkLibraryAssets = function (libName) {
+      return S.library(libName).then(function (e) {
+        if (!e) return [];
+        if (e.kind === 'backdrop') return reportMissingLibAssets('舞台', e.name, [e]);
+        return reportMissingLibAssets('角色', e.name, (e.costumes || []).concat(e.sounds || []));
+      }, function () { return []; });
+    };
+
     /** Switch the stage to a backdrop from the library. */
     S.addLibraryBackdrop = function (libName) {
       return S.library(libName).then(function (e) {

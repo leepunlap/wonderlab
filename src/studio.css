@@ -282,11 +282,19 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 /* the pointer a step that is not about blocks gets: a ring round the region, named */
 .wl-point { position: fixed; z-index: 2147482000; pointer-events: none; border: 3px solid #ffb000; border-radius: 10px;
   animation: wl-point 1.2s ease-in-out infinite; }
+/* the same ring for a target inside a dialog - one tile of a hundred and seventy, so the rest of the
+   screen goes down while it stays lit; "the elephant is here" has to survive a wall of thumbnails */
+.wl-point.is-strong { border-width: 4px; border-radius: 12px; animation-name: wl-point-strong; }
 .wl-point-label { position: absolute; left: 0; padding: 2px 8px; border-radius: 999px; background: #ffb000; color: #3b2a00;
   font: 700 12px/1.6 system-ui, -apple-system, "PingFang HK", "Noto Sans TC", sans-serif; white-space: nowrap; }
+.wl-point.is-strong .wl-point-label { font-size: 13px; padding: 3px 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, .28); }
 @keyframes wl-point {
   0%, 100% { box-shadow: 0 0 0 4px rgba(255, 176, 0, .25), 0 0 0 9999px rgba(15, 23, 42, .08); }
   50% { box-shadow: 0 0 0 9px rgba(255, 176, 0, .13), 0 0 0 9999px rgba(15, 23, 42, .08); }
+}
+@keyframes wl-point-strong {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 176, 0, .5), 0 0 0 9999px rgba(15, 23, 42, .46); }
+  50% { box-shadow: 0 0 0 12px rgba(255, 176, 0, .28), 0 0 0 9999px rgba(15, 23, 42, .46); }
 }
 
 /* ---- narrower than the editor + pane (iPad landscape 1024, small laptops): the pane slides over from the right ---- */

@@ -40,7 +40,14 @@
     palette: ['[class*="blocks_blocks"]'],
     flyout: ['.blocklyFlyout'],
     workspace: ['.blocklyWorkspace'],
-    toolbar: ['[class*="menu-bar_menu-bar"]']
+    toolbar: ['[class*="menu-bar_menu-bar"]'],
+    /* The two buttons a newcomer is looking for and cannot name. The sprite one is an ActionMenu
+       wrapper, not a bare button, so the wrapper is what gets the ring - it is the 44px square the
+       eye sees, and the button inside it is the whole of it. */
+    addSprite: ['[class*="sprite-selector_add-button"]', '[aria-label*="選擇角色"]', '[aria-label*="Choose a Sprite"]'],
+    addBackdrop: ['[class*="stage-selector_add-button"]', '[aria-label*="選擇背景"]', '[aria-label*="Choose a Backdrop"]'],
+    /* the library, once it is open: the grid of tiles the ring lands in */
+    library: ['[class*="library_library-scroll-grid"]', '[class*="library_library"]']
   };
 
   function create(cfg) {

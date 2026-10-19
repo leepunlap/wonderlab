@@ -127,38 +127,64 @@
       pointEl = null;
     }
 
-    /**
-     * A ring around a region of the editor with its name on it. The block animation points at the
-     * palette by itself, but "press the green flag" and "that is the sprite pane" have no such
-     * mechanism, and a sentence without a place is how a student learns to ignore the guide.
-     */
-    function point(region, ms) {
-      clearPoint();
-      var list = REGION[region];
-      if (!list) return;
-      var host = null;
-      for (var i = 0; i < list.length && !host; i++) host = root.document.querySelector(list[i]);
-      if (!host) return;
-      var r = host.getBoundingClientRect();
-      if (!r.width || !r.height) return;
+    /** The first of a list of selectors that is actually on screen. */
+    function firstOf(list) {
+      var d = root.document;
+      for (var i = 0; i < (list || []).length; i++) {
+        var el = d.querySelector(list[i]);
+        if (!el) continue;
+        var r = el.getBoundingClientRect();
+        if (r.width && r.height) return el;
+      }
+      return null;
+    }
 
+    /**
+     * A ring around a rectangle with a word on it.
+     *
+     * The block animation points at the palette by itself, but "press the green flag", "that is the
+     * sprite pane" and "this tile, here" have no such mechanism, and a sentence without a place is how
+     * a student learns to ignore the guide. `ms` is how long it stays: long enough to be looked at,
+     * short enough that it is gone by the time the thing it rings has been clicked.
+     */
+    function ringRect(r, label, ms, strong) {
+      clearPoint();
+      if (!r || !r.width || !r.height) return;
       var box = root.document.createElement('div');
-      box.className = 'wl-point';
+      box.className = 'wl-point' + (strong ? ' is-strong' : '');
       box.setAttribute('aria-hidden', 'true');
       box.style.left = Math.round(r.left - 5) + 'px';
       box.style.top = Math.round(r.top - 5) + 'px';
       box.style.width = Math.round(r.width + 10) + 'px';
       box.style.height = Math.round(r.height + 10) + 'px';
-      var label = root.document.createElement('span');
-      label.className = 'wl-point-label';
-      label.textContent = T('guide.point.' + region);
-      // the green flag sits near the top of the window: a label above it would be off-screen
-      if (r.top < 40) { label.style.top = Math.round(r.height + 11) + 'px'; }
-      else { label.style.top = '-25px'; }
-      box.appendChild(label);
+      if (label) {
+        var pill = root.document.createElement('span');
+        pill.className = 'wl-point-label';
+        pill.textContent = label;
+        // the green flag sits near the top of the window: a label above it would be off-screen
+        if (r.top < 40) pill.style.top = Math.round(r.height + 11) + 'px';
+        else pill.style.top = '-25px';
+        box.appendChild(pill);
+      }
       root.document.body.appendChild(box);
       pointEl = box;
       pointTimer = setTimeout(clearPoint, ms || 2800);
+    }
+
+    /** The same ring, around an element; returns the rectangle it used, or null. */
+    function ringEl(el, label, ms, strong) {
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      ringRect(r, label, ms, strong);
+      return r;
+    }
+
+    /** Ring a named region of the editor (`addSprite`, `stage`, `flag`…), labelled from the locale. */
+    function point(region, ms) {
+      var list = REGION[region];
+      if (!list) return;
+      ringEl(firstOf(list), T('guide.point.' + region), ms);
     }
 
     /* ---------- keys ---------- */
@@ -204,23 +230,240 @@
       });
     }
 
+    /* ---------- the library ---------- */
     /**
-     * Bring an actor or a backdrop in from the library, and wait for it to be really there.
+     * Bringing an actor in is the one thing a lesson never writes down, so the guide does not do it
+     * out of sight any more: it presses the plus, waits for the library, scrolls to the tile, rings
+     * it, and presses it — the four moves a child would make, at a speed a child can follow.
      *
-     * Not animated: the library is a modal with a hundred thumbnails, and driving it would be a
-     * demonstration of the picker rather than of the idea. What the student needs to see is which
-     * button opens it (the ring, drawn by `explain`) and that the actor arrives — the same two things
-     * they are told to do by hand.
+     * The picker is the gui's, not ours: it is a modal with React inside it, and the only contract is
+     * what it looks like. So every step of this can fail, and every failure has a way out — the
+     * import falls back to the API, which is what this file did before, and a step still gets its
+     * actors on the stage. A demonstration that breaks the lesson because a class name changed is a
+     * worse bug than a demonstration that skips the pointing.
      */
-    function addThings(list) {
-      var s = S();
-      return (list || []).reduce(function (p, o) {
+    var PICK = {
+      tile: '[class*="library-item_library-item"]',
+      modal: '[class*="modal_modal-content"]'
+    };
+
+    function until(fn, tries, gap) {
+      var n = 0;
+      function step() {
+        var v = false;
+        try { v = fn(); } catch (e) { v = false; }
+        if (v) return Promise.resolve(true);
+        if (++n >= (tries || 40)) return Promise.resolve(false);
+        return wait(gap || 120).then(step);
+      }
+      return step();
+    }
+
+    function pickerTiles() {
+      return [].slice.call(root.document.querySelectorAll(PICK.tile));
+    }
+
+    function pickerOpen() { return pickerTiles().length > 0; }
+
+    function tileLabel(el) {
+      return ((el && el.textContent) || '').replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Every tile whose caption is this name, best first.
+     *
+     * Upstream draws each entry several times over — 343 actors, 1715 tiles — and the copies are not
+     * all where the student is looking: some are measuring ghosts with a rectangle far below the
+     * visible grid. So this returns the whole set and `settleTile` decides which one is really in
+     * view; a ring drawn on a ghost points at nothing.
+     */
+    function pickerTilesNamed(name) {
+      var want = String(name || '').toLowerCase(), exact = [], near = [];
+      pickerTiles().forEach(function (el) {
+        var t = tileLabel(el).toLowerCase();
+        if (!t) return;
+        if (t === want) exact.push(el);
+        else if (t.indexOf(want) === 0) near.push(el);
+      });
+      if (!exact.length) {
+        near.sort(function (a, b) { return tileLabel(a).length - tileLabel(b).length; });
+        return near.slice(0, 4);
+      }
+      return exact;
+    }
+
+    /* The middle of the tile is on screen: the whole of it does not have to be. A short window
+       scrolls a 160px tile into a 206px grid and it fits; a shorter one would never fit, and a
+       demonstration that gives up because the laptop is small is the wrong kind of correct. */
+    function inside(r, box) {
+      if (!r.width || !r.height) return false;
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      return cx >= box.left && cx <= box.right && cy >= box.top && cy <= box.bottom;
+    }
+
+    /** Scroll a candidate into the middle of the grid and say whether it ended up where eyes are. */
+    function settleTile(el) {
+      var grid = root.document.querySelector('[class*="library_library-scroll-grid"]');
+      try { el.scrollIntoView({ block: 'center', inline: 'nearest' }); }
+      catch (e) { try { el.scrollIntoView(); } catch (e2) { /* it is on screen already */ } }
+      return wait(180).then(function () {
+        var box = grid ? grid.getBoundingClientRect() : { top: 0, left: 0, bottom: root.innerHeight, right: root.innerWidth };
+        return inside(el.getBoundingClientRect(), box) ? el : null;
+      });
+    }
+
+    /** The first candidate that settles in view, or null. */
+    function findTile(name) {
+      var list = pickerTilesNamed(name), i = 0;
+      function next() {
+        if (i >= list.length) return Promise.resolve(null);
+        var el = list[i++];
+        return settleTile(el).then(function (ok) { return ok || next(); });
+      }
+      return next();
+    }
+
+    /** Shut the picker the way a student would, so a failed demonstration is not a locked screen. */
+    function closePicker() {
+      var d = root.document;
+      var x = d.querySelector('[class*="close-button_close-button"], [class*="modal_close-button"]');
+      if (x) { try { x.click(); return; } catch (e) { /* fall through to the key */ } }
+      try {
+        var ev = new root.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+        d.dispatchEvent(ev);
+      } catch (e) { /* the overlay click below is the last resort */ }
+      var overlay = d.querySelector('[class*="modal_modal-overlay"]');
+      if (overlay) { try { overlay.click(); } catch (e) { /* nothing left to try */ } }
+    }
+
+    function targetIds() {
+      var vm = VM();
+      return vm && vm.runtime ? vm.runtime.targets.map(function (t) { return t.id; }) : [];
+    }
+
+    /**
+     * Did the press land? `vm.addSprite` resolves with nothing and the picker's own path resolves
+     * with nothing either, so the stage is the only witness: a new target for an actor, a new costume
+     * for a backdrop.
+     *
+     * Polled, not read once. The picker closes before the sprite it created has been committed, so a
+     * single look taken right after the modal goes finds nothing — and "nothing" here means the
+     * caller falls back and adds a second one. The two wait together: the duplicate is the price of
+     * being in a hurry.
+     */
+    function arrived(kind, name, alias, before, patience) {
+      var vm = VM();
+      if (!vm || !vm.runtime || !vm.runtime.targets.length) return Promise.resolve(false);
+      function found() {
+        if (kind === 'backdrop') {
+          var stage = vm.runtime.targets[0];
+          return (stage.getCostumes() || []).some(function (c) { return c.name === name; })
+            ? { stage: true } : null;
+        }
+        var added = vm.runtime.targets.filter(function (t) { return before.indexOf(t.id) < 0; });
+        return added.length ? { target: added[0] } : null;
+      }
+      var ms = patience || 4000;
+      return until(found, Math.ceil(ms / 120), 120).then(function (ok) {
+        if (!ok) return false;
+        var t = found();
+        if (t && t.target) {
+          // the blocks in the steps address the actor by the lesson's name, not the library's
+          if (alias && t.target.getName() !== alias) {
+            try { vm.renameSprite(t.target.id, alias); } catch (e) { /* keep the library's name */ }
+          }
+          try { vm.setEditingTarget(t.target.id); } catch (e) { /* the next step will set it again */ }
+        }
+        return true;
+      });
+    }
+
+    /**
+     * One actor, the long way round. Resolves true when the picker did it, false when it could not —
+     * the caller then falls back and nothing is lost but the pointing.
+     */
+    function pickOne(o, opts) {
+      var kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
+      var name = o.name;
+      var alias = spriteName(o.sprite || o.name);
+      var before = targetIds();
+      var button = firstOf(REGION[kind === 'backdrop' ? 'addBackdrop' : 'addSprite']);
+      if (!button) return Promise.resolve(false);
+
+      // the button first: "here is what opens the library" is the sentence the student needs most
+      ringEl(button, T('guide.point.' + (kind === 'backdrop' ? 'addBackdrop' : 'addSprite')), 2600);
+      return wait(opts.lead || 900).then(function () {
+        (button.querySelector('button') || button).click();
+        return until(pickerOpen, 45, 120);
+      }).then(function (open) {
+        if (!open) return false;
+        return findTile(name).then(function (tile) {
+          if (!tile) { closePicker(); return false; }
+          return wait(160).then(function () {
+            // the pill says what the lesson calls it, which is not what the library calls it
+            ringEl(tile, alias && alias !== name ? alias : null, opts.hold || 900, true);
+            return wait(opts.hold || 900);
+          }).then(function () {
+            tile.click();
+            /* The modal only closes when the picker has taken a selection: if it is gone, the press
+               was accepted. That, not the arrival, is the moment to tell "landed" from "missed" — the
+               actor itself can still be fetching its costume, and a backdrop is a whole picture. */
+            return until(function () { return !pickerOpen(); }, 50, 100);
+          }).then(function (closed) {
+            if (!closed) { closePicker(); return false; }
+            return arrived(kind, name, alias, before, kind === 'backdrop' ? 12000 : 4000);
+          });
+        });
+      });
+    }
+
+    /** The short way: the library entry straight into the VM, with the lesson's name on it. */
+    function addDirect(o) {
+      var s = S(), kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
+      var alias = spriteName(o.sprite || o.name);
+      var out = kind === 'backdrop'
+        ? Promise.resolve(s.addLibraryBackdrop(o.name))
+        : Promise.resolve(s.addLibrarySprite(o.name, alias));
+      return out.then(function (r) {
+        /* the picker's path gets its missing-file report from the picker; this one has to ask */
+        try { if (s.checkLibraryAssets) s.checkLibraryAssets(o.name); } catch (e) { /* a warning, not a step */ }
+        return r;
+      });
+    }
+
+    /**
+     * Bring this step's actors in. With `opts.picker` each one is imported the visible way — plus,
+     * library, tile, press — and silently falls back to the direct import if the picker cannot be
+     * driven. Without it (rebuilding earlier steps on a rewind) nothing is shown: the student has
+     * watched this once already, and the point of 再看一次 is the step, not the walk up to it.
+     */
+    function addThings(list, opts) {
+      opts = opts || {};
+      var show = !!opts.picker;
+      var first = true;
+      return (list || []).reduce(function (p, o, i) {
         return p.then(function () {
-          if (o['do'] === 'add_sprite') return Promise.resolve(s.addLibrarySprite(o.name, spriteName(o.sprite || o.name)));
-          if (o['do'] === 'add_backdrop') return Promise.resolve(s.addLibraryBackdrop(o.name));
-          return null;
-        }).then(function () { return wait(o.after || 450); }, function (e) {
-          if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
+          if (opts.onProgress) { try { opts.onProgress(i + 1, list.length); } catch (e) {} }
+          if (!show) {
+            return Promise.resolve(addDirect(o)).then(function () {
+              return wait(o.after || 450);
+            }, function (e) {
+              if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
+            });
+          }
+          var lead = first ? 1000 : 700, hold = first ? 1100 : 800;
+          first = false;
+          return pickOne(o, { lead: lead, hold: hold }).then(function (byPicker) {
+            if (byPicker) return wait(o.after || 350);
+            return Promise.resolve(addDirect(o)).then(function () {
+              return wait(o.after || 450);
+            }, function (e) {
+              if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
+            });
+          }, function (e) {
+            if (root.console) console.warn('[guide] the picker failed for ' + (o && o.name) + ':', e && e.message);
+            return Promise.resolve(addDirect(o)).then(function () { return wait(450); }, function () {});
+          });
         });
       }, Promise.resolve());
     }
@@ -421,8 +664,12 @@
       clearMarks();
 
       /* Imports first, in the order the lesson asked for them: a script can only be built on an
-         actor that is already on the stage. */
-      var chain = addThings(adds).then(function () {
+         actor that is already on the stage. When the step is only about importing, the counts under
+         the button are the actors' — the block animation is not running, so nothing else is using it. */
+      var chain = addThings(adds, {
+        picker: true,
+        onProgress: scripts.length ? null : onProgress
+      }).then(function () {
         return scripts.length
           ? build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress })
           : { ok: true };
@@ -492,6 +739,8 @@
       busyNow = false;
       clearPoint();
       clearMarks();
+      // a demonstration that was interrupted mid-import must not leave the library over the canvas
+      if (pickerOpen()) closePicker();
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}
       var vm = VM();
       if (vm) { try { vm.stopAll(); } catch (e) {} }
@@ -523,6 +772,8 @@
       restore: restore,
       isActive: isActive,
       point: point,
+      /** ring one element for a while, for a caller that has the element and not a region name */
+      ring: ringEl,
       /** true while a demonstration is being prepared, explained or performed */
       busy: function () { return busyNow; }
     };

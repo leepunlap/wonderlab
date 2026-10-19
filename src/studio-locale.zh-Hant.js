@@ -94,6 +94,8 @@
     'guide.point.stage': '舞台',
     'guide.point.sprites': '角色區',
     'guide.point.palette': '積木區',
+    'guide.point.addSprite': '加角色',
+    'guide.point.addBackdrop': '加背景',
 
     'guide.sprite.pico': '小光',
     'guide.sprite.lumo': '小飛',

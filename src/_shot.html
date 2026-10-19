@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--
+  A picture of the pointing, for a human to look at: `?shot=plus` rings the sprite button,
+  `?shot=tile` opens the library and rings the elephant, `?shot=end` runs the whole import step and
+  shows the stage afterwards. Not a test — the checks live in _import-check.html.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>shot</title>
+<style>html,body{margin:0;height:100%;overflow:hidden}iframe{display:block;width:100%;height:100vh;border:0}
+#o{position:fixed;left:0;bottom:0;background:#fff;font:12px monospace;padding:2px 6px;opacity:.7}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<div id="o">starting…</div>
+<script>
+(function () {
+  'use strict';
+  var which = (location.search.match(/shot=([a-z]+)/) || [])[1] || 'plus';
+  var o = document.getElementById('o');
+  function say(s) { o.textContent = s; }
+  function win() { return document.getElementById('app').contentWindow; }
+  function doc() { return document.getElementById('app').contentDocument; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function until(fn, tries) {
+    var n = 0;
+    return new Promise(function (done) {
+      (function tick() {
+        var v = null; try { v = fn(); } catch (e) {}
+        if (v) return done(v);
+        if (++n > (tries || 80)) return done(null);
+        setTimeout(tick, 150);
+      })();
+    });
+  }
+
+  until(function () {
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : true;
+    return (!loading && S && S.vm && S.vm.runtime.targets.length && w.StudioGuideDrive) ? w : null;
+  }, 80).then(function (w) {
+    if (!w) { say('never booted'); return; }
+    var drive = w.StudioGuideDrive.create({ i18n: w.StudioI18n });
+
+    if (which === 'plus') {
+      drive.point('addSprite', 600000);
+      say('ring on the sprite button');
+      return;
+    }
+
+    if (which === 'end') {
+      var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === '501-bp01'; })[0];
+      say('running the import step…');
+      return drive.run(topic.steps[1], null, topic).then(function () { say('done: ' + which); });
+    }
+
+    var button = doc().querySelector('[class*="sprite-selector_add-button"]');
+    (button.querySelector('button') || button).click();
+    return until(function () { return doc().querySelector('[class*="library-item_library-item"]'); })
+      .then(function (tile) {
+        var tiles = [].slice.call(doc().querySelectorAll('[class*="library-item_library-item"]'));
+        var hit = tiles.filter(function (t) { return (t.textContent || '').trim() === 'Elephant'; })[0];
+        if (!hit) { say('no elephant'); return; }
+        hit.scrollIntoView({ block: 'center' });
+        return wait(300).then(function () {
+          drive.ring(hit, '大象', 600000, true);
+          say('ring on the elephant');
+        });
+      });
+  });
+}());
+</script>
+</body>
+</html>
