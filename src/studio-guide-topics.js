@@ -21,7 +21,7 @@
  *   keys     key presses to simulate afterwards, for programs that listen instead of starting
  *   point    a region of the editor to point at: flag | stage | sprites | palette | flyout
  *   annotate what to point at while the step is being said, and once its blocks are built:
- *              { shape: 'square' | 'circle' | 'arrow', at, from, to, label, when }
+ *              { shape: 'square' | 'circle', at, label, when, cue }
  *            `at`/`from`/`to` are a region or `field:<opcode>/<FIELD>` (the input to type into);
  *            `label` is a `guide.act.*` key ("press this", "drag it over", "change this number");
  *            `when` defaults to 'say' - 'built' marks appear once the block exists, because an input
@@ -59,7 +59,6 @@
             scripts: [{ sprite: '@pico', id: 'a1', blocks: [flag, move(10)] }],
             annotate: [
               { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
-              { shape: 'arrow', from: 'flyout:first', to: 'workspace' },
               { shape: 'circle', at: 'flag', label: 'guide.act.click' },
               { shape: 'square', at: 'field:motion_movesteps/STEPS', label: 'guide.act.type', when: 'built' }
             ],
@@ -176,8 +175,7 @@
             project: TWO,
             scripts: [{ sprite: '@lumo', id: 't1', blocks: [flag, forever([turn(15), move(5)])] }],
             annotate: [
-              { shape: 'circle', at: 'sprites', label: 'guide.act.click' },
-              { shape: 'arrow', from: 'sprites', to: 'flyout' }
+              { shape: 'circle', at: 'sprites', label: 'guide.act.click' }
             ],
             focus: '@lumo', run: 3200
           }

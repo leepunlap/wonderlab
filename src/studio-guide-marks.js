@@ -3,10 +3,11 @@
  * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
  *
  * WHAT THIS IS
- * The shapes the guide draws over the editor while it talks: a square round the blocks to pick up, an
- * arrow from the palette to the canvas, a circle round the green flag. Three shapes, because there are
- * three things a student can be asked to do with a mouse — click it, drag it, type in it — and a
- * sentence that says "press the flag" without pointing at the flag is a sentence about a place.
+ * The shapes the guide draws over the editor while it talks: a square round the blocks to pick up, a
+ * circle round the green flag. Two shapes, because a mark has exactly one job — say "here" — and the
+ * sentence says the rest. There was an arrow once, from the palette to the canvas, and it was the one
+ * shape that could not survive being wrong: a ring on the flag is either on the flag or absent, but an
+ * arrow that outlives the dialog it pointed into keeps claiming a place that is no longer there.
  *
  * WHY A LAYER AND NOT A HIGHLIGHT
  * The editor belongs to the gui: wrapping a palette block in a class would fight it. So this draws in
@@ -21,7 +22,7 @@
  *
  * WHAT IT DOES NOT OWN
  * When to point (studio-guide-drive.js) and what to say (the locale files): this file knows geometry,
- * three shapes, and one label.
+ * two shapes, and one label.
  *
  * ES5, like the rest of the studio's own code: this ships to old browsers.
  */
@@ -162,15 +163,7 @@
       return rectOfNode(doc.querySelector(s));
     }
 
-    /* ---------- geometry ---------- */
-    function centre(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
-
-    function unit(dx, dy) {
-      var len = Math.sqrt(dx * dx + dy * dy) || 1;
-      return { x: dx / len, y: dy / len };
-    }
-
-    /* ---------- the three shapes ---------- */
+    /* ---------- the two shapes ---------- */
     function square(g, r) {
       var pad = 7;
       g.appendChild(el('rect', {
@@ -186,39 +179,6 @@
         cx: Math.round(r.left + r.width / 2), cy: Math.round(r.top + r.height / 2),
         rx: Math.round(r.width / 2 + pad), ry: Math.round(r.height / 2 + pad)
       }));
-    }
-
-    function arrow(g, a, b) {
-      /* Centre to centre, shortened at both ends. Edge to edge would be right for two boxes with room
-         between them and wrong for the palette and the canvas, which touch: the arrow would be the six
-         pixels of gutter between them, pointing at nothing. */
-      var ac = centre(a), bc = centre(b);
-      var u = unit(bc.x - ac.x, bc.y - ac.y);
-      var span = Math.sqrt((bc.x - ac.x) * (bc.x - ac.x) + (bc.y - ac.y) * (bc.y - ac.y)) || 1;
-      var trim = Math.min(20, span * 0.14);
-      var p1 = { x: ac.x + u.x * trim, y: ac.y + u.y * trim };
-      var p2 = { x: bc.x - u.x * trim, y: bc.y - u.y * trim };
-      var head = 13, wide = 6.5;
-      var tip = { x: p2.x, y: p2.y };
-      var base = { x: tip.x - u.x * head, y: tip.y - u.y * head };
-
-      // a shallow bend, so the arrow does not run along a row of blocks it is not about
-      var bend = Math.min(52, span * 0.18);
-      var mid = { x: (p1.x + base.x) / 2, y: (p1.y + base.y) / 2 };
-      var ctrl = { x: mid.x - u.y * bend, y: mid.y + u.x * bend };
-
-      g.appendChild(el('path', {
-        d: 'M ' + Math.round(p1.x) + ' ' + Math.round(p1.y) +
-           ' Q ' + Math.round(ctrl.x) + ' ' + Math.round(ctrl.y) +
-           ' ' + Math.round(base.x) + ' ' + Math.round(base.y)
-      }));
-      g.appendChild(el('path', {
-        d: 'M ' + Math.round(tip.x) + ' ' + Math.round(tip.y) +
-           ' L ' + Math.round(base.x - u.y * wide) + ' ' + Math.round(base.y + u.x * wide) +
-           ' L ' + Math.round(base.x + u.y * wide) + ' ' + Math.round(base.y - u.x * wide) + ' Z',
-        'class': 'wl-mark-head'
-      }));
-      return ctrl;
     }
 
     /**
@@ -259,20 +219,11 @@
     /* ---------- the verb ---------- */
     function build(spec) {
       var g = el('g', { 'class': 'wl-mark is-' + (spec.shape || 'circle') });
-      var r = null, tagX = 0, above = 0, below = 0;
-
-      if (spec.shape === 'arrow') {
-        var from = rectOf(spec.from), to = rectOf(spec.to || spec.at);
-        if (!from || !to) return null;
-        var ctrl = arrow(g, from, to);
-        tagX = ctrl.x; above = ctrl.y - 10; below = ctrl.y + 16;
-      } else {
-        r = rectOf(spec.at);
-        if (!r) return null;
-        if (spec.shape === 'square') square(g, r);
-        else circle(g, r);
-        tagX = r.left - 6; above = r.top - 10; below = r.top + r.height + 8;
-      }
+      var r = rectOf(spec.at);
+      if (!r) return null;
+      if (spec.shape === 'square') square(g, r);
+      else circle(g, r);
+      var tagX = r.left - 6, above = r.top - 10, below = r.top + r.height + 8;
 
       if (spec.label) g.fit = tag(g, T(spec.label), tagX, above, below);
       return g;
@@ -330,6 +281,8 @@
       /** the same, without clearing what the previous sentence already put on screen */
       add: add,
       clear: clear,
+      /** how many marks are on screen — a caller about to draw its own frame asks first */
+      count: function () { return shown.length; },
       /** for a caller that has one region to name, without a list */
       at: function (anchor) { return rectOf(anchor); }
     };

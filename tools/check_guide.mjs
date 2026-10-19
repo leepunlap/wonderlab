@@ -51,7 +51,7 @@ const spec = JSON.parse(readFileSync(join(SRC, 'opcodes.json'), 'utf8')).opcodes
 const VOICE = JSON.parse(readFileSync(join(SRC, 'assets/voice/manifest.json'), 'utf8'));
 const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar',
   'addSprite', 'addBackdrop']);
-const SHAPES = new Set(['square', 'circle', 'arrow']);
+const SHAPES = new Set(['square', 'circle']);
 const KINDS = new Set(['lesson', 'ref', 'basic']);
 /* The library is outside this repo, so a missing file is a skip, not a failure: what it guards is
    "the demonstration asks for an actor the library does not have", which cannot be checked offline. */
@@ -152,7 +152,7 @@ for (const t of topics) {
     /* the marks: a shape, a place, and a word. A mark whose anchor is misspelt is simply not drawn,
        which is the same failure as a demonstration that does nothing - silence. */
     for (const m of d.annotate || []) {
-      check(`  ${t.id}/${s.id} mark ${m.shape} is one of three shapes`, SHAPES.has(m.shape), String(m.shape));
+      check(`  ${t.id}/${s.id} mark ${m.shape} is a ring or a box`, SHAPES.has(m.shape), String(m.shape));
       if (m.when) check(`  ${t.id}/${s.id} mark is said or built`, m.when === 'say' || m.when === 'built', String(m.when));
       /* a mark may ask to appear on a later sentence (`cue`), because the copy names the tile in the
          second one and a ring that is already there when the student looks is not pointing */
@@ -160,12 +160,8 @@ for (const t of topics) {
         check(`  ${t.id}/${s.id} mark cue is a sentence index`,
           Number.isInteger(m.cue) && m.cue >= 0, String(m.cue));
       }
-      if (m.shape === 'arrow') {
-        check(`  ${t.id}/${s.id} arrow has a from and a to`, !!m.from && !!m.to);
-      } else {
-        check(`  ${t.id}/${s.id} ${m.shape} has somewhere to go`, !!m.at);
-      }
-      for (const anchor of [m.from, m.to, m.at]) {
+      check(`  ${t.id}/${s.id} ${m.shape} has somewhere to go`, !!m.at);
+      for (const anchor of [m.at]) {
         if (!anchor) continue;
         if (String(anchor).startsWith('field:')) {
           const [op, field] = String(anchor).slice(6).split('/');

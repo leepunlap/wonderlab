@@ -59,8 +59,7 @@
           project: EMPTY,
           add: actors,
           annotate: [
-            { shape: 'circle', at: 'addSprite', label: 'guide.act.click' },
-            { shape: 'arrow', from: 'addSprite', to: 'sprites' }
+            { shape: 'circle', at: 'addSprite', label: 'guide.act.click' }
           ]
         }
       },
@@ -70,8 +69,7 @@
           project: EMPTY,
           add: [{ do: 'add_backdrop', name: backdrop }],
           annotate: [
-            { shape: 'circle', at: 'addBackdrop', label: 'guide.act.click' },
-            { shape: 'arrow', from: 'addBackdrop', to: 'stage' }
+            { shape: 'circle', at: 'addBackdrop', label: 'guide.act.click' }
           ]
         }
       }

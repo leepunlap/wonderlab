@@ -10,7 +10,8 @@
   it, press it. This page runs that on the real page, with the real lesson data, and checks the four
   visible facts along the way:
 
-    1. a ring appeared on the plus button while the library was still closed
+    1. something lit the plus button while the library was still closed — the step's own mark, or
+       the picker's own ring, whichever the step asked for
     2. the library opened
     3. a ring appeared on a tile inside the library
     4. every actor the step names is on the stage afterwards, under the lesson's own name
@@ -42,14 +43,24 @@
   function win() { return frame().contentWindow; }
   function doc() { return frame().contentDocument; }
 
-  var seen = { plus: 0, tile: 0, picker: 0, hand: 0, ripple: 0 };
+  /* `stray` is the failure this page was extended for: a frame that outlives the dialog it was drawn
+     inside. The picker closes on the click, so a highlight still on screen one sample after the close
+     is ringing whatever now occupies those coordinates — the editor, not the elephant. */
+  var seen = { plus: 0, tile: 0, picker: 0, hand: 0, ripple: 0, stray: 0 };
+  var wasOpen = false;
   /** While a step runs, remember every ring that appears and whether the library was open then. */
   function sample() {
     var open = doc().querySelectorAll('[class*="library-item_library-item"]').length > 0;
     var rings = doc().querySelectorAll('.wl-point').length;
+    /* A step that already rings the button with its own mark passes `ring: false`, so "did it point
+       at the plus" is the union of the two layers — and the count of rings after a close is a
+       question of its own (`stray`), never evidence that the plus was pointed at. */
+    var lit = rings || doc().querySelectorAll('.wl-mark.is-on').length;
     if (open) seen.picker++;
     if (rings && open) seen.tile++;
-    if (rings && !open) seen.plus++;
+    if (lit && !open) seen.plus++;
+    if (wasOpen && !open && rings) seen.stray++;
+    wasOpen = open;
     if (doc().querySelectorAll('.wl-cur.is-on').length) seen.hand++;
     if (doc().querySelectorAll('.wl-ripple.is-go').length) seen.ripple++;
   }
@@ -99,11 +110,12 @@
     watch(drive.run(topic.steps[1], null, topic)).then(function (ok) {
       var hand = drive.cursor().state();
       log('step 1 finished: ' + ok + '   targets now: ' + names().join(', '));
-      log('  rings seen on the plus: ' + seen.plus + ', inside the library: ' + seen.tile +
-          ', library open samples: ' + seen.picker);
+      log('  plus lit while the library was closed in ' + seen.plus + ' samples, ringed inside the' +
+          ' library in ' + seen.tile + ', library open samples: ' + seen.picker);
       log('  hand: travels ' + hand.travels + ', presses ' + hand.presses +
           ', clicks heard ' + hand.sounds + ', on screen in ' + seen.hand + ' samples' +
           ', ripples seen ' + seen.ripple);
+      log('  frames left after a dialog closed: ' + seen.stray + (seen.stray ? ' — LEFT BEHIND' : ' — none'));
       log('  library closed afterwards: ' + (doc().querySelectorAll('[class*="library-item_library-item"]').length === 0));
 
       var withAlias = actors.map(function (n) {
@@ -117,18 +129,19 @@
       log('  expected on stage: ' + withAlias.join(', '));
       log(absent.length ? '  MISSING: ' + absent.join(', ') : '  all actors present under the lesson\'s names');
 
-      seen.plus = 0; seen.tile = 0; seen.picker = 0; seen.hand = 0;
+      seen.plus = 0; seen.tile = 0; seen.picker = 0; seen.hand = 0; seen.stray = 0;
       return watch(drive.run(topic.steps[2], null, topic)).then(function (ok2) {
         var stage = w.WLStudio.vm.runtime.targets[0];
         var costumes = (stage.getCostumes() || []).map(function (c) { return c.name; });
         var showing = costumes[stage.currentCostume];
         var hand2 = drive.cursor().state();
-        log('step 2 finished: ' + ok2 + '   rings on the backdrop button: ' + seen.plus +
-            ', in the backdrop library: ' + seen.tile);
+        log('step 2 finished: ' + ok2 + '   backdrop button lit while closed in ' + seen.plus +
+            ' samples, ringed in the backdrop library in ' + seen.tile);
         log('  backdrops now: ' + costumes.join(', ') + '   showing: ' + showing);
         log('  hand total: travels ' + hand2.travels + ', presses ' + hand2.presses +
             ', clicks heard ' + hand2.sounds + ', on screen in ' + seen.hand + ' samples' +
             ', ripples seen ' + seen.ripple);
+        log('  frames left after a dialog closed: ' + seen.stray + (seen.stray ? ' — LEFT BEHIND' : ' — none'));
 
         /* Two presses per item — the plus, then the tile — and a click for each. The sounds are
            counted, not heard: a headless browser has no speakers, and a silent regression is exactly
@@ -148,6 +161,7 @@
               (audible ? ' — audible' : ' — SILENT'));
           var okAll = absent.length === 0 &&
                       seen.plus > 0 && seen.tile > 0 && seen.picker > 0 &&
+                      seen.stray === 0 &&
                       costumes.indexOf(backdrop) >= 0 && showing === backdrop &&
                       handOk && audible;
           log(okAll ? 'RESULT PASS' : 'RESULT FAIL');

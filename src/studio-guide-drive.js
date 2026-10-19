@@ -442,9 +442,17 @@
         return wait(there ? Math.max(140, lead - approach) : lead);
       }).then(pressHere).then(function () {
         (button.querySelector('button') || button).click();
+        /* The ring is dropped in the same instant as the press. A frame left standing describes a
+           place on a screen that is about to be covered by a dialog: whatever it is drawn round now,
+           it is no longer what the sentence was about. */
+        clearPoint();
         return until(pickerOpen, 45, 120);
       }).then(function (open) {
         if (!open) { if (C()) C().hide(); return false; }
+        /* the step's own marks are rings round the editor's furniture, and the library has just been
+           laid on top of all of it — a ring on the plus, seen through the dim, is a ring in the wrong
+           place too */
+        clearMarks();
         return true;
       });
     }
@@ -475,6 +483,11 @@
             return wait(there ? Math.max(140, hold - walk) : hold);
           }).then(pressHere).then(function () {
             tile.click();
+            /* THE FRAME GOES WITH THE DIALOG. The tile is inside a modal that closes on the click, so
+               a highlight that waits for its own timer to run out is left ringing empty editor: the
+               dialog is gone, the frame is not, and it now points at whatever happens to be at those
+               coordinates. Cleared here, in the same tick as the press. */
+            clearPoint();
             /* The hand has done its job; left standing it is an arrow pointing at a closed dialog. Long
                enough to see the ripple, then gone. */
             if (C()) setTimeout(function () { if (C()) C().hide(); }, 320);
@@ -806,8 +819,12 @@
       if (adds.length) {
         var first = adds[0];
         var region = first['do'] === 'add_backdrop' ? 'addBackdrop' : 'addSprite';
-        /* a sentence that already rings the button does not need the picker's own ring on top */
-        var alreadyRung = marksFor(st.step, 'say').some(function (mk) { return mk && mk.at === region; });
+        /* A sentence that already rings the button does not need the picker's own ring on top — but
+           only if that mark is really on screen. Without narration there is no `explain`, the data is
+           still there and the mark is not, and the button would go unlit for the whole approach. */
+        var showMarks = marks();
+        var alreadyRung = !!(showMarks && showMarks.count && showMarks.count() > 0) &&
+          marksFor(st.step, 'say').some(function (mk) { return mk && mk.at === region; });
         chain = importAll(adds, {
           open: step(function () { return openPicker(region === 'addBackdrop' ? 'backdrop' : 'sprite', { ring: !alreadyRung }); }),
           gateTile: beat(),

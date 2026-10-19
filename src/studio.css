@@ -274,7 +274,6 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-mark rect, .wl-mark ellipse, .wl-mark path { fill: none; stroke: #ffb000; stroke-width: 3;
   stroke-linecap: round; stroke-linejoin: round;
   filter: drop-shadow(0 0 5px rgba(255, 176, 0, .45)); }
-.wl-mark .wl-mark-head { fill: #ffb000; stroke: none; }
 .wl-mark .wl-mark-tag { fill: #ffb000; stroke: none; filter: none; }
 .wl-mark .wl-mark-text { fill: #3b2a00; stroke: none;
   font: 700 12.5px/1 system-ui, -apple-system, "PingFang HK", "Noto Sans TC", sans-serif; }

@@ -125,19 +125,22 @@ student follows neither, so the animation only ever shows what has just been
 described — and the last narrated line stays over the stage while it happens.
 
 `src/studio-guide-marks.js` draws the pointing while the talking is going on:
-a circle round the thing to click, an arrow for a drag, a square round a field.
+a circle round the thing to click, a square round the thing to drag or type in.
 A mark is declared in the topic data (`annotate`), not in the driver, so adding
 one is a data change:
 
 ```js
 annotate: [
   { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
-  { shape: 'arrow', from: 'flyout:first', to: 'workspace' },
   { shape: 'circle', at: 'flag', label: 'guide.act.click' },
   { shape: 'square', at: 'field:motion_movesteps/STEPS',
     label: 'guide.act.type', when: 'built' }   // a number can only be ringed once it exists
 ]
 ```
+
+There is no arrow. A ring is either on its target or absent; an arrow claiming
+"from here to there" outlives the dialog it pointed into and goes on claiming a
+place that is no longer there.
 
 Anchors are regions (`flag`, `stage`, `sprites`, `palette`, `flyout`, `workspace`),
 `flyout:first` for the block the palette is showing, `field:<opcode>/<INPUT>` for
