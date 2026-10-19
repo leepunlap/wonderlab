@@ -32,7 +32,11 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
    left), and the composer. It used to be five bands, and the conversation came last. */
 #wl-chat { position: relative; display: flex; flex-direction: column; min-height: 0;
   border-left: 1px solid var(--wl-line); background: var(--wl-pane); }
-.wl-chat-shell { position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.wl-chat-shell { position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%;
+  --wl-tabs-h: 0px; }
+/* With two tabs the pane has three bands instead of two; the sheet and the popovers hang from the
+   same stack, so they move by the same amount rather than each remembering the extra height. */
+.wl-chat-shell.has-tabs { --wl-tabs-h: 34px; }
 
 .wl-chat-head { display: flex; align-items: center; gap: 4px; height: var(--wl-head-h); padding: 0 8px; box-sizing: border-box;
   background: var(--wl-accent); color: var(--wl-accent-ink); flex: none; }
@@ -54,7 +58,25 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
   background: none; color: inherit; cursor: pointer; }
 .wl-more-btn:hover { background: rgba(255, 255, 255, .22); }
 
-.wl-menu { position: absolute; top: calc(var(--wl-head-h) - 4px); right: 8px; z-index: 30; min-width: 168px; padding: 5px;
+/* ---- tabs: the same pane, in another mode ----
+   A 34px strip, equal halves, the active one underlined rather than filled: the header is already a
+   solid band of colour, and a second filled bar under it would read as a second header. */
+.wl-tabs { display: flex; flex: none; height: var(--wl-tabs-h); background: var(--wl-bg);
+  border-bottom: 1px solid var(--wl-line); }
+.wl-tab { flex: 1 1 0; display: flex; align-items: center; justify-content: center; min-width: 0;
+  font: inherit; font-size: .82rem; font-weight: 600; color: var(--wl-muted); background: none;
+  border: 0; border-bottom: 2px solid transparent; cursor: pointer; padding: 0 8px; }
+.wl-tab:hover { color: var(--wl-text); }
+.wl-tab.is-on { color: var(--wl-accent); border-bottom-color: var(--wl-accent); }
+.wl-tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-tab:focus-visible { outline: 2px solid #ffb000; outline-offset: -3px; }
+
+/* One view shows at a time. With no tabs there is one, and it behaves exactly as the pane did. */
+.wl-views { flex: 1; min-height: 0; display: flex; }
+.wl-view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.wl-view.is-on { display: flex; }
+
+.wl-menu { position: absolute; top: calc(var(--wl-head-h) + var(--wl-tabs-h) - 4px); right: 8px; z-index: 30; min-width: 168px; padding: 5px;
   background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, .16); }
 .wl-menu[hidden] { display: none; }
 .wl-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; font: inherit; font-size: .82rem;
@@ -72,7 +94,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-lang-toggle:hover { background: rgba(255, 255, 255, .3); }
 .wl-lang-short { line-height: 1; }
 
-.wl-lang-pop { position: absolute; top: calc(var(--wl-head-h) - 2px); right: 8px; z-index: 31; min-width: 138px;
+.wl-lang-pop { position: absolute; top: calc(var(--wl-head-h) + var(--wl-tabs-h) - 2px); right: 8px; z-index: 31; min-width: 138px;
   padding: 5px; background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 10px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, .16); }
 .wl-lang-pop[hidden] { display: none; }
@@ -103,7 +125,9 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
   max-width: 100%; text-align: left; }
 .wl-chip:hover { border-color: var(--wl-accent); }
 .wl-chip:focus-visible, .wl-more-btn:focus-visible, .wl-lang-toggle:focus-visible, .wl-ver-chip:focus-visible,
-.wl-menu-item:focus-visible, .wl-undo-btn:focus-visible, .wl-send:focus-visible, .wl-fab:focus-visible {
+.wl-menu-item:focus-visible, .wl-undo-btn:focus-visible, .wl-send:focus-visible, .wl-fab:focus-visible,
+.wl-g-topic:focus-visible, .wl-g-demo:focus-visible, .wl-g-dot:focus-visible, .wl-g-back:focus-visible,
+.wl-btn:focus-visible {
   outline: 2px solid #ffb000; outline-offset: 2px; }
 
 .wl-composer { flex: none; display: flex; flex-direction: column; gap: 7px; padding: 8px 12px 11px;
@@ -125,7 +149,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-send:disabled { opacity: .5; cursor: default; }
 
 /* ---- the sheet: 版本 / 說明, over the pane instead of beside it ---- */
-.wl-sheet { position: absolute; top: var(--wl-head-h); left: 0; right: 0; bottom: 0; z-index: 10;
+.wl-sheet { position: absolute; top: calc(var(--wl-head-h) + var(--wl-tabs-h)); left: 0; right: 0; bottom: 0; z-index: 10;
   display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; overflow-y: auto; background: var(--wl-bg); }
 .wl-sheet[hidden] { display: none; }
 .wl-sheet-bar { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -156,6 +180,74 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .wl-fab { display: none; }
 
+/* ---- the guide tab ----
+   The pane's second mode: topics, one step at a time, and a 示範 button that drives the editor on the
+   left. It is deliberately all text and one accent: the thing worth looking at while it runs is the
+   canvas, not this column. */
+.wl-guide { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--wl-bg); }
+.wl-g-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.wl-g-index, .wl-g-topic-page { display: flex; flex-direction: column; gap: 10px; }
+.wl-g-intro { margin: 0; font-size: .82rem; line-height: 1.55; color: var(--wl-muted); }
+
+.wl-g-list { display: flex; flex-direction: column; gap: 6px; }
+.wl-g-topic { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; font: inherit; text-align: left;
+  color: var(--wl-text); background: var(--wl-pane); border: 1px solid var(--wl-line); border-radius: 10px; cursor: pointer; }
+.wl-g-topic:hover { border-color: var(--wl-accent); background: var(--wl-bg); }
+.wl-g-ico { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px;
+  background: var(--wl-accent); color: var(--wl-accent-ink); }
+.wl-g-ico .ic { width: 17px; height: 17px; }
+.wl-g-tmain { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.wl-g-ttitle { font-size: .9rem; font-weight: 600; }
+.wl-g-tsub { font-size: .74rem; color: var(--wl-muted); }
+.wl-g-chev { display: grid; place-items: center; color: var(--wl-muted); }
+
+.wl-g-bar { display: flex; align-items: center; gap: 6px; }
+.wl-g-back { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; flex: none;
+  border: 0; border-radius: 8px; background: none; color: var(--wl-text); cursor: pointer; }
+.wl-g-back:hover { background: var(--wl-pane); }
+.wl-g-h { margin: 0; font-size: .98rem; font-weight: 700; min-width: 0; }
+
+/* the rail is a progress bar you can press: one bar per step, the current one filled */
+.wl-g-rail { display: flex; gap: 6px; padding: 2px 0; }
+.wl-g-dot { width: 34px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: var(--wl-line); cursor: pointer; }
+.wl-g-dot:hover { background: #b9c2cc; }
+.wl-g-dot.is-done { background: #9fd0d8; }
+.wl-g-dot.is-on { background: var(--wl-accent); }
+
+.wl-g-card { display: flex; flex-direction: column; gap: 6px; padding: 11px 12px;
+  background: var(--wl-pane); border: 1px solid var(--wl-line); border-radius: 12px; }
+.wl-g-kick { font-size: .72rem; font-weight: 600; color: var(--wl-accent); letter-spacing: .02em; }
+.wl-g-ctitle { margin: 0; font-size: .95rem; font-weight: 700; line-height: 1.35; }
+.wl-g-cbody { margin: 0; font-size: .86rem; line-height: 1.6; }
+
+.wl-g-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wl-g-demo { font: inherit; font-size: .85rem; font-weight: 600; padding: 8px 14px; min-height: 36px; border: 0;
+  border-radius: 999px; background: var(--wl-accent); color: var(--wl-accent-ink); cursor: pointer; }
+.wl-g-demo:hover { filter: brightness(1.12); }
+.wl-g-demo:disabled { opacity: .6; cursor: default; }
+.wl-g-note { font-size: .76rem; color: var(--wl-muted); }
+.wl-g-note.is-bad { color: #b23c17; }
+
+.wl-g-pager { display: flex; gap: 8px; }
+.wl-g-pager .wl-btn { flex: 1 1 0; justify-content: center; }
+.wl-g-next { font-weight: 600; }
+
+/* while a demonstration holds the canvas: a bar that says so, and the way back */
+.wl-g-foot { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  background: var(--wl-q); border-top: 1px solid #f2dca6; }
+.wl-g-foot[hidden] { display: none; }
+.wl-g-foot-label { margin-right: auto; font-size: .74rem; color: #7a5b12; }
+
+/* the pointer a step that is not about blocks gets: a ring round the region, named */
+.wl-point { position: fixed; z-index: 2147482000; pointer-events: none; border: 3px solid #ffb000; border-radius: 10px;
+  animation: wl-point 1.2s ease-in-out infinite; }
+.wl-point-label { position: absolute; left: 0; padding: 2px 8px; border-radius: 999px; background: #ffb000; color: #3b2a00;
+  font: 700 12px/1.6 system-ui, -apple-system, "PingFang HK", "Noto Sans TC", sans-serif; white-space: nowrap; }
+@keyframes wl-point {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 176, 0, .25), 0 0 0 9999px rgba(15, 23, 42, .08); }
+  50% { box-shadow: 0 0 0 9px rgba(255, 176, 0, .13), 0 0 0 9999px rgba(15, 23, 42, .08); }
+}
+
 /* ---- narrower than the editor + pane (iPad landscape 1024, small laptops): the pane slides over from the right ---- */
 @media (max-width: 1279px) {
   #wl-app { grid-template-columns: minmax(0, 1fr); }
@@ -167,4 +259,4 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
   body.wl-chat-open .wl-fab { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } .wl-point { animation: none; } }

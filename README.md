@@ -55,7 +55,20 @@ cd test
 python3 e2e.py              # End-to-end tests
 python3 dual_e2e.py         # Dual mode tests
 python3 module_matrix.py    # Module isolation
+
+npm run check:guide         # The guide's topics, opcodes and words line up
 ```
+
+`check:guide` reads `src/studio-guide-topics.js` as data and checks it against the
+rest of the repo before any browser is involved: unique topic/step ids, every
+opcode present in the editor's block list, every `@sprite` and every `{ k: ... }`
+word resolvable, every `focus` pointing at a region the driver knows, and the
+three locale files carrying the same key set. Editing a topic is the common way
+to break the guide, and this catches it without a page load.
+
+Two pages exist for looking at the pane by hand: `src/_i18n-check.html` walks the
+shell in all three languages and ends with `ALL PASS`, `src/_i18n-layout.html`
+measures the header for overflow and clipping.
 
 ## Attribution
 

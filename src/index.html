@@ -58,6 +58,9 @@
 <script src="ucmake-blocks.js"></script>
 <script src="studio-anim.js"></script>
 <script src="studio-chat.js"></script>
+<script src="studio-guide.js"></script>
+<script src="studio-guide-topics.js"></script>
+<script src="studio-guide-drive.js"></script>
 <script src="studio-models.js"></script>
 <script src="studio-core.js"></script>
 <script src="studio-assist.js"></script>
@@ -87,16 +90,34 @@
   var verPane = $('wl-pane-ver');
   var aboutPane = $('wl-pane-about');
 
+  /* The guide's two halves: the driver touches the editor, the pane does not. Both are created after
+     the editor exists — the driver reaches for WLStudio.vm on every call, and the guide only needs
+     to know whether the editor is ready — so they are declared here and filled in below. */
+  var drive = null, guide = null;
+
   var chat = StudioChat.create({
     mount: '#wl-chat',
     i18n: I,
     badgeKey: 'chat.source.stub',
+    tabs: [
+      { id: 'chat', labelKey: 'chat.tab.chat' },
+      { id: 'guide', labelKey: 'chat.tab.guide' }
+    ],
     menu: [
       { id: 'versions', labelKey: 'chat.menu.versions' },
       { id: 'about', labelKey: 'chat.menu.about' },
       { id: 'export', labelKey: 'chat.sheet.export' }
     ],
     onSend: function (t) { return S.send(t).then(function () { showCtx(); }); },
+    /* A demonstration is a place you are, not a layer over your work: going back to the conversation
+       gives the canvas back, so the AI never edits a stage the student did not build. */
+    onTab: function (from, to) {
+      if (from === 'guide' && to === 'chat' && drive && drive.isActive()) {
+        drive.restore().then(function () { if (guide) guide.sync(); showCtx(); });
+      }
+      // the footer ("a demonstration is using the canvas") is painted from the driver's state
+      if (to === 'guide' && guide) guide.sync();
+    },
     /* Restoring a version is a project load, so the context line has to be recomputed when it
        finishes - reading it straight after the call reports the program we are leaving behind. */
     onUndo: function () {
@@ -109,7 +130,7 @@
       else if (id === 'about') chat.openSheet('chat.menu.about', aboutPane);
       else if (id === 'export') S.exportVersions();
     },
-    onClose: function () { setOpen(false); }
+    onClose: function () { if (drive && drive.isActive()) drive.restore(); setOpen(false); }
   });
   chat.bindOutside();
 
@@ -171,8 +192,26 @@
     onLoaded: function () {
       showCtx();
       chat.bot(T('chat.greeting'));
+      // the guide was painted before the editor existed: its 示範 buttons said "still loading"
+      if (guide) guide.refresh();
     }
   });
+
+  /* ---- the guide ----
+     Two modules, one tab. The driver performs a step on the editor; the guide navigates and waits.
+     Neither is created inside StudioApp: the shell mounts an editor and has never heard of a guide,
+     which is what lets a lesson page mount the same editor without one. */
+  drive = StudioGuideDrive.create({ i18n: I });
+  guide = StudioGuide.create({
+    i18n: I,
+    topics: StudioGuideTopics,
+    run: function (step, onProgress, topic) { return drive.run(step, onProgress, topic); },
+    stop: function () { drive.stop(); chat.closeSheet(); },
+    restore: function () { return drive.restore(); },
+    isActive: function () { return drive.isActive(); },
+    canRun: function () { return !!(S && S.ready); }
+  });
+  chat.addView('guide', guide.el);
 
   function showCtx() {
     /* The language subscription can fire before the editor has booted (boot() runs after this is
@@ -192,6 +231,9 @@
    */
   I.on(function (code) {
     showCtx();
+    /* a language change remounts the gui's chrome: stop whatever a demonstration has moving first,
+       rather than letting the pointer chase a workspace that is being rebuilt underneath it */
+    if (drive && drive.busy()) drive.stop();
     if (!S.setLocale(editorLocale(code))) chat.sys(T('chat.editorLocaleFailed'));
   });
 

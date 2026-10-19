@@ -19,6 +19,8 @@
  * - The composer: an auto-growing input, one accessory slot (the model pill lives there), one
  *   secondary action (上一步) and one primary action (送出).
  * - An overflow menu and an overlay sheet, so 版本 / 說明 cost nothing until asked for.
+ * - A tab strip, when the caller has a second place to be (the guide). The pane owns the tabs and
+ *   the switching; what sits behind the other tab is handed in as a node and is none of its business.
  * - Every word it renders. Since it owns the words, it also owns re-rendering them when the
  *   language changes: pass `i18n` (StudioI18n), and the pane re-labels itself in place — the
  *   conversation stays, which is the point of switching language mid-lesson rather than reloading.
@@ -33,10 +35,14 @@
  *     i18n: StudioI18n,                     // optional: without it the pane renders keys
  *     chips: ['chat.chips'],                // or a literal array of strings
  *     menu: [{ id: 'versions', labelKey: 'chat.menu.versions' }],
+ *     tabs: [{ id: 'chat', labelKey: 'chat.tab.chat' }, { id: 'guide', labelKey: 'chat.tab.guide' }],
+ *     onTab: function (from, to) {},
  *     onSend: function (text) { return assist.send(text); },
  *     onMenu: function (id) {},
  *     onUndo: function () {}
  *   });
+ *   chat.addView('guide', guideNode);     // the second tab's content
+ *   chat.show('guide');
  *   chat.bot(t('chat.greeting'));
  *   chat.thinking('<think>…');      // R1: opens the 思考中 state
  *   chat.bot('…');                  // resolves it in place
@@ -157,6 +163,50 @@
     menuBox.setAttribute('role', 'menu');
     menuBox.hidden = true;
     shell.appendChild(head);
+
+    /* ---------- tabs: one pane, more than one place to be ----------
+       Two tabs, not a new window: the guide is the same companion in another mode, and the editor it
+       talks about is behind both. The strip is the pane's, the content behind the second tab is the
+       caller's (addView), which is how the guide can grow without this file learning what a guide is. */
+    var tabs = cfg.tabs && cfg.tabs.length > 1 ? cfg.tabs : null;
+    var tabBar = null, tabBtns = [];
+    var viewsBox = h('div', 'wl-views');
+    var views = {};                       // id -> { el, btn }
+    var viewId = tabs ? tabs[0].id : 'chat';
+
+    if (tabs) {
+      shell.classList.add('has-tabs');
+      tabBar = h('div', 'wl-tabs');
+      tabBar.setAttribute('role', 'tablist');
+      tabBar.setAttribute('aria-label', T('chat.tabs'));
+      tabs.forEach(function (t, i) {
+        var b = h('button', 'wl-tab' + (i === 0 ? ' is-on' : ''));
+        b.type = 'button';
+        b.id = 'wl-tab-' + uidn + '-' + t.id;
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', String(i === 0));
+        b.tabIndex = i === 0 ? 0 : -1;
+        var label = h('span', 'wl-tab-label', t.labelKey ? T(t.labelKey) : t.label);
+        b.appendChild(label);
+        b.addEventListener('click', function () { show(t.id); });
+        tabBar.appendChild(b);
+        tabBtns.push({ id: t.id, node: b, label: label, key: t.labelKey || null, text: t.label });
+      });
+      // arrow keys move between tabs, as a tablist is expected to: Enter/Space come free with <button>
+      tabBar.addEventListener('keydown', function (e) {
+        var i = tabBtns.map(function (t) { return t.id; }).indexOf(viewId);
+        var next = -1;
+        if (e.key === 'ArrowRight') next = (i + 1) % tabBtns.length;
+        else if (e.key === 'ArrowLeft') next = (i - 1 + tabBtns.length) % tabBtns.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = tabBtns.length - 1;
+        if (next < 0) return;
+        e.preventDefault();
+        show(tabBtns[next].id);
+        tabBtns[next].node.focus();
+      });
+      shell.appendChild(tabBar);
+    }
 
     // Only a pane that can be dismissed gets a dismiss button (the lesson page never offers one).
     var closeBtn = null;
@@ -302,7 +352,7 @@
       chipsOn = true;
       body.appendChild(empty);
     }
-    shell.appendChild(body);
+    // not appended to the shell yet: it goes inside the first view, below.
 
     /* ---------- composer: one input, one accessory slot, one primary action ---------- */
     var comp = h('div', 'wl-composer');
@@ -340,7 +390,25 @@
     sendBtn.appendChild(ic(ICON_SEND));
     row.appendChild(sendBtn);
     comp.appendChild(row);
-    shell.appendChild(comp);
+
+    /* The conversation lives in the first view. With no tabs there is exactly one view and it is the
+       pane - same DOM as before, one wrapper deeper, which is why the stylesheet's sizing rules are
+       stated on .wl-view rather than on the shell's children.
+       The view is keyed by the caller's first tab id, not by a literal 'chat': a caller is free to
+       name its first tab whatever it likes, and a mismatch here would open a second, empty panel. */
+    var chatId = tabs ? tabs[0].id : 'chat';
+    var chatView = h('div', 'wl-view is-on');
+    chatView.appendChild(body);
+    chatView.appendChild(comp);
+    if (tabs) {
+      chatView.id = 'wl-view-' + uidn + '-' + chatId;
+      chatView.setAttribute('role', 'tabpanel');
+      chatView.setAttribute('aria-labelledby', 'wl-tab-' + uidn + '-' + chatId);
+      tabBtns[0].node.setAttribute('aria-controls', chatView.id);
+    }
+    views[chatId] = { el: chatView, btn: tabBtns.length ? tabBtns[0].node : null };
+    viewsBox.appendChild(chatView);
+    shell.appendChild(viewsBox);
 
     /* ---------- the overlay sheet: 版本 / 說明, paid for only when opened ---------- */
     var sheet = h('div', 'wl-sheet');
@@ -358,6 +426,54 @@
     }
 
     if (cfg.mount) mountInto(cfg.mount);
+
+    /* ---------- switching ---------- */
+    /**
+     * Which tab is showing. `onTab(from, to)` is the caller's chance to tidy up what it put behind the
+     * tab it is leaving - the guide ends its demonstration on the way back to the conversation, and
+     * that decision does not belong here.
+     */
+    function show(id) {
+      if (!tabs || !views[id]) return false;
+      var from = viewId;
+      viewId = id;
+      Object.keys(views).forEach(function (k) {
+        views[k].el.className = 'wl-view' + (k === id ? ' is-on' : '');
+      });
+      tabBtns.forEach(function (t) {
+        var on = t.id === id;
+        t.node.className = 'wl-tab' + (on ? ' is-on' : '');
+        t.node.setAttribute('aria-selected', String(on));
+        t.node.tabIndex = on ? 0 : -1;
+      });
+      closeMenu();
+      closeLang();
+      if (from !== id && typeof cfg.onTab === 'function') {
+        try { cfg.onTab(from, id); } catch (e) { if (root.console) root.console.error('[chat] onTab failed:', e); }
+      }
+      return true;
+    }
+
+    /** Put a node behind a tab. Called after create, because the content is the caller's. */
+    function addView(id, node) {
+      if (!id) return null;
+      var v = views[id];
+      if (!v) {
+        v = views[id] = { el: h('div', 'wl-view'), btn: null };
+        v.el.setAttribute('role', 'tabpanel');
+        v.el.id = 'wl-view-' + uidn + '-' + id;
+        viewsBox.appendChild(v.el);
+      }
+      var hit = tabBtns.filter(function (t) { return t.id === id; })[0];
+      if (hit) {
+        v.btn = hit.node;
+        hit.node.setAttribute('aria-controls', v.el.id);
+        v.el.setAttribute('aria-labelledby', hit.node.id);
+      } else v.el.setAttribute('aria-label', id);
+      while (v.el.firstChild) v.el.removeChild(v.el.firstChild);
+      if (node) v.el.appendChild(node);
+      return v.el;
+    }
 
     function closeSheet() { sheet.hidden = true; }
     function openSheet(title, node) {
@@ -487,6 +603,10 @@
       menuItems.forEach(function (it) {
         if (it.key) it.label.textContent = T(it.key);
       });
+      if (tabBar) {
+        tabBar.setAttribute('aria-label', T('chat.tabs'));
+        tabBtns.forEach(function (t) { if (t.key) t.label.textContent = T(t.key); });
+      }
       if (langGroup) {
         langGroup.setAttribute('aria-label', T('chat.language'));
         markLang();
@@ -590,6 +710,11 @@
       focus: function () { input.focus(); },
       closeMenu: closeMenu,
       refresh: refresh,
+
+      /** the second (or third) place to be: content behind a tab, and moving between tabs */
+      addView: addView,
+      show: show,
+      view: function () { return viewId; },
 
       mount: mountInto,
 

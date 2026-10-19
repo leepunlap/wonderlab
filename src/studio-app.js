@@ -538,6 +538,37 @@
     S.targetsInfo = function () { return assist ? assist.targetsInfo() : []; };
     S.snapshot = function () { return lastProgram(); };
 
+    /** The program model, for a module that drives the editor itself rather than asking the AI to. */
+    S.ops = function () { return ops; };
+
+    /**
+     * A project with no blocks: the default stage and as many sprites as the caller names.
+     *
+     * The guide's demonstrations are built on this, for two reasons. A demonstration must not be able
+     * to inherit whatever a student left on the canvas, and it needs sprites it can address by name.
+     * Costumes come from the two seeded vector assets, so a demo costs no network and works offline.
+     *
+     *   spec.sprites = [{ name, x, y, size, costume: 0 | 1 }]
+     */
+    S.blankProject = function (spec) {
+      spec = spec || {};
+      var base = defaultProject(cfg.locale || LOCALE);
+      var stage = base.targets[0], tpl = base.targets[1];
+      var list = (spec.sprites && spec.sprites.length) ? spec.sprites : [{ name: tpl.name }];
+      base.targets = [stage].concat(list.map(function (s, i) {
+        var t = JSON.parse(JSON.stringify(tpl));
+        t.name = String(s.name || tpl.name);
+        t.x = +s.x || 0;
+        t.y = +s.y || 0;
+        t.size = s.size == null ? 100 : +s.size;
+        // the second seeded sprite is a different drawing, not a different asset id
+        if (+s.costume) t.costumes = [t.costumes[1], t.costumes[0]];
+        t.layerOrder = i + 1;
+        return t;
+      }));
+      return base;
+    };
+
     // ---------------------------------------------------------------- the lesson surface
     // Behaviours the lesson page calls that the shell had no equivalent for. Listed as gaps in
     // docs/PORT-TO-PRODUCTION.md; the library and session state are still open, these are not.

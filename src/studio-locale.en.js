@@ -18,6 +18,9 @@
     'app.editorLabel': 'Block editor',
 
     'chat.title': 'AI Companion',
+    'chat.tabs': 'Companion tabs',
+    'chat.tab.chat': 'Chat',
+    'chat.tab.guide': 'Guide',
     /* Shorter than the Chinese on purpose: "Prototype · simulated replies" is ~165px in a 44px
        header that also carries a version chip and two buttons at 360px. The detail belongs in the
        About sheet, not in a badge. */
@@ -58,6 +61,68 @@
     'chat.source.stub': 'Prototype',
     'chat.source.model': 'Live model',
     'chat.bootFailed': 'The editor did not load',
+
+    /* ---- Guide: the second tab (see studio-guide-topics.js for the structure) ---- */
+    'guide.intro': 'Four short topics, one step at a time. Most steps have a “Show me” button that makes the editor do it in front of you. A demonstration borrows the canvas for a moment; “Back to my project” puts your work back.',
+    'guide.stepCount': '{n} steps',
+    'guide.back': 'All topics',
+    'guide.steps': 'Steps',
+    'guide.stepN': 'Step {n}',
+    'guide.stepOf': 'Step {n} of {total}',
+    'guide.demo': 'Show me',
+    'guide.replay': 'Show me again',
+    'guide.running': 'Showing…',
+    'guide.starting': 'Getting ready…',
+    'guide.progress': 'Step {done} of {total}',
+    'guide.failed': 'This one could not be shown.',
+    'guide.notReady': 'The editor is still loading — one moment.',
+    'guide.practice': 'Do it once yourself — that is what makes it stick.',
+    'guide.prev': 'Back',
+    'guide.next': 'Next',
+    'guide.nextTopic': 'Next topic',
+    'guide.demoHolding': 'A demonstration is using the canvas',
+    'guide.stop': 'Stop',
+    'guide.restore': 'Back to my project',
+
+    'guide.point.flag': 'Green flag',
+    'guide.point.stage': 'Stage',
+    'guide.point.sprites': 'Sprites',
+    'guide.point.palette': 'Blocks',
+
+    'guide.sprite.pico': 'Pico',
+    'guide.sprite.lumo': 'Lumo',
+    'guide.say.hello': 'Hello!',
+    'guide.say.hi': 'You clicked me!',
+
+    'guide.motion.title': 'Make it move',
+    'guide.motion.intro': 'Start with the smallest program there is: press the green flag and the sprite moves. Three steps later it walks by itself and bounces off the edges.',
+    'guide.motion.a1.title': 'The green flag, and “move”',
+    'guide.motion.a1.body': 'Stack “when green flag clicked” with “move 10 steps” and you already have a program. Press the flag: the sprite takes one small step forward.',
+    'guide.motion.a2.title': '“Forever” makes it keep going',
+    'guide.motion.a2.body': 'Once is not enough. Wrap the move in “forever” and whatever is inside repeats until you press stop.',
+    'guide.motion.a3.title': 'Bounce off the edge',
+    'guide.motion.a3.body': 'Add “if on edge, bounce” inside the loop and the sprite stops walking off the stage.',
+
+    'guide.keys.title': 'Control it from the keyboard',
+    'guide.keys.intro': 'The green flag is not the only way to start a script. Two steps about keys and clicks.',
+    'guide.keys.k1.title': 'Arrow keys, left and right',
+    'guide.keys.k1.body': 'Two scripts: one listens for the right arrow, one for the left. After the demonstration, try the keys yourself.',
+    'guide.keys.k2.title': 'Click the sprite',
+    'guide.keys.k2.body': '“When this sprite clicked” is another way in. Once it is built, click the sprite on the stage and it speaks.',
+
+    'guide.looks.title': 'Talking, costumes and size',
+    'guide.looks.intro': 'A sprite does more than move: it can talk, change costume, and grow or shrink.',
+    'guide.looks.l1.title': 'Let it talk',
+    'guide.looks.l1.body': '“Say … for 2 seconds” puts a speech bubble beside the sprite, then takes it away again.',
+    'guide.looks.l2.title': 'Costume and size',
+    'guide.looks.l2.body': 'Put “next costume” and “change size” inside “repeat 4” and the sprite changes as it grows.',
+
+    'guide.actors.title': 'Sprites and the stage',
+    'guide.actors.intro': 'One stage can hold several sprites, each with its own scripts.',
+    'guide.actors.t1.title': 'Add a second sprite',
+    'guide.actors.t1.body': 'Sprites are added from the sprite pane on the right. This demonstration puts two on the stage: Pico on the left, Lumo on the right.',
+    'guide.actors.t2.title': 'Two sprites, each doing its own thing',
+    'guide.actors.t2.body': 'Whichever sprite is selected owns the blocks you can see. This script belongs to Lumo alone: it turns as it moves.',
 
     'chat.ctx.prefix': 'Sent with: ',
     'chat.ctx.program': 'your program: {scripts} scripts, {blocks} blocks',

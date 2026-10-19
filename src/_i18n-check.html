@@ -9,6 +9,8 @@
 <script src="studio-locale.zh-Hans.js"></script>
 <script src="studio-locale.en.js"></script>
 <script src="studio-chat.js"></script>
+<script src="studio-guide.js"></script>
+<script src="studio-guide-topics.js"></script>
 <script src="studio-models.js"></script>
 <script>
 (function () {
@@ -30,16 +32,28 @@
   var sent = null;
   var chat = StudioChat.create({
     mount: '#pane', i18n: I, badgeKey: 'chat.source.stub',
+    tabs: [{ id: 'chat', labelKey: 'chat.tab.chat' }, { id: 'guide', labelKey: 'chat.tab.guide' }],
     menu: [{ id: 'about', labelKey: 'chat.menu.about' }, { id: 'export', labelKey: 'chat.sheet.export' }],
     onSend: function (t) { sent = t; }, onMenu: function () {}, onUndo: function () {}
   });
+  /* The guide is the pane's second tab: created here so the words it renders are checked in all
+     three languages too, not just the conversation's. Nothing is ever run - run() is a stub. */
+  var guide = StudioGuide.create({
+    i18n: I, topics: StudioGuideTopics,
+    run: function () { return Promise.resolve(true); }, stop: function () {}, restore: function () { return Promise.resolve(false); },
+    isActive: function () { return false; }
+  });
+  chat.addView('guide', guide.el);
   var m = StudioModels.create({ api: '/api/ai/status/studio', i18n: I });
   chat.setAccessory(m.el);
 
   var CASES = [
-    { id: 'zh-Hant', title: 'AI 學伴', send: '送出', chip: '我想角色移動', menu: '說明', quota: '剩 8 / 10', desc: '快速回應，適合一般對話', undo: '上一步', ver: '版本 3', short: '繁' },
-    { id: 'zh-Hans', title: 'AI 学伴', send: '发送', chip: '我想让角色移动', menu: '说明', quota: '剩 8 / 10', desc: '快速响应，适合一般对话', undo: '撤销', ver: '版本 3', short: '简' },
-    { id: 'en', title: 'AI Companion', send: 'Send', chip: 'Make the sprite move', menu: 'About', quota: '8 / 10 left', desc: 'Fast replies, fine for most turns', undo: 'Undo', ver: 'Version 3', short: 'EN' }
+    { id: 'zh-Hant', title: 'AI 學伴', send: '送出', chip: '我想角色移動', menu: '說明', quota: '剩 8 / 10', desc: '快速回應，適合一般對話', undo: '上一步', ver: '版本 3', short: '繁',
+      tabChat: '對話', tabGuide: '指南', topic0: '動起來', step0: '綠旗與「移動」', demo: '示範' },
+    { id: 'zh-Hans', title: 'AI 学伴', send: '发送', chip: '我想让角色移动', menu: '说明', quota: '剩 8 / 10', desc: '快速响应，适合一般对话', undo: '撤销', ver: '版本 3', short: '简',
+      tabChat: '对话', tabGuide: '指南', topic0: '动起来', step0: '绿旗与「移动」', demo: '示范' },
+    { id: 'en', title: 'AI Companion', send: 'Send', chip: 'Make the sprite move', menu: 'About', quota: '8 / 10 left', desc: 'Fast replies, fine for most turns', undo: 'Undo', ver: 'Version 3', short: 'EN',
+      tabChat: 'Chat', tabGuide: 'Guide', topic0: 'Make it move', step0: 'The green flag, and “move”', demo: 'Show me' }
   ];
 
   function walk(c) {
@@ -71,10 +85,24 @@
     document.body.click();
     // no key leaks, and English contains no Chinese anywhere in the pane except the language
     // buttons themselves - those are meant to stay in their own script.
+    // the second tab: two tabs, the guide's own words, and no key leaking through either
+    eq(c.id + ' tab chat', pane().querySelectorAll('.wl-tab')[0].textContent, c.tabChat);
+    eq(c.id + ' tab guide', pane().querySelectorAll('.wl-tab')[1].textContent, c.tabGuide);
+    chat.show('guide');
+    // the guide keeps its place across a language change, so rewind to the index before reading it
+    var gback = pane().querySelector('.wl-g-back');
+    if (gback) gback.click();
+    eq(c.id + ' guide topic[0]', pane().querySelectorAll('.wl-g-ttitle')[0].textContent, c.topic0);
+    pane().querySelectorAll('.wl-g-topic')[0].click();
+    eq(c.id + ' guide step[0]', pane().querySelector('.wl-g-ctitle').textContent, c.step0);
+    eq(c.id + ' guide demo button', pane().querySelector('.wl-g-demo').textContent, c.demo);
+    chat.show('chat');
+    eq(c.id + ' chat view is back', pane().querySelector('.wl-chat-body').offsetParent !== null, true);
+
     var langBox = pane().querySelector('.wl-lang');
     var langText = langBox ? langBox.textContent : '';
     var all = (pane().textContent || '').replace(langText, '');
-    log(c.id + ' key leak', /(chat|models|assist)\.[a-zA-Z]/.test(all) ? 'LEAK' : 'none');
+    log(c.id + ' key leak', /(chat|models|assist|guide)\.[a-zA-Z]/.test(all) ? 'LEAK' : 'none');
     if (c.id === 'en') {
       var cj = all.match(/[\u3400-\u9FFF]+/g);
       log('en CJK residue', cj && cj.length ? JSON.stringify(cj.slice(0, 8)) : 'none');
