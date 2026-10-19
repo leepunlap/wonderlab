@@ -48,6 +48,7 @@
 
     var saved = null;        // the student's session, held while a demonstration is on the canvas
     var loadedTopic = null;  // which topic's stage is on the canvas
+    var lastIndex = -1;      // the step last performed in that topic, so a repeat knows to rewind
     var names = {};          // '@pico' -> the sprite name this demonstration used
     var pointEl = null;      // the current spotlight
     var pointTimer = null;
@@ -181,6 +182,31 @@
       });
     }
 
+    /**
+     * Put an earlier step's outcome back, without animating it.
+     *
+     * Replaying step three has to start where step three started, which is: a clean stage with steps
+     * one and two already built. Rebuilding those the short way is the whole point — the student has
+     * seen them built once, and watching them again would make "再看一次" a rewind of the topic rather
+     * than of the step.
+     */
+    function applyPrefix(earlier) {
+      var vm = VM(), ops = OPS();
+      if (!vm || !ops) return Promise.resolve();
+      var scripts = [];
+      (earlier || []).forEach(function (st) {
+        ((st && st.demo && st.demo.scripts) || []).forEach(function (s) {
+          scripts.push({ sprite: s.sprite, id: s.id, blocks: (s.blocks || []).map(resolveBlock) });
+        });
+      });
+      if (!scripts.length) return Promise.resolve();
+      var before = JSON.parse(JSON.stringify(ops.snapshot(vm).program));
+      // a prefix that cannot be rebuilt must not take the step itself down with it
+      return applyInstant(setScripts(before, scripts)).then(noop, function (e) {
+        if (root.console) console.info('[guide] could not rebuild the earlier steps:', e && e.message);
+      });
+    }
+
     function build(scripts, opts) {
       var vm = VM(), ops = OPS();
       if (!vm || !ops) return Promise.reject(new Error('guide: the editor is not ready'));
@@ -257,21 +283,31 @@
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}
 
       var topicId = topic && topic.id || 'default';
+      var steps = (topic && topic.steps) || [];
+      var idx = steps.indexOf(step);
       var fresh = saved === null || loadedTopic !== topicId;
+      /* Pressing 示範 again on the step you are looking at, or going back to an earlier one, starts
+         that step from its own beginning: a clean stage carrying only the steps before it. Moving
+         forward does not reload anything, so a step that inserts a block inserts it into the stack
+         the student has just watched being built. */
+      var rewind = !fresh && idx >= 0 && lastIndex >= 0 && idx <= lastIndex;
       var resolved = [];
 
+      // hold the student's session before the first thing that overwrites it, once per demonstration
+      if (saved === null) {
+        try { saved = S().state(); } catch (e) { saved = null; }
+      }
+
       var prep = Promise.resolve();
-      if (fresh) {
-        // hold the student's session before the first thing that overwrites it, once per demonstration
-        if (saved === null) {
-          try { saved = S().state(); } catch (e) { saved = null; }
-        }
-        names = {};
+      if (fresh || rewind) {
+        if (fresh) names = {};
         try { vm.stopAll(); } catch (e) {}
         prep = S().loadState({ project: projectOf(demo.project) }).then(function (ok) {
           if (ok === false) throw new Error('guide: could not load the demonstration stage');
           loadedTopic = topicId;
           return wait(120);   // let the gui finish swapping the workspace before it is dragged in
+        }).then(function () {
+          if (rewind) return applyPrefix(steps.slice(0, idx));
         });
       }
 
@@ -309,6 +345,8 @@
         });
       }).then(function (ok) {
         running = null;
+        // where the stage is now, so the next press knows whether it is moving on or going back
+        if (ok !== false) lastIndex = idx;
         return ok;
       }, function (e) {
         running = null;
@@ -330,6 +368,7 @@
     /** Give the canvas back. The one call that undoes a demonstration, and the only way out of one. */
     function restore() {
       stop();
+      lastIndex = -1;
       if (!saved) { loadedTopic = null; return Promise.resolve(false); }
       var state = saved;
       saved = null;
