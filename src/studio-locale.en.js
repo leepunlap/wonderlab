@@ -73,6 +73,8 @@
     'guide.replay': 'Show me again',
     'guide.running': 'Showing…',
     'guide.starting': 'Getting ready…',
+    'guide.narrating': 'Explaining…',
+    'guide.showing': 'Doing it…',
     'guide.progress': 'Step {done} of {total}',
     'guide.failed': 'This one could not be shown.',
     'guide.notReady': 'The editor is still loading — one moment.',
@@ -84,6 +86,12 @@
     'guide.stop': 'Stop',
     'guide.restore': 'Back to my project',
     'guide.voice': 'Narrate',
+
+    /* the three shapes the guide draws while it talks: click it, drag it, type in it */
+    'guide.act.click': 'Click here',
+    'guide.act.drag': 'Drag it over',
+    'guide.act.type': 'Change this number',
+    'guide.act.watch': 'Watch the stage',
 
     'guide.point.flag': 'Green flag',
     'guide.point.stage': 'Stage',

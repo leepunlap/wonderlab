@@ -15,10 +15,18 @@
  * first demonstration saves the whole session (S.state(): project, assets, script ids) and every
  * exit — 返回我的作品, leaving the tab, changing language — puts it back exactly.
  *
+ * A STEP HAS TWO MOMENTS, AND THEY ARE NOT THE SAME MOMENT
+ * `prepare` puts the stage in the state the step starts from — the student's project held, a clean
+ * stage loaded, the earlier steps of the topic rebuilt if this one is being repeated. `perform` is the
+ * build and the running of it. Between them the guide says what is about to happen; that is why they
+ * are two verbs and not one, and why `run` (prepare then perform, with nothing in between) still
+ * exists for a caller that has nothing to say.
+ *
  * WHAT IT DOES NOT OWN
- * Navigation and wording: those are studio-guide.js's and the locale files'. This file has one
- * exported verb per thing the pane can ask for, and never builds a DOM node the student reads,
- * except the pointer's label.
+ * Navigation and wording: those are studio-guide.js's and the locale files'. Nor the shapes themselves:
+ * `explain` hands the step's annotations to studio-guide-marks.js, which knows where the palette is.
+ * This file has one exported verb per thing the pane can ask for, and builds no DOM node the student
+ * reads, except the pointer's label.
  *
  * ES5, like the rest of the studio's own code: this ships to old browsers.
  */
@@ -43,6 +51,7 @@
 
     var studio = cfg.studio || function () { return root.WLStudio; };
     var anim = cfg.anim || function () { return root.WLAnim; };
+    var marks = cfg.marks || function () { return null; };
     var i18n = cfg.i18n || (root.StudioI18n && typeof root.StudioI18n.t === 'function' ? root.StudioI18n : null);
     function T(key, params) { return i18n ? i18n.t(key, params) : key; }
 
@@ -52,7 +61,6 @@
     var names = {};          // '@pico' -> the sprite name this demonstration used
     var pointEl = null;      // the current spotlight
     var pointTimer = null;
-    var running = null;      // the promise of the demonstration in flight
 
     function S() { return studio(); }
     function OPS() { var s = S(); return s && s.ops ? s.ops() : null; }
@@ -267,12 +275,38 @@
     }
 
     /* ---------- the public verbs ---------- */
+    var take = 0;        // bumped by stop(): a prepared step that nobody wants any more
+    var prepared = null; // { step, demo, scripts, idx, token }
+    var busyNow = false; // preparing, being explained, or being performed
+
+    /** The marks a step asks for, in one of its two moments: while it is said, or once it is built. */
+    function marksFor(step, when) {
+      var list = (step && step.demo && step.demo.annotate) || [];
+      return list.filter(function (m) { return (m && (m.when || 'say')) === when; });
+    }
+
+    function clearMarks() {
+      var m = marks();
+      if (m) m.clear();
+    }
+
     /**
-     * Perform one step. Resolves true when the editor ended up in the state the step describes;
-     * false when it could not, which the guide shows as a plain "this one did not work" rather than
-     * a silent no-op.
+     * Point at what the step is about to say. Called once the stage is in place, so the shapes ring
+     * what is actually on the screen rather than where it was a moment ago.
      */
-    function run(step, onProgress, topic) {
+    function explain(step) {
+      var m = marks();
+      if (!m) return;
+      var list = marksFor(step, 'say');
+      if (!list.length) { m.clear(); return; }
+      m.draw(list);
+    }
+
+    /**
+     * Put the canvas in the state the step starts from, and say nothing. Resolves true when the stage
+     * is ready for its blocks; false when there is no editor to prepare.
+     */
+    function prepare(step, topic) {
       var demo = step && step.demo;
       if (!demo) return Promise.resolve(true);
       var vm = VM(), ops = OPS();
@@ -280,6 +314,7 @@
       if (S().isLoading && S().isLoading()) return Promise.resolve(false);
 
       clearPoint();
+      clearMarks();
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}
 
       var topicId = topic && topic.id || 'default';
@@ -291,12 +326,13 @@
          forward does not reload anything, so a step that inserts a block inserts it into the stack
          the student has just watched being built. */
       var rewind = !fresh && idx >= 0 && lastIndex >= 0 && idx <= lastIndex;
-      var resolved = [];
+      var token = ++take;
 
       // hold the student's session before the first thing that overwrites it, once per demonstration
       if (saved === null) {
         try { saved = S().state(); } catch (e) { saved = null; }
       }
+      busyNow = true;
 
       var prep = Promise.resolve();
       if (fresh || rewind) {
@@ -311,16 +347,43 @@
         });
       }
 
-      running = prep.then(function () {
-        resolved = (demo.scripts || []).map(function (s) {
-          return { sprite: s.sprite, id: s.id, blocks: (s.blocks || []).map(resolveBlock) };
-        });
-        if (!resolved.length) return { ok: true };
-        return build(resolved, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress });
-      }).then(function (res) {
+      return prep.then(function () {
+        prepared = {
+          step: step, demo: demo, idx: idx, token: token,
+          scripts: (demo.scripts || []).map(function (s) {
+            return { sprite: s.sprite, id: s.id, blocks: (s.blocks || []).map(resolveBlock) };
+          })
+        };
+        return true;
+      }, function (e) {
+        busyNow = false;
+        throw e;
+      });
+    }
+
+    /**
+     * Do the step that was prepared: the blocks, then the running of them. Resolves true when the
+     * editor ended up in the state the step describes; false when it could not, which the guide shows
+     * as a plain "this one did not work" rather than a silent no-op.
+     */
+    function perform(onProgress) {
+      var st = prepared;
+      prepared = null;
+      if (!st || st.token !== take) { busyNow = false; return Promise.resolve(false); }
+      var demo = st.demo, scripts = st.scripts, vm = VM(), ops = OPS();
+      if (!vm || !ops) { busyNow = false; return Promise.resolve(false); }
+
+      // the words are finished; from here the animation is the pointer
+      clearMarks();
+
+      var chain = scripts.length
+        ? build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress })
+        : Promise.resolve({ ok: true });
+
+      return chain.then(function (res) {
         if (!res || res.ok === false) return false;
 
-        if (!resolved.length) {
+        if (!scripts.length) {
           if (demo.focus) { var f = ops.targetByName(vm, spriteName(demo.focus)); if (f) { try { vm.setEditingTarget(f.id); } catch (e) {} } }
           if (demo.point) point(demo.point);
           return true;
@@ -330,8 +393,15 @@
         if (target && vm.editingTarget !== target) { try { vm.setEditingTarget(target.id); } catch (e) {} }
         if (demo.point) point(demo.point);
 
-        return settled(resolved).then(function () {
+        return settled(scripts).then(function () {
           var after = Promise.resolve();
+          /* The block is on the canvas now, so the number it is about can be ringed where it sits:
+             "drag this" before the drag, "change this" once there is something to change. */
+          var later = marksFor(st.step, 'built');
+          var m = marks();
+          if (later.length && m) {
+            after = after.then(function () { return m.draw(later); }).then(function () { return wait(900); });
+          }
           if (demo.run) {
             after = after.then(function () {
               try { vm.greenFlag(); } catch (e) {}
@@ -344,22 +414,36 @@
           return after.then(function () { return true; });
         });
       }).then(function (ok) {
-        running = null;
+        busyNow = false;
+        clearMarks();
         // where the stage is now, so the next press knows whether it is moving on or going back
-        if (ok !== false) lastIndex = idx;
+        if (ok !== false) lastIndex = st.idx;
         return ok;
       }, function (e) {
-        running = null;
+        busyNow = false;
+        clearMarks();
         if (root.console) console.warn('[guide] step failed:', e && e.message);
         return false;
       });
-
-      return running;
     }
 
-    /** Stop what is moving: the animation, the program, the spotlight. Not the stage itself. */
+    /** Prepare and perform, without a word in between: for a caller that has nothing to say. */
+    function run(step, onProgress, topic) {
+      return prepare(step, topic).then(function (ok) {
+        return ok === false ? false : perform(onProgress);
+      }, function (e) {
+        if (root.console) console.warn('[guide] could not prepare:', e && e.message);
+        return false;
+      });
+    }
+
+    /** Stop what is moving: the animation, the program, the spotlight, the marks. Not the stage itself. */
     function stop() {
+      take++;              // whatever was prepared or in flight is no longer wanted
+      prepared = null;
+      busyNow = false;
       clearPoint();
+      clearMarks();
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}
       var vm = VM();
       if (vm) { try { vm.stopAll(); } catch (e) {} }
@@ -384,12 +468,15 @@
 
     return {
       run: run,
+      prepare: prepare,
+      perform: perform,
+      explain: explain,
       stop: stop,
       restore: restore,
       isActive: isActive,
       point: point,
-      /** true while a demonstration promise is in flight (a page may hold a language switch back) */
-      busy: function () { return running !== null; }
+      /** true while a demonstration is being prepared, explained or performed */
+      busy: function () { return busyNow; }
     };
   }
 

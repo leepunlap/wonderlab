@@ -19,7 +19,14 @@
  *   focus    the sprite to show while it happens (the animation switches target itself)
  *   run      milliseconds to let the program run afterwards; 0 = build only
  *   keys     key presses to simulate afterwards, for programs that listen instead of starting
- *   point    a region of the editor to point at: flag | stage | sprites | palette
+ *   point    a region of the editor to point at: flag | stage | sprites | palette | flyout
+ *   annotate what to point at while the step is being said, and once its blocks are built:
+ *              { shape: 'square' | 'circle' | 'arrow', at, from, to, label, when }
+ *            `at`/`from`/`to` are a region or `field:<opcode>/<FIELD>` (the input to type into);
+ *            `label` is a `guide.act.*` key ("press this", "drag it over", "change this number");
+ *            `when` defaults to 'say' - 'built' marks appear once the block exists, because an input
+ *            cannot be ringed before there is an input. Three shapes, three actions: a circle round
+ *            what to click, an arrow for a drag, a square for a field.
  *
  * Steps inside one topic share a project on purpose: the second step of 動起來 is the first step
  * plus a loop, so the animation *inserts* a block into the stack the student just watched being
@@ -50,6 +57,12 @@
           demo: {
             project: ONE,
             scripts: [{ sprite: '@pico', id: 'a1', blocks: [flag, move(10)] }],
+            annotate: [
+              { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
+              { shape: 'arrow', from: 'flyout:first', to: 'workspace' },
+              { shape: 'circle', at: 'flag', label: 'guide.act.click' },
+              { shape: 'square', at: 'field:motion_movesteps/STEPS', label: 'guide.act.type', when: 'built' }
+            ],
             run: 1600, point: 'flag'
           }
         },
@@ -58,6 +71,7 @@
           demo: {
             project: ONE,
             scripts: [{ sprite: '@pico', id: 'a1', blocks: [flag, forever([move(10)])] }],
+            annotate: [{ shape: 'square', at: 'flyout:first', label: 'guide.act.drag' }],
             run: 1200
           }
         },
@@ -69,6 +83,10 @@
               sprite: '@pico', id: 'a1',
               blocks: [flag, forever([move(10), { op: 'motion_ifonedgebounce' }])]
             }],
+            annotate: [
+              { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
+              { shape: 'circle', at: 'stage', label: 'guide.act.watch' }
+            ],
             run: 3000
           }
         }
@@ -87,7 +105,11 @@
               { sprite: '@pico', id: 'k1', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'right arrow' }, { op: 'motion_changexby', DX: 10 }] },
               { sprite: '@pico', id: 'k2', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'left arrow' }, { op: 'motion_changexby', DX: -10 }] }
             ],
-            keys: ['ArrowRight', 'ArrowLeft']
+            keys: ['ArrowRight', 'ArrowLeft'],
+            annotate: [
+              { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
+              { shape: 'circle', at: 'stage', label: 'guide.act.watch' }
+            ]
           }
         },
         {
@@ -98,6 +120,7 @@
               sprite: '@pico', id: 'k3',
               blocks: [{ op: 'event_whenthisspriteclicked' }, say('guide.say.hi', 2)]
             }],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.click' }],
             point: 'stage'
           }
         }
@@ -112,6 +135,7 @@
           demo: {
             project: ONE,
             scripts: [{ sprite: '@pico', id: 'l1', blocks: [flag, say('guide.say.hello', 2)] }],
+            annotate: [{ shape: 'square', at: 'flyout:first', label: 'guide.act.drag' }],
             run: 2500
           }
         },
@@ -126,6 +150,10 @@
                 SUBSTACK: [{ op: 'looks_nextcostume' }, { op: 'looks_changesizeby', CHANGE: 10 }, { op: 'control_wait', DURATION: 0.3 }]
               }]
             }],
+            annotate: [
+              { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
+              { shape: 'square', at: 'field:control_repeat/TIMES', label: 'guide.act.type', when: 'built' }
+            ],
             run: 2600
           }
         }
@@ -137,13 +165,20 @@
       steps: [
         {
           id: 't1',
-          demo: { project: TWO, point: 'sprites' }
+          demo: {
+            project: TWO, point: 'sprites',
+            annotate: [{ shape: 'circle', at: 'sprites', label: 'guide.act.click' }]
+          }
         },
         {
           id: 't2',
           demo: {
             project: TWO,
             scripts: [{ sprite: '@lumo', id: 't1', blocks: [flag, forever([turn(15), move(5)])] }],
+            annotate: [
+              { shape: 'circle', at: 'sprites', label: 'guide.act.click' },
+              { shape: 'arrow', from: 'sprites', to: 'flyout' }
+            ],
             focus: '@lumo', run: 3200
           }
         }

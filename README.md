@@ -62,9 +62,10 @@ npm run check:guide         # The guide's topics, opcodes and words line up
 `check:guide` reads `src/studio-guide-topics.js` as data and checks it against the
 rest of the repo before any browser is involved: unique topic/step ids, every
 opcode present in the editor's block list, every `@sprite` and every `{ k: ... }`
-word resolvable, every `focus` pointing at a region the driver knows, and the
-three locale files carrying the same key set. Editing a topic is the common way
-to break the guide, and this catches it without a page load.
+word resolvable, every `focus` pointing at a region the driver knows, every mark
+using one of the three shapes and an anchor that exists, and the three locale
+files carrying the same key set. Editing a topic is the common way to break the
+guide, and this catches it without a page load.
 
 Two pages exist for looking at the pane by hand: `src/_i18n-check.html` walks the
 shell in all three languages and ends with `ALL PASS`, `src/_i18n-layout.html`
@@ -99,6 +100,47 @@ all, the cues still run on a timer. Subtitles never depend on the audio working.
 `src/studio-guide-voice.js` owns the playback and the strip; the guide only says
 which keys to speak, and the speaker button in its header is a mute that is
 remembered across reloads.
+
+## The order of a step, and the shapes
+
+A step is said and then done. The narration starts the moment 示範 is pressed,
+the stage is readied underneath it, and the editor is not allowed to move until
+the last line has been spoken (plus a beat). A demonstration that drags blocks
+while the voice is still on the heading is two explanations at once and the
+student follows neither, so the animation only ever shows what has just been
+described — and the last narrated line stays over the stage while it happens.
+
+`src/studio-guide-marks.js` draws the pointing while the talking is going on:
+a circle round the thing to click, an arrow for a drag, a square round a field.
+A mark is declared in the topic data (`annotate`), not in the driver, so adding
+one is a data change:
+
+```js
+annotate: [
+  { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
+  { shape: 'arrow', from: 'flyout:first', to: 'workspace' },
+  { shape: 'circle', at: 'flag', label: 'guide.act.click' },
+  { shape: 'square', at: 'field:motion_movesteps/STEPS',
+    label: 'guide.act.type', when: 'built' }   // a number can only be ringed once it exists
+]
+```
+
+Anchors are regions (`flag`, `stage`, `sprites`, `palette`, `flyout`, `workspace`),
+`flyout:first` for the block the palette is showing, `field:<opcode>/<INPUT>` for
+an input or a dropdown, or any CSS selector as a last resort. A mark whose target
+is not on screen is skipped rather than drawn in the wrong place: a missing mark
+is a lost hint, but a mark round the wrong thing is a lesson in the wrong thing.
+
+## The copy is spoken Cantonese
+
+The `zh-Hant` guide strings are written to be *heard*, not read: 佢, 嘅, 咗, 緊,
+埋, 畀, 睇 — the words a teacher standing at the board would use. Do not "correct"
+them into written Chinese; that is what the voice would then sound like.
+
+One exception, learned the hard way: 撳 is the right Cantonese word for pressing a
+button and Edge's Hong Kong voice mispronounces it, so the copy says 按 throughout.
+If a character is read wrongly, change the word — the audio is regenerated from the
+text, and `npm run build:voice` will notice.
 
 ## Attribution
 

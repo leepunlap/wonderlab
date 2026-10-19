@@ -14,15 +14,24 @@
  * word is `guide.<topic>.<step>.title` or `.body`, resolved through StudioI18n at paint time, which
  * is what makes a language change mid-topic re-render instead of reload.
  *
+ * THE ORDER OF A STEP, WHICH IS THE POINT OF THIS FILE
+ * Say it, then do it. A demonstration that starts its blocks while the voice is still on the heading
+ * is two explanations at once, and the student follows neither. So: prepare the stage, point at the
+ * place while the step is spoken, keep the last line of the narration on screen, and only when the
+ * voice has finished let the editor move. Everything that moves after that point was said first.
+ *
  * WHAT IT DOES NOT OWN
- * The editor. `run(step)` is the caller's and this module waits for it: while it waits it shows a
- * progress line and nothing else. Nor does it own the demonstration's project, its blocks or its
- * cleanup — those are `studio-guide-drive.js`'s, which is why this file has no idea a VM exists.
+ * The editor. `prepare` and `run` are the caller's and this module waits for them: while it waits it
+ * shows a progress line and nothing else. Nor does it own the demonstration's project, its blocks,
+ * its cleanup or its marks — those are `studio-guide-drive.js`'s, which is why this file has no idea
+ * a VM exists.
  *
  *   var guide = StudioGuide.create({
  *     i18n: StudioI18n,
  *     topics: StudioGuideTopics,           // the structure; the words are in the locale files
- *     run: function (step, onProgress) { return drive.run(step, onProgress); },
+ *     prepare: function (step, topic) { return drive.prepare(step, topic); },
+ *     explain: function (step) { drive.explain(step); },
+ *     perform: function (step, onProgress) { return drive.perform(onProgress); },
  *     stop: function () { drive.stop(); },
  *     restore: function () { return drive.restore(); },
  *     isActive: function () { return drive.isActive(); }
@@ -67,6 +76,11 @@
 
     var topics = (cfg.topics || []).filter(function (t) { return t && t.id; });
     var run = cfg.run || function () { return Promise.resolve(); };
+    var prepare = cfg.prepare || null;
+    /* `perform` is `run` minus the preparing, for a caller that splits the two so it can speak in
+       between; a caller that does not split them passes `run` alone and gets the old behaviour. */
+    var perform = cfg.perform || run;
+    var explain = cfg.explain || noop;
     var stopFn = cfg.stop || noop;
     var restoreFn = cfg.restore || function () { return Promise.resolve(); };
     var canRun = cfg.canRun || function () { return true; };
@@ -82,6 +96,13 @@
     var view = { kind: 'index', topic: 0, step: 0 };
     var marks = {};          // "topicId/stepId" -> 'running' | 'done' | 'failed'
     var progress = null;     // { done, total } while a demonstration is running
+    var phase = null;        // 'ready' | 'speak' | 'show': what the running step is doing
+    var take = 0;            // bumped by every press and every move: a finished narration that nobody
+                             // is waiting for any more must not start a demonstration
+    var BEAT = 260;          // ms of quiet between the last word and the first movement
+    var MARKS_BEAT = 1500;   // ms the marks stand alone when there is no voice to explain them
+
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
     var el = h('div', 'wl-guide');
     var bodyBox = h('div', 'wl-g-body');
@@ -220,7 +241,7 @@
 
         if (mark === 'failed') acts.appendChild(h('span', 'wl-g-note is-bad', T('guide.failed')));
         else if (mark === 'running') {
-          statusEl = h('span', 'wl-g-note', progress ? T('guide.progress', progress) : T('guide.starting'));
+          statusEl = h('span', 'wl-g-note', statusText());
           statusEl.setAttribute('aria-live', 'polite');
           acts.appendChild(statusEl);
         } else if (!canRun()) {
@@ -293,46 +314,95 @@
       bodyBox.scrollTop = 0;
     }
 
+    /**
+     * A step that was interrupted is idle again, not done and not failed: it was neither. Called by
+     * every exit that is not the demonstration finishing by itself.
+     */
+    function clearRunning() {
+      Object.keys(marks).forEach(function (k) { if (marks[k] === 'running') delete marks[k]; });
+    }
+
     /** Leaving a step takes the voice with it: a narration that outlives its step comes from nowhere. */
     function halt() {
+      take++;                                  // a narration still in the air belongs to the old step
+      phase = null;
+      clearRunning();
       try { hush(); } catch (e) { /* a voice is never a reason to fail a navigation */ }
       stopFn();
     }
 
     /* ---------- the demonstration ---------- */
-    function paintStatus() {
-      if (!statusEl) return;
-      statusEl.textContent = progress ? T('guide.progress', progress) : T('guide.starting');
+    /** What the line under the button says: this step is being set up, said, or done. */
+    function statusText() {
+      if (progress) return T('guide.progress', progress);
+      if (phase === 'speak') return T('guide.narrating');
+      if (phase === 'show') return T('guide.showing');
+      return T('guide.starting');
     }
 
+    function paintStatus() {
+      if (!statusEl) return;
+      statusEl.textContent = statusText();
+    }
+
+    /**
+     * One press: ready the stage, point at the place, say the step, then do it.
+     *
+     * The narration is started before anything is awaited, because a browser that only speaks from a
+     * user gesture stops speaking the moment the call is deferred. It is awaited before the editor is
+     * allowed to move: everything the animation does after that point has already been described.
+     */
     function play(t, s) {
       var k = stepKey(t, s);
       if (marks[k] === 'running') return;
       if (!canRun()) { paint(); return; }
+      var mine = ++take;
       marks[k] = 'running';
       progress = null;
+      phase = 'ready';
       paint();
-      /* The voice and the demonstration are two halves of the same explanation, so they start
-         together and neither waits for the other: the blocks take about as long to arrive as the
-         sentence takes to say, and a student watching the canvas should not be read to in silence. */
-      try { speak([keyStep(t, s, 'title'), keyStep(t, s, 'body')]); } catch (e) { /* text still stands */ }
 
-      var settle = function (mark) {
+      function settle(mark) {
+        if (mine !== take) return;
+        phase = null;
         marks[k] = mark;
         progress = null;
         paint();
-      };
-      var p;
-      try {
-        p = run(s, function (done, total) { progress = { done: done, total: total }; paintStatus(); }, t);
-      } catch (e) {
-        settle('failed');
-        return;
       }
-      Promise.resolve(p).then(function (ok) {
+
+      var said = Promise.resolve(speak([keyStep(t, s, 'title'), keyStep(t, s, 'body')], { hold: true }));
+
+      var ready = prepare ? Promise.resolve(prepare(s, t)) : Promise.resolve(true);
+
+      ready.then(function (ok) {
+        if (mine !== take) return false;
+        if (ok === false) throw new Error('guide: the step could not be prepared');
+        /* After preparing, not before: preparing swaps the stage, and a mark drawn first would ring
+           something that has moved by the time the student looks at it. */
+        try { explain(s); } catch (e) { /* a mark is never a reason to lose the step */ }
+        // the canvas is borrowed from here on: say so, and offer the way back
+        renderFoot();
+        phase = 'speak';
+        paintStatus();
+        return said;
+      }).then(function (spoke) {
+        if (mine !== take) return false;
+        phase = 'show';
+        paintStatus();
+        /* One beat of quiet, so the last word is not swallowed by the first movement. With the voice
+           off there is no last word, and the wait belongs to the marks instead: a shape that appears
+           and vanishes in the same frame has pointed at nothing. */
+        return wait(spoke ? BEAT : MARKS_BEAT);
+      }).then(function (go) {
+        if (mine !== take || go === false) return false;
+        return perform(s, function (done, total) { progress = { done: done, total: total }; paintStatus(); }, t);
+      }).then(function (ok) {
+        if (mine !== take) return;
+        try { hush(); } catch (e) { /* the step is over either way */ }
         settle(ok === false ? 'failed' : 'done');
       }, function (e) {
         if (root.console) root.console.warn('[guide] demonstration failed:', e && e.message);
+        try { hush(); } catch (x) { /* nothing playing */ }
         settle('failed');
       });
     }
@@ -340,7 +410,10 @@
     /* ---------- the outside world ---------- */
     /** The pane asks this when the language changes: re-paint, do not restart. */
     function refresh() {
-      hush();     // whatever was being said is now in the wrong language
+      take++;     // whatever was being said or shown is now in the wrong language
+      phase = null;
+      clearRunning();
+      hush();
       paint();
     }
 

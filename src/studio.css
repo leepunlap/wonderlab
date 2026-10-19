@@ -254,6 +254,22 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 /* opacity only: the strip is positioned by an inline transform, which an animation would override */
 @keyframes wl-sub-in { from { opacity: 0; } to { opacity: 1; } }
 
+/* ---- the marks: where to click, what to drag, which number to change ----
+   An overlay of its own rather than a class on the gui's nodes: the editor is not ours to decorate,
+   and a mark must never be the thing the student's click lands on. */
+.wl-marks { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: 2147481990;
+  pointer-events: none; overflow: visible; }
+.wl-mark { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.97);
+  transition: opacity .2s ease-out, transform .26s cubic-bezier(.2, .8, .3, 1); }
+.wl-mark.is-on { opacity: 1; transform: none; }
+.wl-mark rect, .wl-mark ellipse, .wl-mark path { fill: none; stroke: #ffb000; stroke-width: 3;
+  stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(255, 176, 0, .45)); }
+.wl-mark .wl-mark-head { fill: #ffb000; stroke: none; }
+.wl-mark .wl-mark-tag { fill: #ffb000; stroke: none; filter: none; }
+.wl-mark .wl-mark-text { fill: #3b2a00; stroke: none;
+  font: 700 12.5px/1 system-ui, -apple-system, "PingFang HK", "Noto Sans TC", sans-serif; }
+
 /* the pointer a step that is not about blocks gets: a ring round the region, named */
 .wl-point { position: fixed; z-index: 2147482000; pointer-events: none; border: 3px solid #ffb000; border-radius: 10px;
   animation: wl-point 1.2s ease-in-out infinite; }

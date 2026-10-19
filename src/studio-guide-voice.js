@@ -50,6 +50,7 @@
     var audio = null;          // the clip currently playing
     var timers = [];
     var seq = 0;               // bumped by every say/stop: stale callbacks find a different number
+    var hold = false;          // keep the last line on screen when the voice stops talking
 
     /* ---------- the preference ---------- */
     function readPref() {
@@ -189,7 +190,7 @@
       return new Promise(function (resolve) {
         function next() {
           if (mine !== seq) return resolve(false);
-          if (i >= list.length) { cue(''); return resolve(true); }
+          if (i >= list.length) { if (!hold) cue(''); return resolve(true); }
           var c = list[i++] ;
           cue(c.s);
           var u = new U(c.s);
@@ -211,7 +212,7 @@
         var i = 0;
         function step() {
           if (mine !== seq) return resolve(false);
-          if (i >= list.length) { cue(''); return resolve(true); }
+          if (i >= list.length) { if (!hold) cue(''); return resolve(true); }
           var c = list[i++];
           cue(c.s);
           timers.push(setTimeout(step, Math.max(MIN_CUE, c.d || estimate(c.s))));
@@ -250,7 +251,7 @@
         a.addEventListener('timeupdate', tick);
         a.addEventListener('ended', function () {
           drop();
-          if (mine === seq) { audio = null; cue(''); }
+          if (mine === seq) { audio = null; if (!hold) cue(''); }
           resolve(true);
         });
         a.addEventListener('error', function () { drop(); if (mine === seq) audio = null; resolve(false); });
@@ -275,11 +276,16 @@
     /**
      * Narrate these keys, in order, in the language the pane is in. Resolves when the last line has
      * been spoken (or abandoned); resolves false if there was nothing to say.
+     *
+     * `hold` keeps the last line on screen after the voice stops. The guide asks for it because the
+     * step is not finished when the sentence is: the editor is about to do what was just said, and a
+     * student watching that should still be able to read it. Nothing is spoken while it is held.
      */
-    function say(keys) {
+    function say(keys, opts) {
       var list = (keys || []).filter(Boolean);
-      if (!on || !list.length) return Promise.resolve(false);
       stop();
+      hold = !!(opts && opts.hold);
+      if (!on || !list.length) return Promise.resolve(false);
       var mine = seq;
       return clips().then(function (m) {
         if (mine !== seq) return false;
@@ -292,7 +298,7 @@
         var i = 0;
         function next() {
           if (mine !== seq) return false;
-          if (i >= entries.length) { cue(''); return true; }
+          if (i >= entries.length) { if (!hold) cue(''); return true; }
           var e = entries[i++];
           // a line with no clip is read by the browser rather than skipped: the step is not half-silent
           if (e.clip) return playClip(e.clip, mine).then(next);
@@ -304,6 +310,7 @@
 
     function stop() {
       seq++;
+      hold = false;
       timers.forEach(clearTimeout);
       timers = [];
       if (audio) {

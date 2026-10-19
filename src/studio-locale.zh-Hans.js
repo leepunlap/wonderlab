@@ -74,6 +74,8 @@
     'guide.replay': '再看一次',
     'guide.running': '示范中…',
     'guide.starting': '准备中…',
+    'guide.narrating': '正在讲解…',
+    'guide.showing': '正在做给你看…',
     'guide.progress': '第 {done} / {total} 个动作',
     'guide.failed': '这一步未能示范。',
     'guide.notReady': '编辑器还在载入，请稍等。',
@@ -85,6 +87,12 @@
     'guide.stop': '停止',
     'guide.restore': '返回我的作品',
     'guide.voice': '朗读',
+
+    /* the three shapes the guide draws while it talks: click it, drag it, type in it */
+    'guide.act.click': '点这里',
+    'guide.act.drag': '拖过去',
+    'guide.act.type': '改这个数字',
+    'guide.act.watch': '看舞台',
 
     'guide.point.flag': '绿旗',
     'guide.point.stage': '舞台',
