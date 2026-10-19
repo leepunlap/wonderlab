@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!--
+  The voice proof sheet: every narrated line, in every language, playable.
+
+  Pronunciation is the one defect in this project that no test can see. The words exist, the key
+  exists, the clip exists — and then the voice says the wrong character. So this page exists to be
+  listened to: load it, pick a language, press play down the list, and anything that comes out wrong
+  goes into tools/pronunciation.mjs so it cannot be written again.
+
+  Open it from the dev server (it reads assets/voice/manifest.json), not from the file system.
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>指南語音試聽</title>
+<style>
+  body { margin: 0; padding: 20px 22px 40px; background: #f4f6fa; color: #1f2a37;
+    font: 13px/1.55 -apple-system, "PingFang HK", "Noto Sans TC", sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 3px; }
+  .sub { color: #5b6b7c; font-size: 12px; margin: 0 0 16px; }
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  button { font: inherit; padding: 5px 12px; border: 1px solid #c9d4e0; background: #fff; color: #27384a;
+    border-radius: 999px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+  input { font: inherit; padding: 5px 10px; border: 1px solid #c9d4e0; border-radius: 999px; min-width: 240px; }
+  .count { color: #5b6b7c; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid #dde4ec; border-radius: 8px; }
+  td { padding: 7px 10px; border-top: 1px solid #eef2f7; vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  .key { width: 260px; color: #7a8798; font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+  .say { width: 58px; }
+  mark { background: #ffe08a; }
+</style>
+</head>
+<body>
+<h1>指南語音試聽</h1>
+<p class="sub">每句都係烘焙出嚟嘅真錄音。聽到讀錯嘅，記低個 key，加去 <code>tools/pronunciation.mjs</code>。</p>
+<div class="bar">
+  <button data-locale="zh-Hant" aria-pressed="true">廣東話</button>
+  <button data-locale="zh-Hans" aria-pressed="false">普通話</button>
+  <button data-locale="en" aria-pressed="false">English</button>
+  <input id="q" placeholder="搵字，例如：重">
+  <span class="count" id="count"></span>
+</div>
+<table id="rows"><tbody></tbody></table>
+<!-- what npm run check:pages reads: a sheet that lists nothing is a sheet nobody will listen to -->
+<pre id="wl-voice-out" style="position:fixed;left:-9999px;top:0">START</pre>
+
+<!-- A locale file starts with `if (!root.StudioI18n) return;`, so the stub has to be there first.
+     Same trick as tools/build_voice.mjs: collect the dictionary without booting the whole app. -->
+<script>
+  window.__dicts = {};
+  window.StudioI18n = {
+    register: function (code, label, map) { window.__dicts[code] = map; },
+    t: function (k) { return k; },
+    available: function () { return []; },
+    on: function () { return function () {}; },
+    locale: function () { return 'zh-Hant'; }
+  };
+</script>
+<script src="studio-locale.zh-Hant.js"></script>
+<script src="studio-locale.zh-Hans.js"></script>
+<script src="studio-locale.en.js"></script>
+<script>
+(function () {
+  var OUT = 'assets/voice/';
+  var dicts = window.__dicts;
+  var current = 'zh-Hant';
+  var manifest = null;
+  var playing = null;
+
+  fetch(OUT + 'manifest.json').then(function (r) { return r.json(); })
+    .then(function (m) { manifest = m; render(); }, function () {
+      document.getElementById('count').textContent = '搵唔到 manifest.json —— 要用 dev server 開呢頁';
+    });
+
+  function narrated(dict) {
+    return Object.keys(dict || {}).filter(function (k) {
+      var p = k.split('.');
+      return p.length === 4 && p[0] === 'guide' && (p[3] === 'title' || p[3] === 'body');
+    }).sort();
+  }
+
+  function hl(text, q) {
+    if (!q) return document.createTextNode(text);
+    var frag = document.createDocumentFragment(), rest = text, i;
+    while ((i = rest.toLowerCase().indexOf(q.toLowerCase())) >= 0) {
+      if (i) frag.appendChild(document.createTextNode(rest.slice(0, i)));
+      var m = document.createElement('mark');
+      m.textContent = rest.slice(i, i + q.length);
+      frag.appendChild(m);
+      rest = rest.slice(i + q.length);
+    }
+    if (rest) frag.appendChild(document.createTextNode(rest));
+    return frag;
+  }
+
+  function render() {
+    var dict = dicts[current];
+    var body = document.querySelector('#rows tbody');
+    body.textContent = '';
+    if (!dict || !manifest) return;
+    var q = document.getElementById('q').value.trim();
+    var keys = narrated(dict).filter(function (k) { return !q || String(dict[k]).indexOf(q) >= 0; });
+    document.getElementById('count').textContent = keys.length + ' 句' +
+      (manifest.voices && manifest.voices[current] ? '　聲線：' + manifest.voices[current] : '');
+    /* every narrated line has a clip, in every language — the one thing this sheet can prove */
+    var voiced = narrated(dict).filter(function (k) { return !!manifest.clips[k + '|' + current]; }).length;
+    var out = document.getElementById('wl-voice-out');
+    if (out && current === 'zh-Hant' && out.textContent.indexOf('RESULT') < 0) {
+      out.textContent = (voiced === narrated(dict).length && voiced > 0)
+        ? 'RESULT PASS: ' + voiced + ' of ' + narrated(dict).length + ' narrated lines have a clip'
+        : 'RESULT FAIL: ' + voiced + ' of ' + narrated(dict).length + ' narrated lines have a clip';
+    }
+    keys.forEach(function (k) {
+      var clip = manifest.clips[k + '|' + current];
+      var tr = document.createElement('tr');
+      var tdSay = document.createElement('td');
+      tdSay.className = 'say';
+      if (clip) {
+        var b = document.createElement('button');
+        b.textContent = '聽';
+        b.addEventListener('click', function () {
+          if (playing) { playing.pause(); playing = null; }
+          var a = new Audio(OUT + clip.file);
+          a.play();
+          playing = a;
+          b.textContent = '播緊';
+          a.addEventListener('ended', function () { b.textContent = '聽'; });
+        });
+        tdSay.appendChild(b);
+      } else {
+        tdSay.textContent = '—';
+      }
+      var tdKey = document.createElement('td');
+      tdKey.className = 'key';
+      tdKey.textContent = k;
+      var tdText = document.createElement('td');
+      tdText.appendChild(hl(String(dict[k] || ''), q));
+      tr.appendChild(tdSay); tr.appendChild(tdKey); tr.appendChild(tdText);
+      body.appendChild(tr);
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-locale]'), function (b) {
+    b.addEventListener('click', function () {
+      current = b.getAttribute('data-locale');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-locale]'), function (o) {
+        o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      });
+      render();
+    });
+  });
+  document.getElementById('q').addEventListener('input', render);
+}());
+</script>
+</body>
+</html>

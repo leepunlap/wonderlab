@@ -28,7 +28,8 @@ const PAGES = [
   { file: '_drive-check.html', out: 'wl-drive-out', what: '由零開始 的匯入示範' },
   { file: '_mode-check.html', out: 'wl-mode-out', what: '新手 / 熟手 的步數' },
   { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' },
-  { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' }
+  { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' },
+  { file: '_voice-sheet.html', out: 'wl-voice-out', what: '每句旁白 都有錄音' }
 ];
 
 const CHROME = [

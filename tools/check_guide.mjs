@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { describeMisread, findMisread } from './pronunciation.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src');
@@ -184,6 +185,15 @@ for (const [id] of LOCALES) Object.keys(dicts[id] || {}).forEach((k) => all.add(
 for (const [id] of LOCALES) {
   const extra = [...all].filter((k) => !has(id, k));
   check(`${id}: no key is missing relative to the other languages`, extra.length === 0, extra.slice(0, 8).join(', '));
+}
+
+/* What is read aloud is the only part of the copy no other check can see: the words are there, the
+   key exists, and then the voice says the wrong character. See tools/pronunciation.mjs. */
+for (const [id] of LOCALES) {
+  const spoken = (dicts[id] || {});
+  const hits = findMisread(spoken, id);
+  check(`${id}: nothing the voice reads is known to be read wrong`, hits.length === 0,
+    '\n' + describeMisread(id, hits).join('\n'));
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : '\nthe guide is consistent: structure, words and opcodes all line up');

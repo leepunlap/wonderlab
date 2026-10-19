@@ -439,7 +439,7 @@
     'guide.motion.a1.title': '按綠旗，行一步',
     'guide.motion.a1.body': '將「當綠旗被按下」同「移動 10 步」疊埋一齊，就係第一個程式。按一下綠旗，角色就向前行一小步。',
     'guide.motion.a2.title': '加個「一直重複」，佢就唔會停',
-    'guide.motion.a2.body': '行一次唔夠。將「一直重複」套喺外面，裡面嘅積木就會不停重做，直到你按停止為止。',
+    'guide.motion.a2.body': '行一次唔夠。將「一直重複」套喺外面，裡面嘅積木就會不停重複，直到你按停止為止。',
     'guide.motion.a3.title': '撞到邊就彈返轉頭',
     'guide.motion.a3.body': '喺重複裡面加「碰到邊緣就反彈」，角色就唔會行出舞台。',
 

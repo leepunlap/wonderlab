@@ -33,6 +33,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { describeMisread, findMisread } from './pronunciation.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
@@ -153,15 +154,27 @@ async function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
   const jobs = [];
+  const spoken = {};
   Object.keys(LOCALES).forEach((locale) => {
     const dict = dictionary(locale);
     const keys = narratedKeys(dict);
     if (!keys.length) throw new Error(locale + ': no step keys found — has the key shape changed?');
+    spoken[locale] = {};
     keys.forEach((key) => {
       const text = String(dict[key] || '').trim();
+      spoken[locale][key] = text;
       if (text) jobs.push({ locale, key, text, ...LOCALES[locale] });
     });
   });
+
+  /* Checked before, not after: an hour of synthesis on lines that are known to come out wrong is an
+     hour spent hiding the only defect in this pipeline that no test can hear. */
+  const wrong = [];
+  Object.keys(spoken).forEach((locale) => wrong.push(...describeMisread(locale, findMisread(spoken[locale], locale))));
+  if (wrong.length) {
+    console.error('[voice] these lines are known to be read wrong — rewrite them first:\n' + wrong.join('\n'));
+    process.exit(1);
+  }
 
   console.log('[voice] ' + jobs.length + ' lines, ' + Object.keys(LOCALES).length + ' languages, ' +
     CONCURRENCY + ' at a time');

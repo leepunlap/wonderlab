@@ -434,7 +434,7 @@
     'guide.motion.a1.title': '绿旗与「移动」',
     'guide.motion.a1.body': '把「当绿旗被点击」和「移动 10 步」叠在一起，就是第一个程序。按绿旗，角色向前走一小步。',
     'guide.motion.a2.title': '用「重复执行」让它不停走',
-    'guide.motion.a2.body': '只走一次不够。把「重复执行」套在外面，里面的积木就会不断重做，直到你按停止。',
+    'guide.motion.a2.body': '只走一次不够。把「重复执行」套在外面，里面的积木就会不断重复，直到你按停止。',
     'guide.motion.a3.title': '碰到边缘就反弹',
     'guide.motion.a3.body': '在重复里面加「碰到边缘就反弹」，角色就不会走出舞台。',
 
