@@ -12,6 +12,13 @@
  * is read cannot drift apart. Nothing here calls a service, which is why the guide still speaks on a
  * school network that blocks everything but the school's own server.
  *
+ * THE SENTENCE IS A BEAT, AND THE PICTURE KEEPS IT
+ * A clip is not one lump: it is a list of sentences with the millisecond each one begins, measured
+ * when the clip was baked. `narrate` turns that into a clock the demonstration can wait on — "tell me
+ * when you reach sentence two" — so the ring, the hand and the blocks arrive while the sentence about
+ * them is being said, instead of after the whole step has been read out. Waiting on `say` instead
+ * means the picture starts when the talking stops, which is two explanations, one after the other.
+ *
  * WHEN THERE IS NO CLIP
  * A newly written step, a language added without rebuilding, a broken fetch: the line is read by the
  * browser instead, preferring an Edge natural voice when the page is running in Edge. Failing even
@@ -51,6 +58,7 @@
     var timers = [];
     var seq = 0;               // bumped by every say/stop: stale callbacks find a different number
     var hold = false;          // keep the last line on screen when the voice stops talking
+    var active = null;         // the narration in flight, so a stop can open the gates it left shut
 
     /* ---------- the preference ---------- */
     function readPref() {
@@ -168,53 +176,175 @@
       return best;
     }
 
-    /**
-     * The same lines the clips would have spoken, split by sentence. One cue per sentence, and one
-     * per key: a heading read inside the body's first sentence reads as one long run-on.
-     */
-    function cuesFor(keys) {
-      var out = [];
-      keys.forEach(function (k) {
-        var text = T(k);
-        if (text) systemCues(text).forEach(function (c) { out.push(c); });
+    /* ---------- the timeline ----------
+       One entry per line (a key), one cue per sentence, each with the millisecond it begins. A clip
+       carries its own cue track, so nothing here is guessed; a line with no clip is split by hand and
+       paced by the same rule the subtitles use, so the clock still exists when the audio does not. */
+    var GAP = 60;       // ms a player leaves between two clips
+    var LEAD = 120;     // ms after a sentence begins before the picture moves: the word comes first
+
+    function planFor(keys) {
+      return clips().then(function (m) {
+        var lang = locale(), t = 0, cues = [], entries = [];
+        (keys || []).filter(Boolean).forEach(function (k) {
+          var text = T(k);
+          if (!text) return;
+          var clip = m ? m[k + '|' + lang] : null;
+          var list = (clip && clip.cues && clip.cues.length)
+            ? clip.cues.map(function (c) { return { t: c.t || 0, s: c.s || '' }; })
+            : systemCues(text);
+          var own = [], cursor = 0;
+          list.forEach(function (c) {
+            var d = c.d || estimate(c.s);
+            // a baked clip says when the sentence starts; a split one starts where the last ended
+            var start = (clip && c.t != null) ? c.t : cursor;
+            own.push({ t: start, s: c.s, d: d });
+            cursor = start + d;
+          });
+          var e = { key: k, text: text, clip: clip, cues: own, base: cues.length, start: t,
+                    ms: clip ? (clip.ms || cursor + 400) : cursor + 400 };
+          own.forEach(function (c) { cues.push({ t: t + c.t, text: c.s, key: k }); });
+          entries.push(e);
+          t += e.ms + GAP;
+        });
+        return { entries: entries, cues: cues, total: t };
       });
-      return out;
     }
 
-    function speakWithSystem(keys, mine) {
+    /* ---------- narrate: the same voice, with a clock on it ---------- */
+    /**
+     * Say these keys, and hand back a handle on every sentence.
+     *
+     *   var n = narrate(['…title', '…body'], { hold: true, from: 1 });
+     *   n.at(0).then(…)     // the body's first sentence has begun
+     *   …
+     *   n.ended.then(…)     // the last word is out
+     *
+     * `from` is where the caller's sentence numbering starts: 1 skips the heading, because a heading
+     * announces a step and the body is what describes it. `at(i)` past the last sentence resolves at
+     * once — a step with more to show than the copy has sentences keeps moving instead of stalling.
+     * It resolves false when the narration is stopped, which is how a caller learns to stop acting.
+     *
+     * Resolves null when there is nothing to say (muted, no keys): no clock, and the caller paces
+     * itself, which is what a page without a voice has always done.
+     */
+    function narrate(keys, opts) {
+      var list = (keys || []).filter(Boolean);
+      stop();                      // one narration at a time — this also cancels the previous clock
+      hold = !!(opts && opts.hold);
+      var from = Math.max(0, (opts && opts.from) | 0);
+      if (!on || !list.length) return Promise.resolve(null);
+      var mine = seq;
+
+      var reached = 0, waiters = [], done = false, planP = null;
+      var finish;
+      var n = {
+        spoken: false,
+        cues: [],
+        ended: new Promise(function (r) { finish = r; }),
+        at: function (i) {
+          return planP.then(function (p) {
+            if (mine !== seq) return false;
+            if (!p || !p.cues.length) return true;      // nothing to wait for: act now
+            var base = p.entries[from] ? p.entries[from].base : p.cues.length;
+            return whenCue(base + Math.max(0, i | 0));
+          }, function () { return true; });
+        }
+      };
+
+      function whenCue(i) {
+        if (done) return Promise.resolve(true);         // the words are over; the picture is not
+        if (reached > i) return Promise.resolve(true);
+        return new Promise(function (resolve) { waiters.push({ i: i, resolve: resolve }); });
+      }
+
+      function fire(i) {
+        if (done || mine !== seq) return;
+        if (i + 1 > reached) reached = i + 1;
+        var keep = [];
+        waiters.forEach(function (w) { if (w.i < reached) w.resolve(true); else keep.push(w); });
+        waiters = keep;
+      }
+
+      function cancel() {
+        if (done) return;
+        done = true;
+        waiters.forEach(function (w) { w.resolve(false); });
+        waiters = [];
+        finish(false);
+        if (active === slot) active = null;
+      }
+      var slot = { cancel: cancel };
+      active = slot;
+
+      function end() {
+        if (done) return;
+        done = true;
+        n.spoken = true;
+        finish(true);
+        if (active === slot) active = null;
+      }
+
+      /* One line at a time, as before: the difference is that the sentences inside a line fire the
+         clock as they are reached, so the caller's gates open while the voice is still on them. */
+      function start(p) {
+        var i = 0;
+        function next() {
+          if (mine !== seq || done) return;
+          if (i >= p.entries.length) { if (!hold) cue(''); return end(); }
+          var e = p.entries[i++];
+          var line = e.clip ? playClip(e, mine, fire) : speakText(e, mine, fire);
+          line.then(next, next);
+        }
+        next();
+      }
+
+      planP = planFor(list).then(function (p) {
+        if (mine !== seq) return p;
+        n.cues = p.cues;
+        start(p);
+        return p;
+      });
+
+      return planP.then(function () { return n; }, function () { return n; });
+    }
+
+    /** The browser's voice, one utterance per sentence, so the clock can follow the utterances. */
+    function speakText(e, mine, fire) {
       strip().setAttribute('data-from', 'voice');
-      var list = cuesFor(keys);
       var synth = root.speechSynthesis, U = root.SpeechSynthesisUtterance;
-      if (!synth || !U) return timed(list, mine);
+      if (!synth || !U) return speakTimed(e, mine, fire, 0);
       var lang = locale(), voice = pickVoice(lang), i = 0;
       return new Promise(function (resolve) {
         function next() {
           if (mine !== seq) return resolve(false);
-          if (i >= list.length) { if (!hold) cue(''); return resolve(true); }
-          var c = list[i++] ;
+          if (i >= e.cues.length) return resolve(true);
+          var c = e.cues[i], at = i++;
           cue(c.s);
+          fire(e.base + at);
           var u = new U(c.s);
           u.lang = EDGE_LANG[lang] || 'zh-HK';
           u.rate = 0.95;
           if (voice) u.voice = voice;
           u.onend = next;
           u.onerror = next;
-          try { synth.speak(u); } catch (e) { timed(list.slice(i - 1), mine).then(resolve); }
+          try { synth.speak(u); } catch (err) { speakTimed(e, mine, fire, at).then(resolve); }
         }
         next();
       });
     }
 
-    /** No voice at all: the subtitles still have to move. */
-    function timed(list, mine) {
+    /** No voice at all: the subtitles still have to move, and so does the clock. */
+    function speakTimed(e, mine, fire, from) {
       strip().setAttribute('data-from', 'timed');
       return new Promise(function (resolve) {
-        var i = 0;
+        var i = from || 0;
         function step() {
           if (mine !== seq) return resolve(false);
-          if (i >= list.length) { if (!hold) cue(''); return resolve(true); }
-          var c = list[i++];
+          if (i >= e.cues.length) return resolve(true);
+          var c = e.cues[i], at = i++;
           cue(c.s);
+          fire(e.base + at);
           timers.push(setTimeout(step, Math.max(MIN_CUE, c.d || estimate(c.s))));
         }
         step();
@@ -223,11 +353,19 @@
 
     /* ---------- the audio ---------- */
     /**
-     * One clip. The element is attached to the document rather than kept as a bare Audio(): an
-     * unattached media element is collectable in the middle of its own playback, and a clip that
-     * stops firing `ended` leaves the next line unspoken and the subtitle stuck on the wrong words.
+     * One clip, and the clock that goes with it.
+     *
+     * The element is attached to the document rather than kept as a bare Audio(): an unattached media
+     * element is collectable in the middle of its own playback, and a clip that stops firing `ended`
+     * leaves the next line unspoken and the subtitle stuck on the wrong words.
+     *
+     * The sentence gates are timers started with the clip, not something read off `timeupdate`: a
+     * timeupdate arrives four times a second at best, which is a quarter of a second of lag between
+     * the word and the move it asks for. The subtitle keeps using `timeupdate`, which is the honest
+     * clock for text; the picture gets the sharper one.
      */
-    function playClip(clip, mine) {
+    function playClip(e, mine, fire) {
+      var clip = e.clip;
       strip().setAttribute('data-from', 'clip');
       return new Promise(function (resolve) {
         var a = new root.Audio(base + clip.file);
@@ -238,9 +376,18 @@
         audio = a;
         var shown = -1;
         var guard = null;
+        var gates = [];
         function drop() {
           if (guard) { clearTimeout(guard); guard = null; }
+          gates.forEach(clearTimeout);
+          gates = [];
           if (a.parentNode) a.parentNode.removeChild(a);
+        }
+        function open() {
+          if (mine !== seq) return;
+          (e.cues || []).forEach(function (c, j) {
+            gates.push(setTimeout(function () { fire(e.base + j); }, Math.max(0, c.t + LEAD)));
+          });
         }
         function tick() {
           if (mine !== seq) return;
@@ -262,13 +409,12 @@
           drop();
           if (mine !== seq) return resolve(false);
           audio = null;
-          timed(clip.cues, mine).then(resolve);
+          speakTimed(e, mine, fire, 0).then(resolve);
         }, (clip.ms || 8000) + 2500);
         var p = a.play();
-        // a refused playback is not a failed step: the cues still read correctly on a timer
-        if (p && typeof p.catch === 'function') {
-          p.catch(function () { timed(clip.cues, mine).then(resolve); });
-        }
+        /* the clock starts with the sound, not with the call: a clip takes a moment to begin */
+        if (p && typeof p.then === 'function') p.then(open, function () { speakTimed(e, mine, fire, 0).then(resolve); });
+        else open();
       });
     }
 
@@ -280,35 +426,23 @@
      * `hold` keeps the last line on screen after the voice stops. The guide asks for it because the
      * step is not finished when the sentence is: the editor is about to do what was just said, and a
      * student watching that should still be able to read it. Nothing is spoken while it is held.
+     *
+     * A caller that needs to know *when* each sentence arrives asks `narrate` instead; this is the
+     * same narration with the clock thrown away.
      */
     function say(keys, opts) {
-      var list = (keys || []).filter(Boolean);
-      stop();
-      hold = !!(opts && opts.hold);
-      if (!on || !list.length) return Promise.resolve(false);
-      var mine = seq;
-      return clips().then(function (m) {
-        if (mine !== seq) return false;
-        var lang = locale();
-        var entries = list.map(function (k) {
-          return { text: T(k), clip: m ? m[k + '|' + lang] : null };
-        }).filter(function (e) { return e.text; });
-        if (!entries.length) return false;
-        if (!entries.some(function (e) { return e.clip; })) return speakWithSystem(list, mine);
-        var i = 0;
-        function next() {
-          if (mine !== seq) return false;
-          if (i >= entries.length) { if (!hold) cue(''); return true; }
-          var e = entries[i++];
-          // a line with no clip is read by the browser rather than skipped: the step is not half-silent
-          if (e.clip) return playClip(e.clip, mine).then(next);
-          return timed(systemCues(e.text), mine).then(next);
-        }
-        return next();
+      return narrate(keys, opts).then(function (n) {
+        if (!n) return false;
+        return n.ended.then(function () { return n.spoken; });
       });
     }
 
     function stop() {
+      /* Before the counter moves: a demonstration waiting on a sentence must be told to stop, not
+         left holding a promise that nothing will ever resolve. */
+      var going = active;
+      active = null;
+      if (going) going.cancel();
       seq++;
       hold = false;
       timers.forEach(clearTimeout);
@@ -329,6 +463,10 @@
 
     return {
       say: say,
+      /** the same narration with a clock: `at(i)` waits for the i-th sentence, `ended` for the last */
+      narrate: narrate,
+      /** the timeline such a narration would have, without saying a word of it */
+      plan: function (keys) { return planFor(keys); },
       stop: stop,
       enabled: enabled,
       /** which voice a clip is in, for a page that wants to say so */

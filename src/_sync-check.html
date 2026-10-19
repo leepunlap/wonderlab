@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does the picture keep the words?
+
+  The guide used to say a whole step and then do a whole step: the ring was on the button six seconds
+  before the voice reached the button, and the hand set off only after the last word. The fix is a
+  clock: the narration reports when each sentence begins and the demonstration waits for the sentence
+  that describes what it is about to do.
+
+  This page measures that, on the real page, with a narration whose timeline is written down here
+  rather than spoken — a test that depends on a voice and a speaker is a test nobody can run twice
+  the same way. The step is a real one (501-bp01 / p1: the four actors), so what is checked is the
+  real picker, the real hand, the real stage.
+
+  The three numbers that matter:
+    sentence 0 begins at 2500ms   → the ring on the plus appears then, not at 1000ms (prepare)
+    sentence 1 begins at 6000ms   → the first tile is pressed after that
+    the narration ends at 9000ms  → but the plus was pressed at ~3000ms, so nothing waited it out
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-sync-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>sync check</title>
+<style>html,body{margin:0}iframe{width:100%;height:78vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-sync-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-sync-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+  function now() { return (win().performance || performance).now(); }
+
+  /* the timeline this test narrates. Far enough apart to be unambiguous, short enough to run. */
+  var CUE0 = 2500, CUE1 = 6000, CUE2 = 9000;
+
+  var seen = { ringAt: null, presses: [], t0: 0, ticks: 0 };
+
+  function pickerOpen() {
+    return doc().querySelectorAll('[class*="library-item_library-item"]').length > 0;
+  }
+  function names() {
+    return win().WLStudio.vm.runtime.targets.map(function (t) { return t.getName(); });
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading || !w.StudioGuideDrive || !w.StudioGuide) {
+      if (tries < 60) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+
+    var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === '501-bp01'; })[0];
+    if (!topic || !topic.steps || topic.steps.length < 2) {
+      log('RESULT FAIL: 501-bp01 is not in the guide data');
+      return;
+    }
+    var step = topic.steps[1];
+    var actors = (step.demo.add || []).map(function (o) { return o.name; });
+
+    var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
+    var drive = w.StudioGuideDrive.create({
+      i18n: w.StudioI18n, marks: function () { return marks; }, sound: function () { return false; }
+    });
+
+    /* The narration, written down instead of spoken: `at(i)` is the clock the driver waits on. */
+    var guide = w.StudioGuide.create({
+      i18n: w.StudioI18n,
+      topics: [topic],
+      prepare: function (s, t) { return drive.prepare(s, t); },
+      explain: function (s, sync) { drive.explain(s, sync); },
+      perform: function (s, onProgress, sync) { return drive.perform(onProgress, sync); },
+      stop: function () { drive.stop(); marks.clear(); },
+      restore: function () { return drive.restore(); },
+      isActive: function () { return drive.isActive(); },
+      canRun: function () { return true; },
+      narrate: function () {
+        seen.t0 = now();
+        /* absolute, like a clip's cue track: the gate opens at the sentence's own millisecond,
+           however long the caller took to ask for it */
+        var until = function (ms) {
+          return wait(Math.max(0, ms - (now() - seen.t0))).then(function () { return true; });
+        };
+        return Promise.resolve({
+          spoken: true,
+          cues: [{ t: CUE0, text: 'one' }, { t: CUE1, text: 'two' }],
+          ended: until(CUE2),
+          at: function (i) { return until(i <= 0 ? CUE0 : i === 1 ? CUE1 : 0); }
+        });
+      },
+      hush: function () {},
+      voice: function () { return true; }
+    });
+
+    /* What the page can show: a ring, and presses with the library open or shut. A press while it
+       is shut is the plus; a press while it is open is a tile. */
+    var poll = setInterval(function () {
+      if (!seen.t0) return;
+      var t = now() - seen.t0;
+      seen.ticks++;
+      /* the marks are the sentence's own shapes (`svg.wl-marks`), not the picker's spotlight */
+      if (seen.ringAt === null && doc().querySelectorAll('.wl-mark.is-on').length) seen.ringAt = t;
+      var presses = drive.cursor().state().presses;
+      while (seen.presses.length < presses) seen.presses.push({ t: t, open: pickerOpen() });
+    }, 40);
+
+    log('narration written for the test: sentence 0 at ' + CUE0 + 'ms, sentence 1 at ' + CUE1 +
+        'ms, last word at ' + CUE2 + 'ms');
+    log('step imports: ' + actors.join(', '));
+
+    /* The invented timeline above says when the gates open; this says the real one has the same
+       shape — the clips' own cue track, entry per line, sentence per cue. Read from the manifest
+       without playing anything, so it cannot depend on a speaker. */
+    var planInfo = { ready: false, ok: false, body: 0, at: 0 };
+    var voice = w.StudioGuideVoice.create({ i18n: w.StudioI18n });
+    voice.plan(['guide.501-bp01.p1.title', 'guide.501-bp01.p1.body']).then(function (p) {
+      var body = p && p.entries && p.entries[1];
+      planInfo.ready = true;
+      planInfo.body = body ? body.cues.length : 0;
+      planInfo.at = body && body.cues[0] ? Math.round(body.cues[0].t) : 0;
+      planInfo.ok = !!body && body.cues.length > 0 && p.cues.every(function (c, i) {
+        return i === 0 || c.t > p.cues[i - 1].t;
+      });
+    });
+
+    /* the pane opens on its index; the step has to be on screen for its button to exist */
+    guide.open('501-bp01', 1);
+    var btn = guide.el.querySelector('.wl-g-demo');
+    if (!btn) { log('RESULT FAIL: the step has no 示範 button'); return; }
+    btn.click();
+
+    /* busy() is true from the press until the step settles, so it is the end of the run */
+    var armed = false;
+    var watch = setInterval(function () {
+      if (!armed) { armed = drive.busy(); return; }
+      if (drive.busy()) return;
+      clearInterval(watch);
+      clearInterval(poll);
+      finish();
+    }, 120);
+
+    function finish() {
+      var plus = seen.presses.filter(function (p) { return !p.open; })[0] || null;
+      var tile = seen.presses.filter(function (p) { return p.open; })[0] || null;
+      var present = names();
+
+      log('  ring on the plus appeared at ' + (seen.ringAt === null ? 'never' : Math.round(seen.ringAt) + 'ms'));
+      log('  presses: ' + seen.presses.map(function (p) { return Math.round(p.t) + (p.open ? ' tile' : ' plus'); }).join(', '));
+      log('  stage: ' + present.join(', '));
+      log('  library shut at the end: ' + !pickerOpen());
+
+      log('  the baked clips give the body ' + (planInfo.ready ? planInfo.body + ' sentence(s), first at ' +
+          planInfo.at + 'ms' : 'no timeline') + (planInfo.ok ? ' — usable' : ' — UNUSABLE'));
+
+      var ringOk = seen.ringAt !== null && seen.ringAt >= CUE0 - 120 && seen.ringAt <= CUE0 + 600;
+      /* the plus must come after the sentence that names it, and long before the last word */
+      var plusOk = !!plus && plus.t >= CUE0 - 60 && plus.t <= CUE0 + 2200;
+      var tileOk = !!tile && tile.t >= CUE1 - 60;
+      /* the point of the whole thing: the picture is inside the narration, not after it */
+      var insideOk = !!plus && plus.t < CUE2;
+      /* the lesson's names are not the library's: the imports are renamed on arrival, so the stage
+         is counted (the stage itself, plus one sprite per actor) rather than matched by name */
+      var stageOk = present.length >= actors.length + 1;
+      var countOk = seen.presses.length >= actors.length * 2;
+
+      log('  ring kept sentence 0: ' + (ringOk ? 'yes' : 'NO — ' +
+          (seen.ringAt === null ? 'no ring at all' : 'at ' + Math.round(seen.ringAt) + 'ms')));
+      log('  plus kept sentence 0: ' + (plusOk ? 'yes' : 'NO — ' + (plus ? Math.round(plus.t) + 'ms' : 'no press')));
+      log('  first tile kept sentence 1: ' + (tileOk ? 'yes' : 'NO — ' + (tile ? Math.round(tile.t) + 'ms' : 'no tile press')));
+      log('  the picture ran inside the words: ' + (insideOk ? 'yes' : 'NO — the plus waited the narration out'));
+      log('  every actor arrived: ' + (stageOk ? 'yes — ' + present.join(', ') : 'NO — only ' + present.join(', ')));
+      log('  presses: ' + seen.presses.length + ' for ' + actors.length + ' actors (expected ' +
+          actors.length * 2 + ')' + (countOk ? ' — ok' : ' — WRONG'));
+
+      log(ringOk && plusOk && tileOk && insideOk && stageOk && countOk && planInfo.ok ? 'RESULT PASS' : 'RESULT FAIL');
+    }
+  }());
+}());
+</script>
+</body>
+</html>

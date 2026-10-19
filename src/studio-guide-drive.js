@@ -15,12 +15,13 @@
  * first demonstration saves the whole session (S.state(): project, assets, script ids) and every
  * exit — 返回我的作品, leaving the tab, changing language — puts it back exactly.
  *
- * A STEP HAS TWO MOMENTS, AND THEY ARE NOT THE SAME MOMENT
+ * A STEP HAS TWO MOMENTS, AND THE SECOND ONE KEEPS THE FIRST ONE'S SENTENCES
  * `prepare` puts the stage in the state the step starts from — the student's project held, a clean
  * stage loaded, the earlier steps of the topic rebuilt if this one is being repeated. `perform` is the
- * build and the running of it. Between them the guide says what is about to happen; that is why they
- * are two verbs and not one, and why `run` (prepare then perform, with nothing in between) still
- * exists for a caller that has nothing to say.
+ * build and the running of it, and it is handed the narration's clock: one thing the student sees
+ * start per sentence, in the order the copy says them. The plus goes when the voice names the plus,
+ * the first tile when it says "one by one", the green flag when the sentence about running begins.
+ * `run` (prepare then perform, with no clock) still exists for a caller that has nothing to say.
  *
  * THE FIRST STEPS OF A LESSON ARE NOT BLOCKS
  * "From scratch" means the stage is empty and the student has to bring the actors in, so a step can
@@ -419,40 +420,59 @@
     }
 
     /**
-     * One actor, the long way round. Resolves true when the picker did it, false when it could not —
-     * the caller then falls back and nothing is lost but the pointing.
+     * Press the plus and wait for the library to open.
+     *
+     * Split from choosing the tile because the copy says them in two sentences — "that plus opens
+     * the library", "then pick the elephant" — and a picture that does both in the first sentence is
+     * describing something the student has not been told yet.
      */
-    function pickOne(o, opts) {
-      var kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
-      var name = o.name;
-      var alias = spriteName(o.sprite || o.name);
-      var before = targetIds();
+    function openPicker(kind, opts) {
+      opts = opts || {};
       var button = firstOf(REGION[kind === 'backdrop' ? 'addBackdrop' : 'addSprite']);
       if (!button) return Promise.resolve(false);
-
+      if (opts.ring !== false) {
+        ringEl(button, T('guide.point.' + (kind === 'backdrop' ? 'addBackdrop' : 'addSprite')), 2600);
+      }
       /* The pause the caller asked for is the budget for the whole approach, not time on top of it:
          a hand that arrives and a ring that waits are the same beat, and only one of them says
          "press this". */
       var lead = opts.lead || 900;
       var approach = Math.min(560, lead);
-
-      // the button first: "here is what opens the library" is the sentence the student needs most
-      ringEl(button, T('guide.point.' + (kind === 'backdrop' ? 'addBackdrop' : 'addSprite')), 2600);
-      return reach(button, lead).then(function (arrived) {
-        return wait(arrived ? Math.max(140, lead - approach) : lead);
+      return reach(button, lead).then(function (there) {
+        return wait(there ? Math.max(140, lead - approach) : lead);
       }).then(pressHere).then(function () {
         (button.querySelector('button') || button).click();
         return until(pickerOpen, 45, 120);
       }).then(function (open) {
         if (!open) { if (C()) C().hide(); return false; }
+        return true;
+      });
+    }
+
+    /**
+     * Scroll to the tile, ring it, press it, and wait for the actor to be on the stage.
+     *
+     * The picker closes on every selection, so a second actor needs the plus again: it is pressed
+     * quietly, because the step has already made the point once.
+     */
+    function chooseTile(o) {
+      var kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
+      var name = o.name;
+      var alias = spriteName(o.sprite || o.name);
+      var before = targetIds();
+      var front = pickerOpen() ? Promise.resolve(true) : openPicker(kind, { ring: false, lead: 420 });
+      return front.then(function (ok) {
+        if (ok === false) return false;
         return findTile(name).then(function (tile) {
           if (!tile) { closePicker(); if (C()) C().hide(); return false; }
-          var hold = opts.hold || 900;
+          /* the ring the sentence put on the plus has done its job; the pill on the tile is better */
+          clearMarks();
+          var hold = 900;
           var walk = Math.min(560, hold);
-          return reach(tile, hold).then(function (arrived) {
+          return reach(tile, hold).then(function (there) {
             // the pill says what the lesson calls it, which is not what the library calls it
             ringEl(tile, alias && alias !== name ? alias : null, hold, true);
-            return wait(arrived ? Math.max(140, hold - walk) : hold);
+            return wait(there ? Math.max(140, hold - walk) : hold);
           }).then(pressHere).then(function () {
             tile.click();
             /* The hand has done its job; left standing it is an arrow pointing at a closed dialog. Long
@@ -470,7 +490,43 @@
       });
     }
 
-    /** The short way: the library entry straight into the VM, with the lesson's name on it. */
+    /**
+     * Bring this step's actors in, the visible way, one sentence at a time.
+     *
+     * `opts.open` is the promise of the press on the plus (the first sentence) and `opts.gateTile`
+     * the one the first tile waits for (the second). Everything after the first tile follows at the
+     * pace of the hand, because there is no third sentence to wait for.
+     *
+     * Every failure has a way out: no button, a picker that will not open, a tile that is not in the
+     * library — the actor is imported through the API instead, and nothing is lost but the pointing.
+     */
+    function importAll(list, opts) {
+      opts = opts || {};
+      var i = 0;
+      function tile() {
+        if (opts.alive && !opts.alive()) return Promise.resolve(false);
+        if (i >= list.length) return Promise.resolve(true);
+        var one = list[i], at = i++;
+        if (opts.onProgress) { try { opts.onProgress(at + 1, list.length); } catch (e) { /* the count is not the step */ } }
+        var gate = (at === 0 && opts.gateTile) ? opts.gateTile : Promise.resolve(true);
+        return gate.then(function (ok) {
+          if (ok === false) return false;
+          return chooseTile(one).then(function (picked) {
+            if (picked) return wait(one.after || 320).then(tile);
+            return Promise.resolve(addDirect(one)).then(function () {
+              return wait(one.after || 450);
+            }, function (e) {
+              if (root.console) console.warn('[guide] could not add ' + (one && one.name) + ':', e && e.message);
+            }).then(tile);
+          });
+        });
+      }
+      return Promise.resolve(opts.open).then(function (ok) {
+        return ok === false ? addDirectAll(list, opts) : tile();
+      });
+    }
+
+    /** The short way, for everything at once: the library entry straight into the VM. */
     function addDirect(o) {
       var s = S(), kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
       var alias = spriteName(o.sprite || o.name);
@@ -484,41 +540,28 @@
       });
     }
 
-    /**
-     * Bring this step's actors in. With `opts.picker` each one is imported the visible way — plus,
-     * library, tile, press — and silently falls back to the direct import if the picker cannot be
-     * driven. Without it (rebuilding earlier steps on a rewind) nothing is shown: the student has
-     * watched this once already, and the point of 再看一次 is the step, not the walk up to it.
-     */
-    function addThings(list, opts) {
+    function addDirectAll(list, opts) {
       opts = opts || {};
-      var show = !!opts.picker;
-      var first = true;
       return (list || []).reduce(function (p, o, i) {
         return p.then(function () {
-          if (opts.onProgress) { try { opts.onProgress(i + 1, list.length); } catch (e) {} }
-          if (!show) {
-            return Promise.resolve(addDirect(o)).then(function () {
-              return wait(o.after || 450);
-            }, function (e) {
-              if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
-            });
-          }
-          var lead = first ? 1000 : 700, hold = first ? 1100 : 800;
-          first = false;
-          return pickOne(o, { lead: lead, hold: hold }).then(function (byPicker) {
-            if (byPicker) return wait(o.after || 350);
-            return Promise.resolve(addDirect(o)).then(function () {
-              return wait(o.after || 450);
-            }, function (e) {
-              if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
-            });
+          if (opts.alive && !opts.alive()) return false;
+          if (opts.onProgress) { try { opts.onProgress(i + 1, list.length); } catch (e) { /* as above */ } }
+          return Promise.resolve(addDirect(o)).then(function () {
+            return wait(o.after || 450);
           }, function (e) {
-            if (root.console) console.warn('[guide] the picker failed for ' + (o && o.name) + ':', e && e.message);
-            return Promise.resolve(addDirect(o)).then(function () { return wait(450); }, function () {});
+            if (root.console) console.warn('[guide] could not add ' + (o && o.name) + ':', e && e.message);
           });
         });
-      }, Promise.resolve());
+      }, Promise.resolve(true));
+    }
+
+    /**
+     * Bring this step's actors in without showing the walk: for rebuilding an earlier step on a
+     * rewind. The student has watched the imports once already, and the point of 再看一次 is the
+     * step, not the walk up to it.
+     */
+    function addThings(list, opts) {
+      return addDirectAll(list, opts);
     }
 
     /**
@@ -630,15 +673,34 @@
     }
 
     /**
-     * Point at what the step is about to say. Called once the stage is in place, so the shapes ring
-     * what is actually on the screen rather than where it was a moment ago.
+     * Point at what the step is about to say, as it says it.
+     *
+     * A mark used to be drawn the instant the stage was ready — all of them together, before the
+     * first word — so by the time the voice said "this button here" the ring had been on screen for
+     * six seconds and had stopped meaning anything. Now each mark waits for the sentence it belongs
+     * to: `cue` (0 by default) is the sentence index, counted from the start of the body.
      */
-    function explain(step) {
+    function explain(step, sync) {
       var m = marks();
       if (!m) return;
       var list = marksFor(step, 'say');
       if (!list.length) { m.clear(); return; }
-      m.draw(list);
+      /* no narration, no clock: draw at once, which is what a silent step has always done */
+      if (!sync || !sync.live) { m.draw(list); return; }
+
+      var groups = [], order = [];
+      list.forEach(function (mk) {
+        var c = Math.max(0, (mk && mk.cue) | 0);
+        if (!groups[c]) { groups[c] = []; order.push(c); }
+        groups[c].push(mk);
+      });
+      order.sort(function (a, b) { return a - b; });
+      order.forEach(function (c) {
+        Promise.resolve(sync.at(c)).then(function (ok) {
+          if (ok === false) return;
+          try { m.add(groups[c]); } catch (e) { /* a mark is never a reason to lose the step */ }
+        });
+      });
     }
 
     /**
@@ -702,34 +764,60 @@
     }
 
     /**
-     * Do the step that was prepared: the blocks, then the running of them. Resolves true when the
-     * editor ended up in the state the step describes; false when it could not, which the guide shows
-     * as a plain "this one did not work" rather than a silent no-op.
+     * Do the step that was prepared — one thing per sentence, in the order the copy says them.
+     *
+     * `sync` is the narration's clock (`{ live, at(i) }`): the plus waits for the sentence that names
+     * it, the first tile for the sentence that says "one by one", the blocks for the sentence that
+     * describes the stack, the green flag for the one after that. A sentence already spoken is not
+     * waited for twice — the clock clamps — so a step with more to show than the copy has sentences
+     * still moves at the hand's pace rather than stalling on a beat that will never come.
+     *
+     * Without a clock (a muted pane, a page with no voice) every gate opens at once and this is the
+     * old behaviour: the pauses are the hand's own, the ring's own.
+     *
+     * Resolves true when the editor ended up in the state the step describes; false when it could
+     * not, which the guide shows as a plain "this one did not work" rather than a silent no-op.
      */
-    function perform(onProgress) {
+    function perform(onProgress, sync) {
       var st = prepared;
       prepared = null;
       if (!st || st.token !== take) { busyNow = false; return Promise.resolve(false); }
       var demo = st.demo, scripts = st.scripts, adds = st.adds || [], vm = VM(), ops = OPS();
       if (!vm || !ops) { busyNow = false; return Promise.resolve(false); }
 
-      // the words are finished; from here the animation is the pointer
-      clearMarks();
+      var slot = 0;                              // which sentence the next thing waits for
+      function alive() { return st.token === take; }
+      function beat() {
+        var i = slot++;
+        if (!sync) return Promise.resolve(true);
+        return Promise.resolve(sync.at(i)).then(function (v) { return v !== false; });
+      }
+      function step(fn) {
+        return beat().then(function (go) {
+          if (!go || !alive()) return false;
+          return fn();
+        });
+      }
 
       /* Imports first, in the order the lesson asked for them: a script can only be built on an
          actor that is already on the stage. When the step is only about importing, the counts under
          the button are the actors' — the block animation is not running, so nothing else is using it. */
-      var chain = addThings(adds, {
-        picker: true,
-        onProgress: scripts.length ? null : onProgress
-      }).then(function () {
-        return scripts.length
-          ? build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress })
-          : { ok: true };
-      });
+      var chain = Promise.resolve(true);
+      if (adds.length) {
+        var first = adds[0];
+        var region = first['do'] === 'add_backdrop' ? 'addBackdrop' : 'addSprite';
+        /* a sentence that already rings the button does not need the picker's own ring on top */
+        var alreadyRung = marksFor(st.step, 'say').some(function (mk) { return mk && mk.at === region; });
+        chain = importAll(adds, {
+          open: step(function () { return openPicker(region === 'addBackdrop' ? 'backdrop' : 'sprite', { ring: !alreadyRung }); }),
+          gateTile: beat(),
+          alive: alive,
+          onProgress: scripts.length ? null : onProgress
+        });
+      }
 
-      return chain.then(function (res) {
-        if (!res || res.ok === false) return false;
+      chain = chain.then(function (ok) {
+        if (!ok || !alive()) return false;
 
         if (!scripts.length) {
           if (demo.focus) { var f = ops.targetByName(vm, spriteName(demo.focus)); if (f) { try { vm.setEditingTarget(f.id); } catch (e) {} } }
@@ -737,31 +825,41 @@
           return true;
         }
 
-        var target = demo.focus ? ops.targetByName(vm, spriteName(demo.focus)) : null;
-        if (target && vm.editingTarget !== target) { try { vm.setEditingTarget(target.id); } catch (e) {} }
-        if (demo.point) point(demo.point);
+        return step(function () {
+          return build(scripts, { focus: demo.focus ? spriteName(demo.focus) : null, onProgress: onProgress });
+        }).then(function (res) {
+          if (!res || res.ok === false) return false;
 
-        return settled(scripts).then(function () {
-          var after = Promise.resolve();
-          /* The block is on the canvas now, so the number it is about can be ringed where it sits:
-             "drag this" before the drag, "change this" once there is something to change. */
-          var later = marksFor(st.step, 'built');
-          var m = marks();
-          if (later.length && m) {
-            after = after.then(function () { return m.draw(later); }).then(function () { return wait(900); });
-          }
-          if (demo.run) {
-            after = after.then(function () {
-              try { vm.greenFlag(); } catch (e) {}
-              return wait(demo.run);
-            }).then(function () { try { vm.stopAll(); } catch (e) {} });
-          }
-          (demo.keys || []).forEach(function (key) {
-            after = after.then(function () { return press(key); });
+          var target = demo.focus ? ops.targetByName(vm, spriteName(demo.focus)) : null;
+          if (target && vm.editingTarget !== target) { try { vm.setEditingTarget(target.id); } catch (e) {} }
+          if (demo.point) point(demo.point);
+
+          return settled(scripts).then(function () {
+            var after = Promise.resolve();
+            /* The block is on the canvas now, so the number it is about can be ringed where it sits:
+               "drag this" before the drag, "change this" once there is something to change. */
+            var later = marksFor(st.step, 'built');
+            var m = marks();
+            if (later.length && m) {
+              after = after.then(function () { return m.draw(later); }).then(function () { return wait(900); });
+            }
+            if (demo.run) {
+              after = after.then(function () { return step(function () {
+                try { vm.greenFlag(); } catch (e) {}
+                return wait(demo.run);
+              }); }).then(function (go) {
+                if (go === false) return false;
+                try { vm.stopAll(); } catch (e) {}
+              });
+            }
+            (demo.keys || []).forEach(function (key) {
+              after = after.then(function () { return step(function () { return press(key); }); });
+            });
+            return after.then(function () { return true; });
           });
-          return after.then(function () { return true; });
         });
-      }).then(function (ok) {
+      });
+      return chain.then(function (ok) {
         busyNow = false;
         clearMarks();
         // where the stage is now, so the next press knows whether it is moving on or going back

@@ -22,10 +22,19 @@
  * remembered, and it changes the steps, never the words.
  *
  * THE ORDER OF A STEP, WHICH IS THE POINT OF THIS FILE
- * Say it, then do it. A demonstration that starts its blocks while the voice is still on the heading
- * is two explanations at once, and the student follows neither. So: prepare the stage, point at the
- * place while the step is spoken, keep the last line of the narration on screen, and only when the
- * voice has finished let the editor move. Everything that moves after that point was said first.
+ * Say it and do it, sentence by sentence. The first version of this file said the whole step and
+ * then did the whole step, which is correct for one sentence and wrong for four: by the time the
+ * blocks moved the student had stopped listening, and the ring around the button had been on screen
+ * for six seconds before the voice got to the button. So the step now runs on the narration's clock.
+ * The demonstration is handed `sync` — "tell me when you reach sentence two" — and starts one thing
+ * per sentence: the plus when the voice names the plus, the tile when it says "one by one", the
+ * green flag when the sentence about running begins. What the student hears and what they see are
+ * the same beat, and the step is over when the later of the two is.
+ *
+ * WITHOUT A VOICE THERE IS NO CLOCK
+ * A muted pane, a browser with no audio, a page that cannot serve the clips: `narrate` resolves
+ * nothing, `sync.live` is false, and the step falls back to pacing itself — a beat for the marks to
+ * be looked at, then the hand's own pauses. The picture never waits for a word that will not come.
  *
  * WHAT IT DOES NOT OWN
  * The editor. `prepare` and `run` are the caller's and this module waits for them: while it waits it
@@ -37,8 +46,9 @@
  *     i18n: StudioI18n,
  *     topics: StudioGuideTopics,           // the structure; the words are in the locale files
  *     prepare: function (step, topic) { return drive.prepare(step, topic); },
- *     explain: function (step) { drive.explain(step); },
- *     perform: function (step, onProgress) { return drive.perform(onProgress); },
+ *     explain: function (step, sync) { drive.explain(step, sync); },
+ *     perform: function (step, onProgress, sync) { return drive.perform(onProgress, sync); },
+ *     narrate: function (keys, opts) { return voice.narrate(keys, opts); },   // `speak` without it
  *     stop: function () { drive.stop(); },
  *     restore: function () { return drive.restore(); },
  *     isActive: function () { return drive.isActive(); }
@@ -95,6 +105,9 @@
     /* Narration is optional in the same way: without `speak` the guide is exactly what it was before
        anyone thought of a voice, which is what a page that cannot serve audio needs. */
     var speak = cfg.speak || function () { return Promise.resolve(false); };
+    /* `narrate` is `speak` with a clock: it resolves a handle whose `at(i)` waits for the i-th
+       sentence. Absent = the caller has no voice, and the guide paces the step itself. */
+    var narrate = cfg.narrate || null;
     var hush = cfg.hush || noop;
     var voice = cfg.voice || null;      // get/set the mute; absent = no toggle is offered
     /* `mode` is 'new' (every step, including the ones that name a button) or 'pro' (skip those).
@@ -109,7 +122,6 @@
     var phase = null;        // 'ready' | 'speak' | 'show': what the running step is doing
     var take = 0;            // bumped by every press and every move: a finished narration that nobody
                              // is waiting for any more must not start a demonstration
-    var BEAT = 260;          // ms of quiet between the last word and the first movement
     var MARKS_BEAT = 1500;   // ms the marks stand alone when there is no voice to explain them
 
     function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -412,11 +424,12 @@
     }
 
     /**
-     * One press: ready the stage, point at the place, say the step, then do it.
+     * One press: start the voice, ready the stage, then let the picture follow the words.
      *
      * The narration is started before anything is awaited, because a browser that only speaks from a
-     * user gesture stops speaking the moment the call is deferred. It is awaited before the editor is
-     * allowed to move: everything the animation does after that point has already been described.
+     * user gesture stops speaking the moment the call is deferred. It is *not* awaited before the
+     * editor may move any more — the handle it resolves is the clock, and the demonstration waits on
+     * the sentence it needs rather than on the last word of the paragraph.
      */
     function play(t, s) {
       var k = stepKey(t, s);
@@ -436,36 +449,58 @@
         paint();
       }
 
-      var said = Promise.resolve(speak([keyStep(t, s, 'title'), keyStep(t, s, 'body')], { hold: true }));
+      var keys = [keyStep(t, s, 'title'), keyStep(t, s, 'body')];
+      /* `from: 1` — the heading announces the step, the body is what describes the picture, so the
+         gates are numbered from the body's first sentence. */
+      var live = narrate
+        ? Promise.resolve(narrate(keys, { hold: true, from: 1 })).then(null, function () { return null; })
+        : Promise.resolve(null);
+
+      /* Until the handle arrives we do not know whether there is a clock at all, so the fallback is
+         the pause a silent step has always had: long enough to look at the marks before they move. */
+      var said = live.then(function (n) { return n ? n.ended : speak(keys, { hold: true }); });
+
+      var firstMove = true;
+      var sync = {
+        live: false,
+        at: function (i) {
+          var pace = function () { return wait(i === 0 ? MARKS_BEAT : 0).then(function () { return true; }); };
+          var p = sync.live && live ? live.then(function (n) { return n ? n.at(i) : pace(); }) : pace();
+          return p.then(function (v) {
+            if (v !== false && firstMove) {
+              firstMove = false;
+              if (phase) { phase = 'show'; paintStatus(); }
+            }
+            return v;
+          });
+        }
+      };
 
       var ready = prepare ? Promise.resolve(prepare(s, t)) : Promise.resolve(true);
 
-      ready.then(function (ok) {
+      Promise.all([ready, live]).then(function (r) {
+        var ok = r[0], n = r[1];
         if (mine !== take) return false;
         if (ok === false) throw new Error('guide: the step could not be prepared');
+        /* Decided here, not at the click: a muted pane still resolves a handle, and it is null. */
+        sync.live = !!n;
         /* After preparing, not before: preparing swaps the stage, and a mark drawn first would ring
            something that has moved by the time the student looks at it. */
-        try { explain(s); } catch (e) { /* a mark is never a reason to lose the step */ }
+        try { explain(s, sync); } catch (e) { /* a mark is never a reason to lose the step */ }
         // the canvas is borrowed from here on: say so, and offer the way back
         renderFoot();
         phase = 'speak';
         paintStatus();
-        return said;
-      }).then(function (spoke) {
-        if (mine !== take) return false;
-        phase = 'show';
-        paintStatus();
-        /* One beat of quiet, so the last word is not swallowed by the first movement. With the voice
-           off there is no last word, and the wait belongs to the marks instead: a shape that appears
-           and vanishes in the same frame has pointed at nothing. */
-        return wait(spoke ? BEAT : MARKS_BEAT);
-      }).then(function (go) {
-        if (mine !== take || go === false) return false;
-        return perform(s, function (done, total) { progress = { done: done, total: total }; paintStatus(); }, t);
-      }).then(function (ok) {
+        /* Both at once, and the step ends when the later of them does: the words and the picture are
+           on one clock now, so neither can finish the step while the other is still going. */
+        return Promise.all([
+          perform(s, function (done, total) { progress = { done: done, total: total }; paintStatus(); }, sync),
+          said
+        ]);
+      }).then(function (res) {
         if (mine !== take) return;
         try { hush(); } catch (e) { /* the step is over either way */ }
-        settle(ok === false ? 'failed' : 'done');
+        settle(res && res[0] === false ? 'failed' : 'done');
       }, function (e) {
         if (root.console) root.console.warn('[guide] demonstration failed:', e && e.message);
         try { hush(); } catch (x) { /* nothing playing */ }

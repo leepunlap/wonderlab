@@ -241,13 +241,15 @@
       return guideMode;
     },
     prepare: function (step, topic) { return drive.prepare(step, topic); },
-    explain: function (step) { drive.explain(step); },
-    perform: function (step, onProgress) { return drive.perform(onProgress); },
+    explain: function (step, sync) { drive.explain(step, sync); },
+    /* the third argument is the narration's clock: the driver starts one thing per sentence */
+    perform: function (step, onProgress, sync) { return drive.perform(onProgress, sync); },
     stop: function () { drive.stop(); marks.clear(); chat.closeSheet(); },
     restore: function () { return drive.restore(); },
     isActive: function () { return drive.isActive(); },
     canRun: function () { return !!(S && S.ready); },
     speak: function (keys, opts) { return voice.say(keys, opts); },
+    narrate: function (keys, opts) { return voice.narrate(keys, opts); },
     hush: function () { voice.stop(); marks.clear(); },
     voice: function (on) { return voice.enabled(on); }
   });

@@ -46,6 +46,9 @@ load('studio-guide-refs.js');
    list because they are checked by the same rules — only the shelf they sit on differs. */
 const topics = [].concat(sandbox.StudioGuideLessons || [], sandbox.StudioGuideRefs || [], sandbox.StudioGuideTopics || []);
 const spec = JSON.parse(readFileSync(join(SRC, 'opcodes.json'), 'utf8')).opcodes;
+/* The picture follows the sentences, so the sentences have to exist: the gate that starts a ring or
+   a press fires on a cue, and a body with no cue track has no beat to fire on, in that language. */
+const VOICE = JSON.parse(readFileSync(join(SRC, 'assets/voice/manifest.json'), 'utf8'));
 const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar',
   'addSprite', 'addBackdrop']);
 const SHAPES = new Set(['square', 'circle', 'arrow']);
@@ -151,6 +154,12 @@ for (const t of topics) {
     for (const m of d.annotate || []) {
       check(`  ${t.id}/${s.id} mark ${m.shape} is one of three shapes`, SHAPES.has(m.shape), String(m.shape));
       if (m.when) check(`  ${t.id}/${s.id} mark is said or built`, m.when === 'say' || m.when === 'built', String(m.when));
+      /* a mark may ask to appear on a later sentence (`cue`), because the copy names the tile in the
+         second one and a ring that is already there when the student looks is not pointing */
+      if (m.cue != null) {
+        check(`  ${t.id}/${s.id} mark cue is a sentence index`,
+          Number.isInteger(m.cue) && m.cue >= 0, String(m.cue));
+      }
       if (m.shape === 'arrow') {
         check(`  ${t.id}/${s.id} arrow has a from and a to`, !!m.from && !!m.to);
       } else {
@@ -177,6 +186,28 @@ for (const t of topics) {
 for (const [id] of LOCALES) {
   const missing = [...required].filter((k) => !has(id, k));
   check(`${id}: every word the guide asks for exists`, missing.length === 0, missing.slice(0, 8).join(', '));
+}
+
+/* The clock the picture follows is made of the clips' own cue tracks: one entry per sentence, each
+   with the millisecond it begins. A body with no clip, or a clip with no sentence, leaves the
+   demonstration with nothing to wait for and it runs after the paragraph again. */
+for (const [id] of LOCALES) {
+  const bad = [];
+  let sentences = 0, steps = 0;
+  for (const t of topics) {
+    for (const s of t.steps || []) {
+      const clip = VOICE.clips[`guide.${t.id}.${s.id}.body|${id}`];
+      if (!clip) { bad.push(`${t.id}/${s.id}: no clip`); continue; }
+      const cues = (clip.cues || []).slice().sort((a, b) => a.t - b.t);
+      if (!cues.length) { bad.push(`${t.id}/${s.id}: one long unreachable sentence`); continue; }
+      steps++;
+      sentences += cues.length;
+      if (cues[0].t >= clip.ms) bad.push(`${t.id}/${s.id}: first sentence starts after the clip ends`);
+    }
+  }
+  check(`${id}: every step's body is spoken in sentences the picture can follow`, bad.length === 0,
+    bad.slice(0, 6).join('; '));
+  if (!bad.length) console.log(`        ${sentences} sentences across ${steps} steps, ${(sentences / steps).toFixed(1)} per step`);
 }
 
 /* and nothing beyond: a key added to one language and forgotten in another drifts silently */

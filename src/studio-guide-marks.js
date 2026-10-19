@@ -281,15 +281,21 @@
     /**
      * Draw a list of marks. Returns when the last one has appeared, so a caller that wants to speak
      * only once the picture is complete can wait; a caller that does not care can ignore it.
+     *
+     * A mark is not always drawn with its siblings any more: a step whose first sentence is about the
+     * button and whose second is about the tile says so, and the ring for the tile must not appear
+     * while the student is still looking at the button. So `add` appends to what is already there,
+     * and `draw` is the same thing with a clear in front of it.
      */
-    function draw(list, redraw) {
-      clear();
-      last = (list || []).slice();
-      if (!last.length) return Promise.resolve(false);
+    function paint(list, redraw, append) {
+      if (!append) clear();
+      var more = (list || []).slice();
+      last = append ? (last || []).concat(more) : more;
+      if (!more.length) return Promise.resolve(shown.length > 0);
       var svg = surface();
       var waits = [];
 
-      last.forEach(function (spec, i) {
+      more.forEach(function (spec, i) {
         var g = build(spec || {});
         if (!g) return;
         svg.appendChild(g);
@@ -308,6 +314,9 @@
       return Promise.all(waits).then(function () { return shown.length > 0; });
     }
 
+    function draw(list, redraw) { return paint(list, redraw, false); }
+    function add(list) { return paint(list, false, true); }
+
     function clear() {
       timers.forEach(clearTimeout);
       timers = [];
@@ -318,6 +327,8 @@
 
     return {
       draw: draw,
+      /** the same, without clearing what the previous sentence already put on screen */
+      add: add,
       clear: clear,
       /** for a caller that has one region to name, without a list */
       at: function (anchor) { return rectOf(anchor); }
