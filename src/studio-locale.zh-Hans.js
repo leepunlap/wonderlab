@@ -84,6 +84,7 @@
     'guide.demoHolding': '示范借用画布中',
     'guide.stop': '停止',
     'guide.restore': '返回我的作品',
+    'guide.voice': '朗读',
 
     'guide.point.flag': '绿旗',
     'guide.point.stage': '舞台',

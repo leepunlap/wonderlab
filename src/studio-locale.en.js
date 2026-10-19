@@ -83,6 +83,7 @@
     'guide.demoHolding': 'A demonstration is using the canvas',
     'guide.stop': 'Stop',
     'guide.restore': 'Back to my project',
+    'guide.voice': 'Narrate',
 
     'guide.point.flag': 'Green flag',
     'guide.point.stage': 'Stage',

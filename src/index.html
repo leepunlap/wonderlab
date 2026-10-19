@@ -61,6 +61,7 @@
 <script src="studio-guide.js"></script>
 <script src="studio-guide-topics.js"></script>
 <script src="studio-guide-drive.js"></script>
+<script src="studio-guide-voice.js"></script>
 <script src="studio-models.js"></script>
 <script src="studio-core.js"></script>
 <script src="studio-assist.js"></script>
@@ -112,6 +113,8 @@
     /* A demonstration is a place you are, not a layer over your work: going back to the conversation
        gives the canvas back, so the AI never edits a stage the student did not build. */
     onTab: function (from, to) {
+      // the voice belongs to the tab it is explaining, not to the pane
+      if (voice) voice.stop();
       if (from === 'guide' && to === 'chat' && drive && drive.isActive()) {
         drive.restore().then(function () { if (guide) guide.sync(); showCtx(); });
       }
@@ -130,7 +133,11 @@
       else if (id === 'about') chat.openSheet('chat.menu.about', aboutPane);
       else if (id === 'export') S.exportVersions();
     },
-    onClose: function () { if (drive && drive.isActive()) drive.restore(); setOpen(false); }
+    onClose: function () {
+      if (voice) voice.stop();
+      if (drive && drive.isActive()) drive.restore();
+      setOpen(false);
+    }
   });
   chat.bindOutside();
 
@@ -200,8 +207,11 @@
   /* ---- the guide ----
      Two modules, one tab. The driver performs a step on the editor; the guide navigates and waits.
      Neither is created inside StudioApp: the shell mounts an editor and has never heard of a guide,
-     which is what lets a lesson page mount the same editor without one. */
+     which is what lets a lesson page mount the same editor without one.
+     The voice is a third, because it is neither navigation nor the editor: it plays the baked clips
+     and owns the strip of text over the stage. */
   drive = StudioGuideDrive.create({ i18n: I });
+  var voice = StudioGuideVoice.create({ i18n: I });
   guide = StudioGuide.create({
     i18n: I,
     topics: StudioGuideTopics,
@@ -209,7 +219,10 @@
     stop: function () { drive.stop(); chat.closeSheet(); },
     restore: function () { return drive.restore(); },
     isActive: function () { return drive.isActive(); },
-    canRun: function () { return !!(S && S.ready); }
+    canRun: function () { return !!(S && S.ready); },
+    speak: function (keys) { return voice.say(keys); },
+    hush: function () { voice.stop(); },
+    voice: function (on) { return voice.enabled(on); }
   });
   chat.addView('guide', guide.el);
 

@@ -238,6 +238,22 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-g-foot[hidden] { display: none; }
 .wl-g-foot-label { margin-right: auto; font-size: .74rem; color: #7a5b12; }
 
+/* the speaker: a mute, not a play button — the voice belongs to the demonstration */
+.wl-g-voice { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; flex: none;
+  margin-left: auto; border: 0; border-radius: 8px; background: none; color: var(--wl-muted); cursor: pointer; }
+.wl-g-voice:hover { background: var(--wl-pane); color: var(--wl-text); }
+.wl-g-voice.is-on { color: var(--wl-accent); }
+
+/* the narration's subtitle, over the bottom of the stage: dark, two lines at most, never in the way */
+.wl-sub { position: fixed; z-index: 480; padding: 7px 12px; border-radius: 9px;
+  background: rgba(18, 22, 34, .84); color: #fff; text-align: center;
+  font-size: .84rem; line-height: 1.5; font-weight: 500;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
+  pointer-events: none; animation: wl-sub-in .18s ease-out; }
+.wl-sub[hidden] { display: none; }
+/* opacity only: the strip is positioned by an inline transform, which an animation would override */
+@keyframes wl-sub-in { from { opacity: 0; } to { opacity: 1; } }
+
 /* the pointer a step that is not about blocks gets: a ring round the region, named */
 .wl-point { position: fixed; z-index: 2147482000; pointer-events: none; border: 3px solid #ffb000; border-radius: 10px;
   animation: wl-point 1.2s ease-in-out infinite; }
@@ -259,4 +275,4 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
   body.wl-chat-open .wl-fab { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } .wl-point { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } .wl-point { animation: none; } .wl-sub { animation: none; } }

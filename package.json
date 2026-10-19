@@ -12,6 +12,7 @@
     "test": "python3 test/e2e.py",
     "perf": "python3 test/perf.py",
     "check:guide": "node tools/check_guide.mjs",
+    "build:voice": "node tools/build_voice.mjs",
     "build": "node tools/build.mjs"
   },
   "wonderlab": {

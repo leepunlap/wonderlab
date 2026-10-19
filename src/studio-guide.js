@@ -55,6 +55,9 @@
 
   var ICON_CHEV = '<path d="m9 18 6-6-6-6"/>';
   var ICON_BACK = '<path d="M15 18l-6-6 6-6"/>';
+  var ICON_VOICE_ON = '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
+    '<path d="M18.5 5.5a9 9 0 0 1 0 13"/>';
+  var ICON_VOICE_OFF = '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>';
 
   function create(cfg) {
     cfg = cfg || {};
@@ -68,6 +71,11 @@
     var restoreFn = cfg.restore || function () { return Promise.resolve(); };
     var canRun = cfg.canRun || function () { return true; };
     var isActive = cfg.isActive || function () { return false; };
+    /* Narration is optional in the same way: without `speak` the guide is exactly what it was before
+       anyone thought of a voice, which is what a page that cannot serve audio needs. */
+    var speak = cfg.speak || function () { return Promise.resolve(false); };
+    var hush = cfg.hush || noop;
+    var voice = cfg.voice || null;      // get/set the mute; absent = no toggle is offered
 
     /* Where the student is. Kept out of the DOM so a language change, a resize or returning from a
        demonstration re-paints the same place rather than the beginning. */
@@ -148,6 +156,24 @@
       var head = h('div', 'wl-g-bar-main');
       head.appendChild(h('h2', 'wl-g-h', T(keyTopic(t, 'title'))));
       bar.appendChild(head);
+
+      /* The speaker is a mute, not a play button: the voice belongs to the demonstration, and a
+         student who wants to read in silence should not have to press it before every step. */
+      if (voice) {
+        var isOn = !!voice();
+        var vb = h('button', 'wl-g-voice' + (isOn ? ' is-on' : ''));
+        vb.type = 'button';
+        vb.setAttribute('aria-pressed', String(isOn));
+        vb.setAttribute('aria-label', T('guide.voice'));
+        vb.title = T('guide.voice');
+        vb.appendChild(ic(isOn ? ICON_VOICE_ON : ICON_VOICE_OFF));
+        vb.addEventListener('click', function () {
+          var now = voice(!voice());
+          if (!now) hush();
+          paint();
+        });
+        bar.appendChild(vb);
+      }
       box.appendChild(bar);
 
       box.appendChild(h('p', 'wl-g-intro', T(keyTopic(t, 'intro'))));
@@ -164,7 +190,7 @@
         d.setAttribute('aria-current', i === view.step ? 'step' : 'false');
         d.addEventListener('click', function () {
           if (i === view.step) return;
-          stopFn();
+          halt();
           go(view.topic, i);
         });
         rail.appendChild(d);
@@ -210,14 +236,14 @@
       var prev = h('button', 'wl-btn wl-small', T('guide.prev'));
       prev.type = 'button';
       prev.disabled = view.step === 0;
-      prev.addEventListener('click', function () { stopFn(); go(view.topic, Math.max(0, view.step - 1)); });
+      prev.addEventListener('click', function () { halt(); go(view.topic, Math.max(0, view.step - 1)); });
       pager.appendChild(prev);
 
       var last = view.step >= steps.length - 1, more = view.topic < topics.length - 1;
       var next = h('button', 'wl-btn wl-small wl-g-next', T(last ? (more ? 'guide.nextTopic' : 'guide.back') : 'guide.next'));
       next.type = 'button';
       next.addEventListener('click', function () {
-        stopFn();
+        halt();
         if (!last) go(view.topic, view.step + 1);
         else if (more) go(view.topic + 1, 0);
         else goIndex();
@@ -236,11 +262,14 @@
       foot.appendChild(h('span', 'wl-g-foot-label', T('guide.demoHolding')));
       var s = h('button', 'wl-btn wl-small', T('guide.stop'));
       s.type = 'button';
-      s.addEventListener('click', function () { stopFn(); paint(); });
+      s.addEventListener('click', function () { halt(); paint(); });
       foot.appendChild(s);
       var r = h('button', 'wl-btn wl-small wl-g-restore', T('guide.restore'));
       r.type = 'button';
-      r.addEventListener('click', function () { restoreFn().then(paint, paint); });
+      r.addEventListener('click', function () {
+        try { hush(); } catch (e) { /* restoring matters more than a voice */ }
+        restoreFn().then(paint, paint);
+      });
       foot.appendChild(r);
     }
 
@@ -264,6 +293,12 @@
       bodyBox.scrollTop = 0;
     }
 
+    /** Leaving a step takes the voice with it: a narration that outlives its step comes from nowhere. */
+    function halt() {
+      try { hush(); } catch (e) { /* a voice is never a reason to fail a navigation */ }
+      stopFn();
+    }
+
     /* ---------- the demonstration ---------- */
     function paintStatus() {
       if (!statusEl) return;
@@ -277,6 +312,10 @@
       marks[k] = 'running';
       progress = null;
       paint();
+      /* The voice and the demonstration are two halves of the same explanation, so they start
+         together and neither waits for the other: the blocks take about as long to arrive as the
+         sentence takes to say, and a student watching the canvas should not be read to in silence. */
+      try { speak([keyStep(t, s, 'title'), keyStep(t, s, 'body')]); } catch (e) { /* text still stands */ }
 
       var settle = function (mark) {
         marks[k] = mark;
@@ -300,7 +339,10 @@
 
     /* ---------- the outside world ---------- */
     /** The pane asks this when the language changes: re-paint, do not restart. */
-    function refresh() { paint(); }
+    function refresh() {
+      hush();     // whatever was being said is now in the wrong language
+      paint();
+    }
 
     if (i18n && typeof i18n.on === 'function') i18n.on(refresh);
 

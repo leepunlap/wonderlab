@@ -70,6 +70,36 @@ Two pages exist for looking at the pane by hand: `src/_i18n-check.html` walks th
 shell in all three languages and ends with `ALL PASS`, `src/_i18n-layout.html`
 measures the header for overflow and clipping.
 
+## The guide's voice
+
+The help tab narrates a step and shows the line it is speaking over the stage.
+The audio is baked ahead of time, not fetched from a speech service:
+
+```bash
+pip install edge-tts
+npm run build:voice           # -> src/assets/voice/*.mp3 + manifest.json
+```
+
+Baked files are the only form that survives a school network with no outside
+access, and the static production deploy has no application server to proxy a
+speech call anyway. Re-running is cheap and idempotent: each clip is named after
+a hash of voice + text, unchanged lines are kept, and `VOICE_JOBS` sets how many
+synthesise at once. `EDGE_TTS` overrides the binary if it is not on `PATH`.
+
+Voices, per language: `zh-HK-HiuMaanNeural` (Cantonese — the copy is Hong Kong
+Chinese, so a Mandarin voice would be reading a translation), `zh-CN-XiaoxiaoNeural`,
+`en-GB-SoniaNeural`, all at `-5%` for a teaching pace.
+
+Each clip carries its own cue track, generated from Edge's word timings, so the
+subtitle is the timing the voice actually used rather than an estimate. A line
+with no clip — a step edited but not rebuilt, a language added in a hurry — is
+read by the browser instead, preferring an Edge natural voice; with no voice at
+all, the cues still run on a timer. Subtitles never depend on the audio working.
+
+`src/studio-guide-voice.js` owns the playback and the strip; the guide only says
+which keys to speak, and the speaker button in its header is a mute that is
+remembered across reloads.
+
 ## Attribution
 
 Based on Scratch, developed by the Lifelong Kindergarten Group at the MIT Media Lab. See https://scratch.mit.edu
