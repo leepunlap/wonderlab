@@ -62,6 +62,7 @@
 <script src="studio-guide-topics.js"></script>
 <script src="studio-guide-lessons.js"></script>
 <script src="studio-guide-refs.js"></script>
+<script src="studio-guide-cursor.js"></script>
 <script src="studio-guide-drive.js"></script>
 <script src="studio-guide-marks.js"></script>
 <script src="studio-guide-voice.js"></script>
@@ -215,7 +216,13 @@
      The voice is a fourth, because it is neither navigation nor the editor: it plays the baked clips
      and owns the strip of text over the stage. */
   var marks = StudioGuideMarks.create({ i18n: I });
-  drive = StudioGuideDrive.create({ i18n: I, marks: function () { return marks; } });
+  /* The hand follows the narration's switch. A child who turned the voice off asked for quiet, and
+     the clicks are part of the telling — they just happen to be thirty milliseconds long. */
+  drive = StudioGuideDrive.create({
+    i18n: I,
+    marks: function () { return marks; },
+    sound: function () { return voice.enabled(); }
+  });
   var voice = StudioGuideVoice.create({ i18n: I });
   /* 新手 / 熟手. The same course with the "which button is that" steps taken out of it, remembered
      for next time: a child who has used this before should not be re-taught where the sprite button

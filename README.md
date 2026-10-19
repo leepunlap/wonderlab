@@ -101,6 +101,20 @@ all, the cues still run on a timer. Subtitles never depend on the audio working.
 which keys to speak, and the speaker button in its header is a mute that is
 remembered across reloads.
 
+## The hand
+
+Importing an actor is the one thing a lesson never writes down, so the guide does
+it the way a child would: the plus, the library, the tile, the press. A ring says
+where; `src/studio-guide-cursor.js` says *press* — an arrow that travels to the
+target, compresses against it, leaves a ripple, and clicks.
+
+The click is synthesised rather than sampled: a band-passed noise burst for the
+tick and a fast-falling triangle for the body, both gone in under a tenth of a
+second. It follows the narration's mute — a child who turned the voice off asked
+for quiet, and the clicks are part of the telling. `probe()` renders the very same
+graph into an `OfflineAudioContext` and measures its peak, because a click that
+makes no sound is exactly the kind of bug no screenshot can show.
+
 ## The order of a step, and the shapes
 
 A step is said and then done. The narration starts the moment 示範 is pressed,

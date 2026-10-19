@@ -14,6 +14,7 @@
     2. the library opened
     3. a ring appeared on a tile inside the library
     4. every actor the step names is on the stage afterwards, under the lesson's own name
+    5. a hand travelled to each target and pressed it, once per press, with a click each time
 
   plus the same for a backdrop, whose picker is a different button and a different list.
 
@@ -41,7 +42,7 @@
   function win() { return frame().contentWindow; }
   function doc() { return frame().contentDocument; }
 
-  var seen = { plus: 0, tile: 0, picker: 0 };
+  var seen = { plus: 0, tile: 0, picker: 0, hand: 0, ripple: 0 };
   /** While a step runs, remember every ring that appears and whether the library was open then. */
   function sample() {
     var open = doc().querySelectorAll('[class*="library-item_library-item"]').length > 0;
@@ -49,6 +50,8 @@
     if (open) seen.picker++;
     if (rings && open) seen.tile++;
     if (rings && !open) seen.plus++;
+    if (doc().querySelectorAll('.wl-cur.is-on').length) seen.hand++;
+    if (doc().querySelectorAll('.wl-ripple.is-go').length) seen.ripple++;
   }
   function watch(untilDone) {
     var timer = setInterval(sample, 120);
@@ -94,9 +97,13 @@
     log('step 1 imports: ' + actors.join(', ') + '   step 2 backdrop: ' + backdrop);
 
     watch(drive.run(topic.steps[1], null, topic)).then(function (ok) {
+      var hand = drive.cursor().state();
       log('step 1 finished: ' + ok + '   targets now: ' + names().join(', '));
       log('  rings seen on the plus: ' + seen.plus + ', inside the library: ' + seen.tile +
           ', library open samples: ' + seen.picker);
+      log('  hand: travels ' + hand.travels + ', presses ' + hand.presses +
+          ', clicks heard ' + hand.sounds + ', on screen in ' + seen.hand + ' samples' +
+          ', ripples seen ' + seen.ripple);
       log('  library closed afterwards: ' + (doc().querySelectorAll('[class*="library-item_library-item"]').length === 0));
 
       var withAlias = actors.map(function (n) {
@@ -110,18 +117,41 @@
       log('  expected on stage: ' + withAlias.join(', '));
       log(absent.length ? '  MISSING: ' + absent.join(', ') : '  all actors present under the lesson\'s names');
 
-      seen.plus = 0; seen.tile = 0; seen.picker = 0;
+      seen.plus = 0; seen.tile = 0; seen.picker = 0; seen.hand = 0;
       return watch(drive.run(topic.steps[2], null, topic)).then(function (ok2) {
         var stage = w.WLStudio.vm.runtime.targets[0];
         var costumes = (stage.getCostumes() || []).map(function (c) { return c.name; });
         var showing = costumes[stage.currentCostume];
+        var hand2 = drive.cursor().state();
         log('step 2 finished: ' + ok2 + '   rings on the backdrop button: ' + seen.plus +
             ', in the backdrop library: ' + seen.tile);
         log('  backdrops now: ' + costumes.join(', ') + '   showing: ' + showing);
-        var okAll = absent.length === 0 &&
-                    seen.plus > 0 && seen.tile > 0 && seen.picker > 0 &&
-                    costumes.indexOf(backdrop) >= 0 && showing === backdrop;
-        log(okAll ? 'RESULT PASS' : 'RESULT FAIL');
+        log('  hand total: travels ' + hand2.travels + ', presses ' + hand2.presses +
+            ', clicks heard ' + hand2.sounds + ', on screen in ' + seen.hand + ' samples' +
+            ', ripples seen ' + seen.ripple);
+
+        /* Two presses per item — the plus, then the tile — and a click for each. The sounds are
+           counted, not heard: a headless browser has no speakers, and a silent regression is exactly
+           the kind of thing no screenshot would ever show. The ripple is checked the same way, for
+           the same reason: a 460ms animation is uncatchable in a still. */
+        var presses = hand2.presses, expected = (actors.length + 1) * 2;
+        var handOk = presses >= expected && hand2.travels >= expected &&
+                     hand2.sounds === presses && seen.ripple > 0;
+        log('  hand pressed ' + presses + ' times, expected at least ' + expected +
+            (handOk ? ' — ok' : ' — WRONG'));
+
+        /* The click, rendered offline and measured: a headless browser has no speakers, and a click
+           that makes no sound is precisely the bug a screenshot cannot show. */
+        return drive.cursor().probe().then(function (p) {
+          var audible = !!p && p.peak > 0.05;
+          log('  click waveform: ' + (p ? 'peak ' + p.peak + ' over ' + p.ms + 'ms' : 'could not render') +
+              (audible ? ' — audible' : ' — SILENT'));
+          var okAll = absent.length === 0 &&
+                      seen.plus > 0 && seen.tile > 0 && seen.picker > 0 &&
+                      costumes.indexOf(backdrop) >= 0 && showing === backdrop &&
+                      handOk && audible;
+          log(okAll ? 'RESULT PASS' : 'RESULT FAIL');
+        });
       });
     }).then(null, function (e) {
       log('RESULT FAIL threw: ' + (e && e.message));

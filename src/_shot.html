@@ -47,6 +47,27 @@
       return;
     }
 
+    /* the hand, parked on the plus with the ripple still leaving it — the frame a teacher sees */
+    if (which === 'cursor') {
+      var plus = doc().querySelector('[class*="sprite-selector_add-button"]');
+      drive.point('addSprite', 600000);
+      return drive.cursor().moveToEl(plus, 0).then(function () {
+        drive.cursor().press();
+        /* A still cannot catch a 460ms ripple: headless does not advance CSS animations while it
+           virtualises time, so the frame is posed — the ripple at roughly a third of its life, the
+           arrow at the bottom of its press. The motion itself is checked in _import-check.html. */
+        var rp = doc().querySelector('.wl-ripple');
+        if (rp) {
+          /* the animation outranks inline styles, so pose it with the animation taken off */
+          rp.classList.remove('is-go');
+          rp.style.transform = 'scale(1.6)';
+          rp.style.opacity = '.55';
+        }
+        doc().querySelector('.wl-cur').classList.add('is-down');
+        say('hand on the sprite button');
+      });
+    }
+
     if (which === 'end') {
       var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === '501-bp01'; })[0];
       say('running the import step…');
@@ -63,6 +84,12 @@
         hit.scrollIntoView({ block: 'center' });
         return wait(300).then(function () {
           drive.ring(hit, '大象', 600000, true);
+          if (which === 'tilehand') {
+            return drive.cursor().moveToEl(hit, 0).then(function () {
+              drive.cursor().press();
+              say('hand on the elephant');
+            });
+          }
           say('ring on the elephant');
         });
       });

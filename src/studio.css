@@ -297,6 +297,26 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
   50% { box-shadow: 0 0 0 12px rgba(255, 176, 0, .28), 0 0 0 9999px rgba(15, 23, 42, .46); }
 }
 
+/* the hand that presses it for you: an arrow that travels, compresses, and leaves a ring behind.
+   It is above the ring, because it is the thing that is on top of the screen. */
+.wl-cur { position: fixed; left: 0; top: 0; z-index: 2147482500; width: 26px; height: 26px; pointer-events: none;
+  opacity: 0; transform: translate3d(-200px, -200px, 0);
+  transition-property: transform, opacity; transition-duration: .6s, .22s;
+  transition-timing-function: cubic-bezier(.22, .61, .36, 1), ease; }
+.wl-cur.is-on { opacity: 1; }
+.wl-cur svg { display: block; width: 26px; height: 26px; transform-origin: 3px 2px;
+  transition: transform .09s ease-out; filter: drop-shadow(0 2px 3px rgba(15, 23, 42, .35)); }
+.wl-cur.is-down svg { transform: scale(.78); }
+
+/* the ripple the press leaves: one ring, gone in half a second, at the point that was pressed */
+.wl-ripple { position: fixed; z-index: 2147482400; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  pointer-events: none; border-radius: 50%; border: 2px solid #ffb000; background: rgba(255, 176, 0, .22); opacity: 0; }
+.wl-ripple.is-go { animation: wl-ripple .46s ease-out forwards; }
+@keyframes wl-ripple {
+  0% { transform: scale(.35); opacity: .95; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
 /* ---- narrower than the editor + pane (iPad landscape 1024, small laptops): the pane slides over from the right ---- */
 @media (max-width: 1279px) {
   #wl-app { grid-template-columns: minmax(0, 1fr); }
@@ -308,4 +328,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
   body.wl-chat-open .wl-fab { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } .wl-point { animation: none; } .wl-sub { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #wl-chat { transition: none; } .wl-point { animation: none; } .wl-sub { animation: none; }
+  /* the arrow still appears and still presses; it just does not fly across the screen (the script
+     already asks for a zero-length travel, this covers the browser that ignores the query in JS) */
+  .wl-cur { transition: none; } .wl-cur svg { transition: none; } }

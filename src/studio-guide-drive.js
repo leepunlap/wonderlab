@@ -73,6 +73,23 @@
     var pointEl = null;      // the current spotlight
     var pointTimer = null;
 
+    /**
+     * The hand. Optional on purpose: a lesson page that mounts the guide without it still gets every
+     * step, just without the arrow — the ring and the real press are what the step is made of, and the
+     * pointer is the thing that explains them.
+     */
+    var cursorOf = cfg.cursor || null;
+    var ownCursor;
+    function C() {
+      if (cursorOf) return cursorOf();
+      if (ownCursor === undefined) {
+        ownCursor = (root.StudioGuideCursor && typeof root.StudioGuideCursor.create === 'function')
+          ? root.StudioGuideCursor.create({ i18n: i18n, sound: cfg.sound })
+          : null;
+      }
+      return ownCursor;
+    }
+
     function S() { return studio(); }
     function OPS() { var s = S(); return s && s.ops ? s.ops() : null; }
     function VM() { var s = S(); return s && s.vm; }
@@ -379,6 +396,29 @@
     }
 
     /**
+     * Travel to a node, resolving true when the hand is there. Without a hand it resolves false at
+     * once, and the caller falls back to the pause a ring on its own used to get.
+     */
+    function reach(node, ms) {
+      var c = C();
+      if (!c) return Promise.resolve(false);
+      return c.moveToEl(node, Math.min(560, ms));
+    }
+
+    /**
+     * Press where the hand is, then a beat.
+     *
+     * The beat is the ripple's: the press is what the student is meant to notice, and a modal that
+     * opens in the same frame as the click hides the one thing worth seeing.
+     */
+    function pressHere() {
+      var c = C();
+      if (!c) return Promise.resolve(false);
+      c.press();
+      return wait(90).then(function () { return true; });
+    }
+
+    /**
      * One actor, the long way round. Resolves true when the picker did it, false when it could not —
      * the caller then falls back and nothing is lost but the pointing.
      */
@@ -390,21 +430,34 @@
       var button = firstOf(REGION[kind === 'backdrop' ? 'addBackdrop' : 'addSprite']);
       if (!button) return Promise.resolve(false);
 
+      /* The pause the caller asked for is the budget for the whole approach, not time on top of it:
+         a hand that arrives and a ring that waits are the same beat, and only one of them says
+         "press this". */
+      var lead = opts.lead || 900;
+      var approach = Math.min(560, lead);
+
       // the button first: "here is what opens the library" is the sentence the student needs most
       ringEl(button, T('guide.point.' + (kind === 'backdrop' ? 'addBackdrop' : 'addSprite')), 2600);
-      return wait(opts.lead || 900).then(function () {
+      return reach(button, lead).then(function (arrived) {
+        return wait(arrived ? Math.max(140, lead - approach) : lead);
+      }).then(pressHere).then(function () {
         (button.querySelector('button') || button).click();
         return until(pickerOpen, 45, 120);
       }).then(function (open) {
-        if (!open) return false;
+        if (!open) { if (C()) C().hide(); return false; }
         return findTile(name).then(function (tile) {
-          if (!tile) { closePicker(); return false; }
-          return wait(160).then(function () {
+          if (!tile) { closePicker(); if (C()) C().hide(); return false; }
+          var hold = opts.hold || 900;
+          var walk = Math.min(560, hold);
+          return reach(tile, hold).then(function (arrived) {
             // the pill says what the lesson calls it, which is not what the library calls it
-            ringEl(tile, alias && alias !== name ? alias : null, opts.hold || 900, true);
-            return wait(opts.hold || 900);
-          }).then(function () {
+            ringEl(tile, alias && alias !== name ? alias : null, hold, true);
+            return wait(arrived ? Math.max(140, hold - walk) : hold);
+          }).then(pressHere).then(function () {
             tile.click();
+            /* The hand has done its job; left standing it is an arrow pointing at a closed dialog. Long
+               enough to see the ripple, then gone. */
+            if (C()) setTimeout(function () { if (C()) C().hide(); }, 320);
             /* The modal only closes when the picker has taken a selection: if it is gone, the press
                was accepted. That, not the arrival, is the moment to tell "landed" from "missed" — the
                actor itself can still be fetching its costume, and a backdrop is a whole picture. */
@@ -741,6 +794,8 @@
       clearMarks();
       // a demonstration that was interrupted mid-import must not leave the library over the canvas
       if (pickerOpen()) closePicker();
+      // the hand goes with the rest: an arrow left on screen points at a step that has stopped
+      if (C()) C().hide();
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}
       var vm = VM();
       if (vm) { try { vm.stopAll(); } catch (e) {} }
@@ -774,6 +829,8 @@
       point: point,
       /** ring one element for a while, for a caller that has the element and not a region name */
       ring: ringEl,
+      /** the hand, for a page that wants to drive it or a test that wants to read it */
+      cursor: C,
       /** true while a demonstration is being prepared, explained or performed */
       busy: function () { return busyNow; }
     };
