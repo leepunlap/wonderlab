@@ -44,8 +44,17 @@
   /** The default project name is upstream's, so it follows the editor's locale, not the pane's. */
   var TITLE = { 'zh-tw': '我的作品', 'zh-cn': '我的作品', 'en': 'My project' };
 
-  /** Strings the bundled locale does not carry. */
-  var ZH_MISSING = {};
+  /**
+   * Strings the bundled locale does not carry, per editor locale.
+   *
+   * These two are upstream's menu entries with no Simplified translation in the l10n build this
+   * ships with: without them the Simplified menu bar reads 文件 編輯 教程 in Chinese and Settings
+   * Debug in English. Traditional has both, so this is a gap in one language, not a missing feature
+   * — which is why it belongs here and not in a fallback.
+   */
+  var ZH_MISSING = {
+    'zh-cn': { 'gui.menuBar.settings': '设置', 'gui.menuBar.debug': '调试方式' }
+  };
 
   /** Library buttons, relabelled to what this product does with them. */
   var LIB_LABELS = { '選個角色': '繪畫', '選個背景': '繪畫', '選個造型': '繪畫', '選個音效': '錄音' };
@@ -144,10 +153,56 @@
       });
       all[loc] = m;
     });
-    Object.assign(all[locale], ZH_MISSING, opts.missing || {});
+    Object.assign(all[locale], ZH_MISSING[locale] || {}, opts.missing || {});
     all[locale]['gui.gui.defaultProjectTitle'] = opts.title || TITLE[locale] || '我的作品';
     all.en['gui.gui.defaultProjectTitle'] = opts.titleEn || 'My project';
     store.dispatch({ type: 'scratch-gui/locales/UPDATE_LOCALES', messagesByLocale: all });
+  }
+
+  /**
+   * Switch the editor's language while the student is using it.
+   *
+   * Three things have to move, and upstream only lets them move in this order:
+   *
+   *   1. the gui's words — every string in the menus, the tabs and the dialogs comes from the store's
+   *      `locales` slice, so the de-branding rewrite has to be in `messagesByLocale[code]` *before*
+   *      the language is selected, or the new language arrives with the old language's rewrites;
+   *   2. Blockly's words — the palette, the reporter labels and the category names are Blockly
+   *      strings, and `make-toolbox-xml` bakes those names into the XML when it is built rather than
+   *      leaving message references to resolve later. So the toolbox has to be rebuilt after Blockly
+   *      has been moved, not before;
+   *   3. the toolbox — the gui rebuilds it itself on `workspaceUpdate`, which `refreshWorkspace()`
+   *      emits, so nothing here writes XML or DOM by hand.
+   *
+   * The project is untouched throughout: the blocks live in the VM, not in the Blockly workspace, so
+   * a language change is not a load. Returns false when the code is one upstream does not ship,
+   * and the caller decides what to say.
+   *
+   * `opts.debrand === false` switches the language and leaves upstream's words alone, which is what
+   * `?stock=1` wants: a page asking "is this their bug or ours?" must not get our rewrites either.
+   */
+  function setLocale(store, vm, code, opts) {
+    if (!store || !code) return false;
+    var messages = store.getState().locales.messagesByLocale[code];
+    if (!messages) return false;
+    if (!opts || opts.debrand !== false) patchMessages(store, { locale: code });
+    store.dispatch({ type: 'scratch-gui/locales/SELECT_LOCALE', locale: code });
+    /* The gui keys its IntlProvider on the locale, so the dispatch above remounts the editor's
+       chrome and Blockly re-injects itself in the new language. These two calls are the belt to
+       that braces: they cost nothing when the remount already did the work, and they are the only
+       thing that moves the palette if a future upstream stops keying the provider. */
+    if (!vm) return true;
+    var b = blocksInstance();
+    try {
+      if (b && b.ScratchBlocks && b.ScratchBlocks.ScratchMsgs && b.ScratchBlocks.ScratchMsgs.locales[code]) {
+        b.ScratchBlocks.ScratchMsgs.setLocale(code);
+      }
+      vm.setLocale(code, messages);
+      if (vm.editingTarget) vm.refreshWorkspace();
+    } catch (e) {
+      if (root.console) console.warn('[WonderLab] locale switch left the palette alone:', e);
+    }
+    return true;
   }
 
   /**
@@ -215,6 +270,7 @@
     place: place,
     cacheAssets: cacheAssets,
     patchMessages: patchMessages,
+    setLocale: setLocale,
     patchDom: patchDom,
     watchLoads: watchLoads
   };

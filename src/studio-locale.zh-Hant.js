@@ -35,7 +35,7 @@
     'chat.menu.versions': '版本記錄',
     'chat.menu.about': '說明',
     'chat.language': '語言',
-    'chat.editorReloadHint': '積木編輯器會在下次載入頁面時轉用這個語言。',
+    'chat.editorLocaleFailed': '積木編輯器未能轉用這個語言。重新載入頁面就會生效。',
 
     'chat.sheet.versionsHelp': '每次你自己改程式，或者 AI 改了程式，都會記下一個版本。之後可以比較：先前試過、行不通的做法，和最後行得通的做法。',
     'chat.sheet.export': '匯出全部版本（JSON）',

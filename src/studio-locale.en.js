@@ -39,7 +39,7 @@
     'chat.menu.versions': 'Version history',
     'chat.menu.about': 'About',
     'chat.language': 'Language',
-    'chat.editorReloadHint': 'The block editor will switch to this language the next time the page loads.',
+    'chat.editorLocaleFailed': 'The block editor could not switch language. Reload the page and it will.',
 
     'chat.sheet.versionsHelp': 'Every time you change the program, or the AI does, a version is saved. Later you can compare the approaches that did not work with the one that did.',
     'chat.sheet.export': 'Export all versions (JSON)',

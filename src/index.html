@@ -78,10 +78,11 @@
   I.boot();
   function T(k, p) { return I.t(k, p); }
 
-  /* The block editor is not re-mountable, so its locale is read once, here. Scratch ships all three;
-     this table is the only place the codes differ. */
+  /* The pane's codes and the editor's are two vocabularies for the same three languages — Scratch
+     says zh-tw / zh-cn. This table is the only place they meet; the shell itself never learns what
+     the pane calls a language. */
   var EDITOR_LOCALE = { 'zh-Hant': 'zh-tw', 'zh-Hans': 'zh-cn', 'en': 'en' };
-  var bootedEditorLocale = EDITOR_LOCALE[I.locale()] || 'zh-tw';
+  function editorLocale(code) { return EDITOR_LOCALE[code] || 'zh-tw'; }
 
   var verPane = $('wl-pane-ver');
   var aboutPane = $('wl-pane-about');
@@ -126,7 +127,7 @@
 
   var S = StudioApp.create({
     root: '#wl-editor', api: '/api/ai/lab/studio', library: true, ucmake: true,
-    locale: bootedEditorLocale,
+    locale: editorLocale(I.locale()),
     i18n: I,
     modelSelector: modelSelector,  // Pass model selector to app
     ui: {
@@ -181,18 +182,17 @@
   }
 
   /**
-   * Language changed mid-lesson. Everything this page owns re-reads its words immediately; the two
-   * things it cannot rewrite are the block editor (mounted once with its locale) and the tutor's
-   * replies (which the server produces). Say so once, rather than leaving a half-English page and
-   * no explanation.
+   * Language changed mid-lesson. The page owns two surfaces and both follow: the pane re-reads its
+   * own words through its subscription, and the editor is moved here, in place, with the student's
+   * program still on the canvas. The tutor's replies are the only thing that lags, and they cannot
+   * be fixed here — the server produces them, and it now receives the language with every turn.
+   *
+   * A switch the editor refuses (a code upstream does not ship) is said out loud rather than leaving
+   * half the screen in the other language with no explanation.
    */
   I.on(function (code) {
     showCtx();
-    var want = EDITOR_LOCALE[code] || 'zh-tw';
-    if (want !== bootedEditorLocale) {
-      chat.sys(T('chat.editorReloadHint'));
-      bootedEditorLocale = want;   // one notice per switch, not one per render
-    }
+    if (!S.setLocale(editorLocale(code))) chat.sys(T('chat.editorLocaleFailed'));
   });
 
   function setOpen(on) {

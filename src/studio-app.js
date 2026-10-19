@@ -54,15 +54,29 @@
       { id: 'dd382de37d368241a1231e2558b0fcaf', type: 'ImageVector', fmt: 'SVG', url: 'assets/sprite-b.svg' }
     ];
 
-  function defaultProject() {
+  /**
+   * The names a new project gives itself, per editor locale.
+   *
+   * These are words, not data: a sprite called 角色1 in an English editor puts 造型2 inside an
+   * English block ("switch costume to 造型2"), which reads as a half-finished translation. A project
+   * that is opened rather than created keeps its own names, whatever language it arrives in.
+   */
+  var DEFAULT_NAMES = {
+    'zh-tw': { sprite: '角色1', costume: '造型', backdrop: '背景' },
+    'zh-cn': { sprite: '角色1', costume: '造型', backdrop: '背景' },
+    'en': { sprite: 'Sprite1', costume: 'costume', backdrop: 'backdrop' }
+  };
+
+  function defaultProject(locale) {
+      var N = DEFAULT_NAMES[locale] || DEFAULT_NAMES['zh-tw'];
       return { targets: [
         { isStage: true, name: 'Stage', variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {}, currentCostume: 0,
-          costumes: [{ assetId: DEFAULT_ASSETS[0].id, name: '背景1', md5ext: DEFAULT_ASSETS[0].id + '.svg', dataFormat: 'svg', rotationCenterX: 240, rotationCenterY: 180 }],
+          costumes: [{ assetId: DEFAULT_ASSETS[0].id, name: N.backdrop + '1', md5ext: DEFAULT_ASSETS[0].id + '.svg', dataFormat: 'svg', rotationCenterX: 240, rotationCenterY: 180 }],
           sounds: [], volume: 100, layerOrder: 0, tempo: 60, videoTransparency: 50, videoState: 'off', textToSpeechLanguage: null },
-        { isStage: false, name: '角色1', variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {}, currentCostume: 0,
+        { isStage: false, name: N.sprite, variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {}, currentCostume: 0,
           costumes: [
-            { assetId: DEFAULT_ASSETS[1].id, name: '造型1', bitmapResolution: 1, md5ext: DEFAULT_ASSETS[1].id + '.svg', dataFormat: 'svg', rotationCenterX: 42, rotationCenterY: 50 },
-            { assetId: DEFAULT_ASSETS[2].id, name: '造型2', bitmapResolution: 1, md5ext: DEFAULT_ASSETS[2].id + '.svg', dataFormat: 'svg', rotationCenterX: 42, rotationCenterY: 50 }],
+            { assetId: DEFAULT_ASSETS[1].id, name: N.costume + '1', bitmapResolution: 1, md5ext: DEFAULT_ASSETS[1].id + '.svg', dataFormat: 'svg', rotationCenterX: 42, rotationCenterY: 50 },
+            { assetId: DEFAULT_ASSETS[2].id, name: N.costume + '2', bitmapResolution: 1, md5ext: DEFAULT_ASSETS[2].id + '.svg', dataFormat: 'svg', rotationCenterX: 42, rotationCenterY: 50 }],
           sounds: [], volume: 100, layerOrder: 1, visible: true, x: 0, y: 0, size: 100, direction: 90, draggable: false, rotationStyle: 'all around' }],
         monitors: [], extensions: [], meta: { semver: '3.0.0', vm: '15.2.0', agent: 'WonderLabStudio' } };
     }
@@ -81,14 +95,14 @@
     return base + id + '.' + fmt;
   }
 
-  function StudioStorage(G, project, assets, libBase) {
+  function StudioStorage(G, project, assets, libBase, locale) {
       var st = this.scratchStorage = new G.ScratchStorage();
       var enc = new TextEncoder();
       // the built-in helper is where scratch-gui's own LegacyStorage keeps its default project (id "0").
       // `project` lets a caller open something other than the empty default - the lesson page opens
       // its lesson's stage and sprites, which the shell is handed rather than knowing about.
       st.builtinHelper._store(st.AssetType.Project, st.DataFormat.JSON,
-                              enc.encode(JSON.stringify(project || defaultProject())), '0');
+                              enc.encode(JSON.stringify(project || defaultProject(locale))), '0');
       (assets || []).forEach(function (a) {
         if (!a || !a.text || !a.type || !a.fmt || !a.id) return;
         if (!st.AssetType[a.type] || !st.DataFormat[a.fmt]) return;
@@ -193,7 +207,7 @@
         ops = new root.StudioOps(spec);
 
         var state = new G.EditorState({ locale: cfg.locale || LOCALE }, function () {
-          return { storage: new StudioStorage(G, cfg.project, fetched, cfg.libraryUrl ? cfg.libraryUrl + 'a/' : null) };
+          return { storage: new StudioStorage(G, cfg.project, fetched, cfg.libraryUrl ? cfg.libraryUrl + 'a/' : null, cfg.locale || LOCALE) };
         });
         store = state.store;
 
@@ -234,6 +248,10 @@
 
     // ---------------------------------------------------------------- the VM
     function onVmInit(v) {
+      /* A language change remounts the gui's chrome (it keys its IntlProvider on the locale), and a
+         remount hands the same vm back through onVmInit. Without this guard the second call would
+         build a second trace and a second assistant on one vm, and every event would run twice. */
+      if (vm === v) return;
       vm = S.vm = v;
 
       if (stock) {
@@ -482,6 +500,30 @@
 
     // the page-facing surface
     S.workspace = function () { return core() ? core().workspace() : null; };
+    /**
+     * Change the editor's language, live.
+     *
+     * The editor is mounted once with a locale and upstream offers no "change your mind" entry
+     * point, but it does offer all the pieces: the store's locales slice, Blockly's own message
+     * table and the workspaceUpdate event that rebuilds the toolbox. StudioCore.setLocale stitches
+     * them together; this only decides *when* it is allowed to run.
+     *
+     * Before the store exists there is nothing to switch, and the honest answer is not "no": boot()
+     * has not read cfg.locale yet, so writing it there makes the editor start in the language the
+     * student just picked. That is a race a fast click can win, and losing it would leave the pane
+     * in one language and the editor in another.
+     *
+     * The `code` is an editor code (zh-tw / zh-cn / en). Mapping the pane's vocabulary onto
+     * upstream's is the page's job, not the shell's: the shell is also mounted by lesson pages that
+     * have no pane at all.
+     */
+    S.setLocale = function (code) {
+      if (!code) return false;
+      cfg.locale = code;
+      if (!store) return true;
+      return !!core().setLocale(store, vm, code, { debrand: !stock });
+    };
+    S.locale = function () { return store ? store.getState().locales.locale : (cfg.locale || LOCALE); };
     S.boot = boot;
     S.send = function (text) { return assist ? assist.send(text) : Promise.resolve(null); };
     S.applyReply = function (d, t) { return assist ? assist.applyReply(d, t) : null; };

@@ -40,7 +40,7 @@
     'chat.menu.versions': '版本记录',
     'chat.menu.about': '说明',
     'chat.language': '语言',
-    'chat.editorReloadHint': '积木编辑器会在下次加载页面时改用这个语言。',
+    'chat.editorLocaleFailed': '积木编辑器未能切换到这个语言。重新加载页面即可生效。',
 
     'chat.sheet.versionsHelp': '每次你自己改程序，或者 AI 改了程序，都会记下一个版本。之后可以比较：先前试过、行不通的做法，和最后行得通的做法。',
     'chat.sheet.export': '导出全部版本（JSON）',
