@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <!--
-  Wonder Lab Studio — does the guide's 「由零開始」 opening really work on the real editor?
+  Wonder Lab Studio — does every 「匯入」 the guide asks for actually land on the stage?
 
   A lesson's first steps are the ones no lesson material ever writes down: an empty stage, the actors
-  brought in, a background put behind them. They are data (studio-guide-lessons.js) plus a driver
-  (studio-guide-drive.js), and a data bug there looks exactly like a working feature until somebody
-  presses the button - so this page presses it, on the real editor, and says PASS or FAIL.
+  brought in, a background put behind them. They are data (studio-guide-lessons.js,
+  studio-guide-refs.js) plus a driver (studio-guide-drive.js), and a wrong sprite or backdrop name in
+  that data looks exactly like a working feature until somebody presses the button - because
+  `addThings` only warns when an import fails. So this page walks the real data, imports every single
+  thing it names, and checks that each one arrived.
 
-  It loads index.html in an iframe rather than copying it, so the page under test is the page the
-  students get and this file cannot drift out of step with it.
+  It reads the lists out of the iframe's own window, so a name added to a lesson is covered without
+  anybody editing this file, and it loads index.html rather than copying it so the page under test is
+  the page the students get.
 
   Run it:
       WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920   (the library 404s without it)
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
-          --virtual-time-budget=120000 --dump-dom http://127.0.0.1:8920/_drive-check.html
-  then read the text of #wl-drive-out (the last line is RESULT PASS or RESULT FAIL).
+          --virtual-time-budget=300000 --dump-dom http://127.0.0.1:8920/_drive-check.html
+  or just `npm run check:pages`. Read #wl-drive-out; the last line is RESULT PASS or RESULT FAIL.
 
   Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
 -->
@@ -31,13 +34,23 @@
   var out = document.getElementById('wl-drive-out');
   function log(s) { out.textContent += '\n' + s; }
 
-  /* Mouse1 / Giraffe / Forest are what 501-bp01's opening asks for; the aliases stand in for the
-     names the locale resolves '@mouse' / '@giraffe' to, which is the driver's job, not this page's. */
-  var ADDS = [
-    { do: 'add_sprite', name: 'Mouse1', alias: 'T-mouse' },
-    { do: 'add_sprite', name: 'Giraffe', alias: 'T-giraffe' },
-    { do: 'add_backdrop', name: 'Forest' }
-  ];
+  /** Every distinct thing the guide's data asks the library for, in the order it asks for it. */
+  function plan(win) {
+    var seen = {}, adds = [];
+    ((win.StudioGuideLessons || []).concat(win.StudioGuideRefs || [])).forEach(function (t) {
+      (t.steps || []).forEach(function (st) {
+        (((st && st.demo) || {}).add || []).forEach(function (o) {
+          var key = o['do'] + ':' + o.name;
+          if (seen[key]) return;
+          seen[key] = 1;
+          /* '@mouse' is the driver's reference, not a name; 'T-' stands in for whatever the locale
+             resolves it to, because resolving it is the driver's job, not this page's. */
+          adds.push({ 'do': o['do'], name: o.name, alias: 'T-' + String(o.sprite || o.name).replace('@', '') });
+        });
+      });
+    });
+    return adds;
+  }
 
   var tries = 0;
   (function tick() {
@@ -49,26 +62,36 @@
       log('RESULT FAIL: the editor never booted');
       return;
     }
-    log('before: ' + vm.runtime.targets.map(function (t) { return t.getName(); }).join(', '));
+    if (!win.StudioGuideLessons) {
+      log('RESULT FAIL: the lesson data did not load');
+      return;
+    }
 
+    var adds = plan(win);
+    log(adds.length + ' things the guide asks the library for');
+
+    var bad = [];
     var p = Promise.resolve();
-    ADDS.forEach(function (o) {
+    adds.forEach(function (o) {
       p = p.then(function () {
-        return o.do === 'add_sprite' ? S.addLibrarySprite(o.name, o.alias) : S.addLibraryBackdrop(o.name);
-      }).then(function (r) { log(o.do + ' ' + o.name + ' -> ' + (r === undefined ? 'ok' : String(r))); },
-        function (e) { log(o.do + ' ' + o.name + ' -> ERROR ' + (e && e.message)); });
+        return o['do'] === 'add_sprite' ? S.addLibrarySprite(o.name, o.alias) : S.addLibraryBackdrop(o.name);
+      }).then(function () {
+        /* vm.addSprite / vm.addBackdrop resolve with nothing, so success can only be read off the
+           stage: the target has to be there afterwards. */
+        var stage = vm.runtime.targets[0];
+        var got = o['do'] === 'add_sprite'
+          ? vm.runtime.targets.some(function (t) { return t.getName() === o.alias; })
+          : stage.getCostumes().some(function (c) { return c.name === o.name; });
+        if (!got) { bad.push(o['do'] + ' ' + o.name); log('  MISSING ' + o['do'] + ' ' + o.name); }
+      }, function (e) {
+        bad.push(o['do'] + ' ' + o.name);
+        log('  ERROR ' + o['do'] + ' ' + o.name + ': ' + (e && e.message));
+      });
     });
 
     p.then(function () {
-      var names = vm.runtime.targets.map(function (t) { return t.getName(); });
-      var stage = vm.runtime.targets[0];
-      var cos = stage.getCostumes().map(function (c) { return c.name; });
-      log('after: ' + names.join(', '));
-      log('stage: ' + cos.join(' | ') + '  [current ' + stage.currentCostume + ']');
-      var ok = ADDS.every(function (o) {
-        return o.do === 'add_sprite' ? names.indexOf(o.alias) >= 0 : cos.indexOf(o.name) >= 0;
-      }) && cos[stage.currentCostume] === 'Forest';
-      log(ok ? 'RESULT PASS' : 'RESULT FAIL');
+      log(bad.length ? bad.length + ' of ' + adds.length + ' did not arrive' : 'all ' + adds.length + ' arrived');
+      log(bad.length ? 'RESULT FAIL' : 'RESULT PASS');
     }, function (e) { log('RESULT FAIL ' + (e && e.message)); });
   })();
 }());

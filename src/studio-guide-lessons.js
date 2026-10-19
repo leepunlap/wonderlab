@@ -278,7 +278,7 @@
       steps: opening([
         { do: 'add_sprite', name: 'Dove', sprite: '@dove' },
         { do: 'add_sprite', name: 'Gift', sprite: '@gift' }
-      ], 'Chalkboard').concat([
+      ], 'Xy-grid').concat([
         {
           id: 't1',
           demo: {
@@ -527,7 +527,7 @@
       icon: '<path d="M12 21v-6"/><path d="M12 15l-4-4h8z"/><path d="M12 11 8 7h8z"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Tree1', sprite: '@tree' }
-      ], 'Desert').concat([
+      ], 'Pathway').concat([
         {
           id: 't1',
           demo: {
@@ -655,7 +655,7 @@
         { do: 'add_sprite', name: 'Wizard Girl', sprite: '@girl' },
         { do: 'add_sprite', name: 'Ball', sprite: '@ropeA' },
         { do: 'add_sprite', name: 'Balloon1', sprite: '@ropeB' }
-      ], 'Bedroom 1').concat([
+      ], 'Room 1').concat([
         {
           id: 't1',
           demo: {

@@ -46,7 +46,7 @@ async function dump(file) {
   const url = `http://127.0.0.1:${PORT}/${file}`;
   const { stdout } = await run(CHROME, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--noproxy-server',
-    '--virtual-time-budget=120000', '--dump-dom', url
+    '--virtual-time-budget=900000', '--dump-dom', url
   ], { maxBuffer: 64 * 1024 * 1024 });
   return stdout;
 }
