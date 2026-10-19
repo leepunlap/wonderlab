@@ -67,6 +67,15 @@
     return s.firstChild;
   }
 
+  /**
+   * The one or two characters the header pill can afford: 繁 / 简 / EN. Derived from the label the
+   * locale registered, not from the locale code, so a new language file needs no change here.
+   */
+  function shortLang(label) {
+    var s = String(label || '');
+    return /^[\u3400-\u9fff]/.test(s) ? s.charAt(0) : s.slice(0, 2).toUpperCase();
+  }
+
   var ICON_BOT = '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>' +
     '<path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>';
   var ICON_MORE = '<circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/>' +
@@ -121,6 +130,21 @@
     verChip.addEventListener('click', function () { onMenu('versions'); });
     head.appendChild(verChip);
 
+    // Language sits in the header, not behind ⋯. It was in the menu, on the argument that a student
+    // touches it once; the argument was wrong — a teacher looking for it never opened the menu at all.
+    // One pill, showing the language the pane is currently in, so the answer is visible without a
+    // click as well.
+    var langBtn = null;
+    if (i18n && typeof i18n.available === 'function' && i18n.available().length > 1) {
+      langBtn = h('button', 'wl-lang-toggle');
+      langBtn.type = 'button';
+      langBtn.setAttribute('aria-haspopup', 'true');
+      langBtn.setAttribute('aria-expanded', 'false');
+      langBtn.appendChild(h('span', 'wl-lang-short', ''));
+      langBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleLang(); });
+      head.appendChild(langBtn);
+    }
+
     var more = h('button', 'wl-more-btn');
     more.type = 'button';
     more.setAttribute('aria-label', T('chat.more'));
@@ -145,9 +169,12 @@
       head.appendChild(closeBtn);
     }
 
+    // The two popovers are siblings under the same header triangle; opening one closes the other,
+    // so a student never ends up with ⋯ and the language list open on top of each other.
     function closeMenu() { menuBox.hidden = true; more.setAttribute('aria-expanded', 'false'); }
     function openMenu() {
-      if (!menuItems.length && !langGroup) return;
+      if (!menuItems.length) return;
+      if (typeof closeLang === 'function') closeLang();
       menuBox.hidden = false;
       more.setAttribute('aria-expanded', 'true');
       var first = menuBox.firstChild;
@@ -173,16 +200,15 @@
     shell.appendChild(menuBox);
 
     /**
-     * Language lives in the menu, not in the header: it is a setting a student touches once, and a
-     * second control in a 44px header costs more than the choice is worth. The group is built from
-     * StudioI18n's registry, so adding a language file adds a button here with no change to this
-     * module.
+     * The popover under the header pill. Built from StudioI18n's registry, so adding a language file
+     * adds a row here with no change to this module — and the pill relabels itself from the same
+     * registry, which is why nothing in this file names a locale.
      */
     var langGroup = null;
-    var langSep = null;
-    if (i18n && typeof i18n.available === 'function' && i18n.available().length > 1) {
-      langSep = h('div', 'wl-menu-sep');
-      langSep.setAttribute('role', 'separator');
+    var langPop = null;
+    if (langBtn) {
+      langPop = h('div', 'wl-lang-pop');
+      langPop.hidden = true;
       langGroup = h('div', 'wl-lang');
       langGroup.setAttribute('role', 'group');
       langGroup.setAttribute('aria-label', T('chat.language'));
@@ -190,15 +216,35 @@
         var b = h('button', 'wl-lang-btn', loc.label);
         b.type = 'button';
         b.setAttribute('data-locale', loc.id);
+        b.setAttribute('data-label', loc.label);
         b.addEventListener('click', function (e) {
           e.stopPropagation();
           i18n.set(loc.id);
+          closeLang();
         });
         langGroup.appendChild(b);
       });
-      menuBox.appendChild(langSep);
-      menuBox.appendChild(langGroup);
+      langPop.appendChild(langGroup);
+      shell.appendChild(langPop);
       markLang();
+    }
+
+    function toggleLang() {
+      if (!langPop) return;
+      var opening = langPop.hidden;
+      if (opening) closeMenu();
+      langPop.hidden = !opening;
+      langBtn.setAttribute('aria-expanded', String(opening));
+      if (opening) {
+        var on = langGroup.querySelector('.wl-lang-btn.is-on');
+        if (on) on.focus();
+      }
+    }
+
+    function closeLang() {
+      if (!langPop || langPop.hidden) return;
+      langPop.hidden = true;
+      langBtn.setAttribute('aria-expanded', 'false');
     }
 
     /** Which of the three is current — needed on first paint, not only after a switch. */
@@ -206,11 +252,16 @@
       if (!langGroup) return;
       var code = i18n.locale();
       var btns = langGroup.querySelectorAll('.wl-lang-btn');
+      var label = code;
       for (var i = 0; i < btns.length; i++) {
         var on = btns[i].getAttribute('data-locale') === code;
         btns[i].className = 'wl-lang-btn' + (on ? ' is-on' : '');
         btns[i].setAttribute('aria-pressed', String(on));
+        if (on) label = btns[i].getAttribute('data-label') || code;
       }
+      var short = langBtn && langBtn.firstChild;
+      if (short) short.textContent = shortLang(label);
+      if (langBtn) langBtn.setAttribute('aria-label', T('chat.language') + '：' + label);
     }
 
     /* ---------- body: the conversation, and nothing else ---------- */
@@ -542,14 +593,14 @@
 
       mount: mountInto,
 
-      /** outside clicks close the overflow menu; the pane does not otherwise watch the document */
+      /** outside clicks close the pane's popovers; it does not otherwise watch the document */
       bindOutside: function () {
         doc.addEventListener('click', function (e) {
-          if (menuBox.hidden) return;
-          if (!menuBox.contains(e.target) && !more.contains(e.target)) closeMenu();
+          if (!menuBox.hidden && !menuBox.contains(e.target) && !more.contains(e.target)) closeMenu();
+          if (langPop && !langPop.hidden && !langPop.contains(e.target) && !langBtn.contains(e.target)) closeLang();
         });
         doc.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape') { closeMenu(); closeSheet(); }
+          if (e.key === 'Escape') { closeMenu(); closeLang(); closeSheet(); }
         });
       }
     };

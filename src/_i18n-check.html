@@ -37,9 +37,9 @@
   chat.setAccessory(m.el);
 
   var CASES = [
-    { id: 'zh-Hant', title: 'AI 學伴', send: '送出', chip: '我想角色移動', menu: '說明', quota: '剩 8 / 10', desc: '快速回應，適合一般對話', undo: '上一步', ver: '版本 3' },
-    { id: 'zh-Hans', title: 'AI 学伴', send: '发送', chip: '我想让角色移动', menu: '说明', quota: '剩 8 / 10', desc: '快速响应，适合一般对话', undo: '撤销', ver: '版本 3' },
-    { id: 'en', title: 'AI Companion', send: 'Send', chip: 'Make the sprite move', menu: 'About', quota: '8 / 10 left', desc: 'Fast replies, fine for most turns', undo: 'Undo', ver: 'Version 3' }
+    { id: 'zh-Hant', title: 'AI 學伴', send: '送出', chip: '我想角色移動', menu: '說明', quota: '剩 8 / 10', desc: '快速回應，適合一般對話', undo: '上一步', ver: '版本 3', short: '繁' },
+    { id: 'zh-Hans', title: 'AI 学伴', send: '发送', chip: '我想让角色移动', menu: '说明', quota: '剩 8 / 10', desc: '快速响应，适合一般对话', undo: '撤销', ver: '版本 3', short: '简' },
+    { id: 'en', title: 'AI Companion', send: 'Send', chip: 'Make the sprite move', menu: 'About', quota: '8 / 10 left', desc: 'Fast replies, fine for most turns', undo: 'Undo', ver: 'Version 3', short: 'EN' }
   ];
 
   function walk(c) {
@@ -60,6 +60,14 @@
     var on = pane().querySelector('.wl-lang-btn.is-on');
     eq(c.id + ' lang active', on ? on.getAttribute('data-locale') : null, c.id);
     eq(c.id + ' lang count', pane().querySelectorAll('.wl-lang-btn').length, 3);
+    // the pill in the header says which language you are in, and opens the list
+    eq(c.id + ' lang pill', txt('.wl-lang-short'), c.short);
+    eq(c.id + ' lang pop starts shut', pane().querySelector('.wl-lang-pop').hidden, true);
+    eq(c.id + ' lang not in menu', !!pane().querySelector('.wl-menu .wl-lang'), false);
+    pane().querySelector('.wl-lang-toggle').click();
+    eq(c.id + ' lang pop opens', pane().querySelector('.wl-lang-pop').hidden, false);
+    pane().querySelector('.wl-lang-btn.is-on').click();
+    eq(c.id + ' lang pop shuts', pane().querySelector('.wl-lang-pop').hidden, true);
     document.body.click();
     // no key leaks, and English contains no Chinese anywhere in the pane except the language
     // buttons themselves - those are meant to stay in their own script.

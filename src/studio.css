@@ -34,7 +34,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
   border-left: 1px solid var(--wl-line); background: var(--wl-pane); }
 .wl-chat-shell { position: relative; display: flex; flex-direction: column; min-height: 0; height: 100%; }
 
-.wl-chat-head { display: flex; align-items: center; gap: 7px; height: var(--wl-head-h); padding: 0 10px; box-sizing: border-box;
+.wl-chat-head { display: flex; align-items: center; gap: 4px; height: var(--wl-head-h); padding: 0 8px; box-sizing: border-box;
   background: var(--wl-accent); color: var(--wl-accent-ink); flex: none; }
 .wl-chat-head .ic { width: 17px; height: 17px; flex: none; }
 .wl-chat-title { font-size: .94rem; margin: 0; font-weight: 700; min-width: 0; white-space: nowrap;
@@ -42,11 +42,11 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 /* The badge is the first thing to give way: it is secondary information, and English runs about
    twice the width of the Chinese it replaces. Ellipsis rather than a wrap, because the header is a
    fixed 44px band and a second line would push the conversation down. */
-.wl-chat-badge { font-size: .68rem; padding: 2px 7px; border-radius: 999px; background: rgba(255, 255, 255, .18);
+.wl-chat-badge { font-size: .68rem; padding: 2px 6px; border-radius: 999px; background: rgba(255, 255, 255, .18);
   white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .wl-chat-badge[hidden] { display: none; }
 .wl-head-spacer { margin-left: auto; }
-.wl-ver-chip { font: inherit; font-size: .7rem; padding: 2px 8px; border: 0; border-radius: 999px;
+.wl-ver-chip { font: inherit; font-size: .66rem; padding: 2px 6px; border: 0; border-radius: 999px;
   background: rgba(255, 255, 255, .22); color: inherit; cursor: pointer; white-space: nowrap; }
 .wl-ver-chip[hidden] { display: none; }
 .wl-ver-chip:hover { background: rgba(255, 255, 255, .34); }
@@ -62,15 +62,25 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-menu-item:hover { background: var(--wl-pane); }
 .wl-menu-badge { margin-left: auto; font-size: .72rem; color: var(--wl-muted); }
 
-/* Language: three equal targets in the menu, never in the header. The active one is filled, so the
-   current language is readable at a glance without a tick or a second label. */
-.wl-menu-sep { height: 1px; margin: 5px 3px; background: var(--wl-line); }
-.wl-lang { display: flex; gap: 4px; padding: 2px 4px 3px; }
-.wl-lang-btn { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font: inherit; font-size: .74rem; color: var(--wl-muted);
-  background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 7px; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wl-lang-btn:hover { color: var(--wl-text); border-color: var(--wl-muted); }
-.wl-lang-btn.is-on { color: var(--wl-accent-ink); background: var(--wl-accent); border-color: var(--wl-accent); font-weight: 600; }
+/* Language: a pill in the header showing the language the pane is in, and the list of three under
+   it. It used to live in the ⋯ menu, on the argument that it is a setting a student touches once;
+   in practice a teacher never opened the menu, so the setting may as well not have existed. The
+   active row is filled, so the current language reads at a glance from the list as well. */
+.wl-lang-toggle { display: grid; place-items: center; height: 21px; min-width: 26px; padding: 0 7px;
+  font: inherit; font-size: .7rem; font-weight: 700; letter-spacing: .03em; color: inherit;
+  background: rgba(255, 255, 255, .18); border: 0; border-radius: 999px; cursor: pointer; flex: none; }
+.wl-lang-toggle:hover { background: rgba(255, 255, 255, .3); }
+.wl-lang-short { line-height: 1; }
+
+.wl-lang-pop { position: absolute; top: calc(var(--wl-head-h) - 2px); right: 8px; z-index: 31; min-width: 138px;
+  padding: 5px; background: var(--wl-bg); border: 1px solid var(--wl-line); border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .16); }
+.wl-lang-pop[hidden] { display: none; }
+.wl-lang { display: flex; flex-direction: column; gap: 2px; }
+.wl-lang-btn { width: 100%; height: 30px; padding: 0 9px; font: inherit; font-size: .8rem; color: var(--wl-text);
+  background: none; border: 0; border-radius: 7px; cursor: pointer; text-align: left; }
+.wl-lang-btn:hover { background: var(--wl-pane); }
+.wl-lang-btn.is-on { color: var(--wl-accent-ink); background: var(--wl-accent); font-weight: 600; }
 .wl-lang-btn:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
 
 .wl-chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;
@@ -92,8 +102,9 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
   background: var(--wl-pane); color: var(--wl-text); cursor: pointer; min-height: 32px;
   max-width: 100%; text-align: left; }
 .wl-chip:hover { border-color: var(--wl-accent); }
-.wl-chip:focus-visible, .wl-more-btn:focus-visible, .wl-ver-chip:focus-visible, .wl-menu-item:focus-visible,
-.wl-undo-btn:focus-visible, .wl-send:focus-visible, .wl-fab:focus-visible { outline: 2px solid #ffb000; outline-offset: 2px; }
+.wl-chip:focus-visible, .wl-more-btn:focus-visible, .wl-lang-toggle:focus-visible, .wl-ver-chip:focus-visible,
+.wl-menu-item:focus-visible, .wl-undo-btn:focus-visible, .wl-send:focus-visible, .wl-fab:focus-visible {
+  outline: 2px solid #ffb000; outline-offset: 2px; }
 
 .wl-composer { flex: none; display: flex; flex-direction: column; gap: 7px; padding: 8px 12px 11px;
   background: var(--wl-bg); border-top: 1px solid var(--wl-line); }
