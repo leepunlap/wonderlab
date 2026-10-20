@@ -91,7 +91,11 @@ export const COST = {
   },
   settle: { base: 150, floor: 150 },
   builtMark: { base: 900, floor: 900 },
-  key: { base: 400, floor: 400 }
+  key: { base: 400, floor: 400 },
+  /* The walk to the green flag and the press. This is not the payoff — the payoff is the program
+     running after it — so it belongs in the demand: a step that says "press the green flag" has to
+     be given time to show the flag being pressed. */
+  flag: { base: 750, floor: 390 }
 };
 
 const P = COST.part;
@@ -200,8 +204,12 @@ export function slotsOf(step) {
     slots.push({ what: 'build ' + scripts.length + ' script(s)', base: b, floor: b, gate: beat++ });
   }
   /* `run` is the payoff, not an explanation: the program is meant to be watched after the last
-     word has landed, so it is on the timeline but not in the demand. */
-  if (d.run) slots.push({ what: 'run the program', base: d.run, floor: d.run, gate: beat++, run: true });
+     word has landed, so it is on the timeline but not in the demand. The walk to the flag is the
+     opposite — it is the last thing the lesson has to show — so it stays in the demand. */
+  if (d.run) {
+    slots.push({ what: 'walk to the flag', base: COST.flag.base, floor: COST.flag.floor, gate: beat });
+    slots.push({ what: 'run the program', base: d.run, floor: d.run, gate: beat++, run: true });
+  }
   (d.keys || []).forEach((k) => {
     slots.push({ what: 'press ' + k, base: COST.key.base, floor: COST.key.floor, gate: beat++ });
   });

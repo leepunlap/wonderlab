@@ -205,6 +205,41 @@
       ringEl(firstOf(list), T('guide.point.' + region), ms);
     }
 
+    /**
+     * Press the green flag with the hand, and start the project on the same tick as the click.
+     *
+     * This used to be the one action in a lesson that happened by itself: the copy said "press the
+     * green flag", a ring appeared round it, and the stage began moving with nobody having pressed
+     * anything. A demonstration of pressing the flag that never presses it is not a demonstration —
+     * it is the guide doing it for the child, which is the thing the hand exists to avoid.
+     *
+     * The button is not clicked through the DOM. `vm.greenFlag()` is the call the button itself
+     * makes, and going through the GUI's handler would race the step's `settled()`; what is borrowed
+     * from the button is only where it is. No hand (reduced motion, a harness) means no walk, not no
+     * run: the program still starts.
+     */
+    function pressFlag(opts) {
+      opts = opts || {};
+      var c = C(), vm = VM();
+      var button = c ? firstOf(REGION.flag) : null;
+      function start() { if (vm) { try { vm.greenFlag(); } catch (e) { /* the step still ends */ } } }
+      if (!button) { start(); return Promise.resolve(false); }
+      var sq = opts.squeeze || 1;
+      /* Shorter than the walk to a tile: the flag sits still in the corner and was ringed for the
+         whole sentence, so the hand only has to arrive and be seen arriving. */
+      var lead = Math.round(520 * sq);
+      return reach(button, lead).then(function (there) {
+        /* the ring has been saying "here" for the whole sentence; the hand is saying "now" */
+        clearPoint();
+        return wait(there ? Math.round(140 * sq) : 0);
+      }).then(pressHere).then(function () {
+        start();
+        /* left standing, the arrow points at a flag nobody is about to press again */
+        setTimeout(function () { if (C()) C().hide(); }, 420);
+        return true;
+      });
+    }
+
     /* ---------- keys ---------- */
     /**
      * A real keyboard event through the VM's IO layer, so the hat scripts start exactly as they would
@@ -715,7 +750,7 @@
       return { top: top, nested: nested };
     }
 
-    function squeezeOf(clock, adds, scripts, keys) {
+    function squeezeOf(clock, adds, scripts, keys, run) {
       if (!clock || !clock.total) return 1;
       /* Two piles, because only one of them can be given away: the press, the modal, the walk to the
          tile and the actor landing take what they take, while the lead, the ringed hold and the beat
@@ -735,6 +770,9 @@
         fixed += Math.min(14000, 400 + c.top * 850 + c.nested * 480);
       }
       (keys || []).forEach(function () { fixed += 400; });
+      /* The walk to the green flag can be hurried the same way the walk to a tile can; the press
+         that starts the program cannot. */
+      if (run) { fixed += 90; shrink += 660; }
       if (!fixed && !shrink) return 1;
       if (room >= fixed + shrink) return 1;
       return Math.max(HURRY, Math.min(1, (room - fixed) / Math.max(1, shrink)));
@@ -887,7 +925,7 @@
          actor that is already on the stage. When the step is only about importing, the counts under
          the button are the actors' — the block animation is not running, so nothing else is using it. */
       /* the clock the narration handed over: from the body's first sentence to its last word */
-      var squeeze = squeezeOf(sync && sync.clock ? sync.clock() : null, adds, scripts, demo.keys);
+      var squeeze = squeezeOf(sync && sync.clock ? sync.clock() : null, adds, scripts, demo.keys, demo.run);
       if (root.console && squeeze < 1) console.info('[guide] hand at ' + Math.round(squeeze * 100) + '% pace');
 
       var chain = Promise.resolve(true);
@@ -940,8 +978,7 @@
             }
             if (demo.run) {
               after = after.then(function () { return step(function () {
-                try { vm.greenFlag(); } catch (e) {}
-                return wait(demo.run);
+                return pressFlag({ squeeze: squeeze }).then(function () { return wait(demo.run); });
               }); }).then(function (go) {
                 if (go === false) return false;
                 try { vm.stopAll(); } catch (e) {}

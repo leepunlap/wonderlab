@@ -16,7 +16,11 @@
     narration   from the first word to the last
     presses     when the hand pressed, relative to the first word
     arrivals    when each actor reached the stage
-    overrun     the last action minus the last word  (positive = the picture outlived the words)
+    overrun     when the hand finished minus the last word  (positive = the hand outlived the words)
+
+  The gate is the hand, not the actor: a costume still being fetched on a loaded machine says
+  nothing about pacing, so arrivals are printed and a library stall exempts its case. The last case
+  checks the one action a lesson used to perform without anyone pressing it — the green flag.
 
   Run it:
       WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
@@ -47,11 +51,16 @@
      out of a hole, because four actors take nine seconds whatever the voice does. A backdrop is
      included because its arrival is slower than a sprite's and the model has to allow for it.
      Build steps are checked arithmetically by tools/check_pace.mjs and exercised by
-     _drive-check.html; measuring them here as well only repeats the animator's own clock. */
+     _drive-check.html; measuring them here as well only repeats the animator's own clock.
+
+     The last case is the one action a lesson used to do without a hand: pressing the green flag.
+     `flag: true` asks the page to prove that the press came from the hand — that the tip was on the
+     button at the moment it pressed — and that the program actually started. */
   var CASES = [
     { topic: '501-bp01', idx: 1, what: 'four actors, nine seconds of copy' },
     { topic: '501-bp02', idx: 1, what: 'four actors, the shortest copy' },
-    { topic: '501-bp03', idx: 2, what: 'a backdrop on its own' }
+    { topic: '501-bp03', idx: 2, what: 'a backdrop on its own' },
+    { topic: 'motion', idx: 0, what: 'the green flag, pressed by hand', flag: true }
   ];
 
   var seen = null;
@@ -75,6 +84,22 @@
   function targets() {
     var S = win().WLStudio;
     return S && S.vm && S.vm.runtime ? S.vm.runtime.targets.length : 0;
+  }
+  /* where the green flag is, so a press can be shown to have happened *on* it rather than near it */
+  function flagRect() {
+    var el = doc().querySelector('[class*="green-flag_green-flag-button"]');
+    return el ? el.getBoundingClientRect() : null;
+  }
+  /* the sprite's x, for proving the program actually ran: "move 10 steps" is visible here even
+     when nothing else about the frame changed */
+  function spriteX() {
+    var S = win().WLStudio;
+    if (!S || !S.vm || !S.vm.runtime) return null;
+    var ts = S.vm.runtime.targets;
+    for (var i = 0; i < ts.length; i++) {
+      if (ts[i] && !ts[i].isStage && typeof ts[i].x === 'number') return Math.round(ts[i].x);
+    }
+    return null;
   }
 
   var tries = 0;
@@ -117,7 +142,8 @@
              a baseline — otherwise the previous case's presses are counted into this one */
           var st = drive.cursor ? drive.cursor().state() : { presses: 0 };
           seen = { t0: now(), ended: null, presses: [], arrivals: [], built: null, scripts: scripts(),
-                   names: targets(), total: 0, keys: keys, basePresses: st.presses || 0 };
+                   names: targets(), total: 0, keys: keys, basePresses: st.presses || 0,
+                   flag: null, x0: null };
           var last = (n.cues && n.cues.length) ? n.cues[n.cues.length - 1].t : 0;
           seen.total = last;
           n.ended.then(function () { if (seen && seen.ended === null) seen.ended = now() - seen.t0; });
@@ -134,7 +160,8 @@
     function next() {
       if (i >= CASES.length) return finish();
       var c = CASES[i++];
-      var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === c.topic; })[0];
+      var shelf = (w.StudioGuideLessons || []).concat(w.StudioGuideRefs || [], w.StudioGuideTopics || []);
+      var topic = shelf.filter(function (t) { return t.id === c.topic; })[0];
       if (!topic || !topic.steps[c.idx]) { log('  (skipped ' + c.topic + ' — not in the data)'); return next(); }
 
       seen = null;
@@ -149,13 +176,28 @@
         var t = now() - seen.t0;
         var presses = drive.cursor ? drive.cursor().state().presses : 0;
         while (seen.presses.length < presses - seen.basePresses) seen.presses.push({ t: t, open: pickerOpen() });
+        /* a press counts as "on the flag" only if the tip was inside the button when it happened */
+        if (c.flag && !seen.flag && seen.presses.length) {
+          var st = drive.cursor().state(), r = flagRect();
+          seen.flag = st && r ? { t: t, on: st.x >= r.left - 4 && st.x <= r.right + 4 &&
+                                            st.y >= r.top - 4 && st.y <= r.bottom + 4 } : { t: t, on: false };
+        }
         /* prepare() replaces the project, so the count can go down as well as up: a change is what
            says an actor landed, not an increase over the number taken before the reset */
         var n = targets();
         if (n !== seen.names) { if (n > seen.names) seen.arrivals.push({ t: t, n: n }); seen.names = n; }
         /* a build has no press to watch: what marks its end is the last script appearing */
         var sc = scripts();
-        if (sc !== seen.scripts) { if (sc > 0) seen.built = t; seen.scripts = sc; }
+        if (sc !== seen.scripts) {
+          if (sc > 0) {
+            seen.built = t;
+            /* where the sprite stands once it exists and before anything has run: the "did the
+               program start" comparison needs a reading taken after prepare(), not before it —
+               the previous case likely left the stage with no sprite at all */
+            if (seen.x0 === null) seen.x0 = spriteX();
+          }
+          seen.scripts = sc;
+        }
       }, 40);
 
       /* busy() is true from the press until the step settles, so it is the end of the run */
@@ -177,34 +219,54 @@
       var lastPress = s.presses.length ? s.presses[s.presses.length - 1].t : 0;
       var lastArrival = s.arrivals.length ? s.arrivals[s.arrivals.length - 1].t : 0;
       var lastAction = Math.max(lastPress, lastArrival, s.built || 0);
+      /* The hand's own end, which is what pacing controls. An actor landing is the library fetching
+         a costume: on a loaded machine that can be seconds late with the hand long finished, and
+         holding the pacing to account for it would make this page fail for reasons no lesson can
+         fix. Both numbers are printed; only this one is judged, and a library stall excuses it. */
+      var hand = Math.max(lastPress, s.built || 0);
       var ended = s.ended === null ? null : s.ended;
-      var over = ended === null ? null : lastAction - ended;
+      var over = ended === null ? null : hand - ended;
       var gaps = [];
       for (var k = 1; k < s.presses.length; k++) gaps.push(Math.round(s.presses[k].t - s.presses[k - 1].t));
+      var stalled = gaps.some(function (g) { return g > 3000; });
       log('  ' + c.topic + '/' + (c.idx) + '  ' + c.what);
       log('    narration ended at ' + (ended === null ? '??' : Math.round(ended) + 'ms') +
           ' (clip length ' + (s.total / 1000).toFixed(1) + 's)');
       log('    presses ' + s.presses.map(function (p) { return Math.round(p.t) + (p.open ? 't' : 'p'); }).join(' '));
       log('    gaps between presses ' + (gaps.join(', ') || 'none') +
-          (gaps.some(function (g) { return g > 3000; }) ? '   (a stall — the library, not the pacing)' : ''));
+          (stalled ? '   (a stall — the library, not the pacing)' : ''));
       log('    actors landed ' + (s.arrivals.map(function (a) { return Math.round(a.t); }).join(', ') || 'none'));
       log('    last script placed at ' + (s.built === null ? 'n/a' : Math.round(s.built) + 'ms'));
-      log('    last action ' + Math.round(lastAction) + 'ms vs last word ' + (ended === null ? '??' : Math.round(ended) + 'ms' +
+      log('    the hand finished at ' + Math.round(hand) + 'ms vs last word ' + (ended === null ? '??' : Math.round(ended) + 'ms' +
           '  → ' + (over === null ? '?' : (over > 0 ? '+' : '') + Math.round(over) + 'ms')));
+      if (lastArrival) {
+        log('    the last actor landed at ' + Math.round(lastArrival) + 'ms (the library, not the pacing)');
+      }
+      var flagOk = true;
+      if (c.flag) {
+        var x1 = spriteX();
+        var moved = s.x0 !== null && x1 !== null && x1 !== s.x0;
+        flagOk = !!(s.flag && s.flag.on) && moved;
+        log('    the hand pressed the flag: ' + (s.flag ? (s.flag.on ? 'yes, on the button' : 'NO — the tip was elsewhere') : 'NO — it never pressed') +
+            '; the program started: ' + (moved ? 'yes (x ' + s.x0 + ' → ' + x1 + ')' : 'NO'));
+      }
       /* Looser than the arithmetic gate, on purpose: this page runs a real library in a headless
          browser under a virtual clock, and one tile search across 343 thumbnails can add seconds
          that have nothing to do with pacing. It answers "is the shape right", while
          tools/check_pace.mjs answers "does it fit". Anything past three seconds is not jitter — it
-         is the picture still catching up after the voice has stopped. */
-      return { ok: over !== null && over <= 3000, over: over, case: c.topic + '/' + c.idx,
-               stall: gaps.some(function (g) { return g > 3000; }) };
+         is the hand still working after the voice has stopped. A stall is exempt: a library that
+         took three seconds to open one dialog has already been reported as such on its own line. */
+      return { ok: over !== null && (over <= 3000 || stalled) && flagOk, over: over,
+               case: c.topic + '/' + c.idx, stall: stalled, flag: !!c.flag };
     }
 
     function finish() {
       var bad = results.filter(function (r) { return !r.ok; });
       log('  ---');
-      log('  ' + results.length + ' case(s); ' + bad.length + ' with the picture outliving the words by more than 2s');
-      bad.forEach(function (r) { log('    ' + r.case + ' by ' + Math.round(r.over) + 'ms'); });
+      log('  ' + results.length + ' case(s); ' + bad.length + ' where the hand outlived the words or never pressed');
+      bad.forEach(function (r) {
+        log('    ' + r.case + (!r.flag ? ' by ' + Math.round(r.over) + 'ms' : ' — the hand did not press the flag'));
+      });
       log(bad.length ? 'RESULT FAIL' : 'RESULT PASS');
     }
   }

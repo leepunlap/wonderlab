@@ -113,6 +113,12 @@ it the way a child would: the plus, the library, the tile, the press. A ring say
 where; `src/studio-guide-cursor.js` says *press* — an arrow that travels to the
 target, compresses against it, leaves a ripple, and clicks.
 
+The green flag is pressed the same way. The copy says 按一下綠旗 and the hand goes
+there and presses it, with the project starting under the ripple; the flag used to
+be rung and then started by the guide on the child's behalf, which is the one
+thing the rest of this avoids. Nothing is pressed on a scene change: the stage is
+rebuilt by the guide, and a hand on a picture that nobody chose would be theatre.
+
 The click is synthesised rather than sampled: a band-passed noise burst for the
 tick and a fast-falling triangle for the body, both gone in under a tenth of a
 second. It follows the narration's mute — a child who turned the voice off asked

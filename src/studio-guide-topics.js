@@ -59,10 +59,9 @@
             scripts: [{ sprite: '@pico', id: 'a1', blocks: [flag, move(10)] }],
             annotate: [
               { shape: 'square', at: 'flyout:first', label: 'guide.act.drag' },
-              { shape: 'circle', at: 'flag', label: 'guide.act.click' },
               { shape: 'square', at: 'field:motion_movesteps/STEPS', label: 'guide.act.type', when: 'built' }
             ],
-            run: 1600, point: 'flag'
+            run: 1600
           }
         },
         {
