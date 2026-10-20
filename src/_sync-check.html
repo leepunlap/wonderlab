@@ -73,7 +73,13 @@
       log('RESULT FAIL: 501-bp01 is not in the guide data');
       return;
     }
-    var step = topic.steps[1];
+    /* by id, not by position: the opening lost its empty-stage step, and a position would have
+       quietly moved this test onto the wrong step */
+    var step = topic.steps.filter(function (s) { return s.id === 'p1'; })[0];
+    if (!step || !(step.demo.add || []).length) {
+      log('RESULT FAIL: 501-bp01 has no import step');
+      return;
+    }
     var actors = (step.demo.add || []).map(function (o) { return o.name; });
 
     var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
@@ -142,7 +148,7 @@
     });
 
     /* the pane opens on its index; the step has to be on screen for its button to exist */
-    guide.open('501-bp01', 1);
+    guide.open('501-bp01', topic.steps.indexOf(step));
     var btn = guide.el.querySelector('.wl-g-demo');
     if (!btn) { log('RESULT FAIL: the step has no 示範 button'); return; }
     btn.click();

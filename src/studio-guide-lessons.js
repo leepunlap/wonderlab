@@ -11,9 +11,9 @@
  * WHY IT STARTS FROM NOTHING
  * The lesson files arrive with their actors and backdrop already on the stage, which is why a child
  * who opens a blank project cannot start: nothing in the material ever says where 小老鼠 came from.
- * Every lesson here begins with three steps that are true of every project — new project, bring the
- * actors in, put a background behind them — and those are the `basic` ones a reader in 熟手 mode
- * never sees.
+ * Every lesson here begins with two steps that are true of every project — bring the actors in,
+ * put a background behind them — and those are the `basic` ones a reader in 熟手 mode never sees.
+ * The demonstration is itself a new project, so there is no step for starting one.
  *
  * THE ACTORS ARE STAND-INS, THE SCRIPTS ARE NOT
  * The lesson's own artwork belongs to the lesson file and is not in the shared library, so a
@@ -46,13 +46,14 @@
   /** Every lesson starts here: the stage and nothing on it. */
   var EMPTY = { empty: true };
 
-  /** The three steps no lesson material ever writes down, in the order they happen. */
+  /**
+   * The two steps no lesson material ever writes down: the actors in, then a background behind them.
+   * There is no third step for "start a new project": the demonstration already is one, so such a
+   * step could only ring an empty stage and press nothing — and the first thing a child watches
+   * should not teach that a step may point at nothing.
+   */
   function opening(actors, backdrop) {
     return [
-      {
-        id: 'p0', basic: true,
-        demo: { project: EMPTY, point: 'stage' }
-      },
       {
         id: 'p1', basic: true,
         demo: {

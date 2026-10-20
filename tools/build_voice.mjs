@@ -196,6 +196,7 @@ async function main() {
     CONCURRENCY + ' at a time');
 
   const clips = {};
+  const jobIds = new Set(jobs.map((j) => j.key + '|' + j.locale));
   let done = 0, reused = 0, failed = 0;
   const queue = jobs.slice();
 
@@ -241,6 +242,8 @@ async function main() {
     } catch (e) { before = {}; }
   }
   Object.keys(before).forEach((id) => {
+    // a line that is no longer narrated is not carried over: the step was removed or rewritten
+    if (!jobIds.has(id)) return;
     if (!before[id] || !before[id].file || !fs.existsSync(path.join(OUT, before[id].file))) return;
     // a manifest from before rates were recorded: the file was baked at the base rate
     clips[id] = { rate: BASE_RATE, ...before[id] };

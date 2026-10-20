@@ -71,7 +71,8 @@
     if (which === 'end') {
       var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === '501-bp01'; })[0];
       say('running the import step…');
-      return drive.run(topic.steps[1], null, topic).then(function () { say('done: ' + which); });
+      var importStep = topic.steps.filter(function (s) { return s.id === 'p1'; })[0];
+      return drive.run(importStep, null, topic).then(function () { say('done: ' + which); });
     }
 
     var button = doc().querySelector('[class*="sprite-selector_add-button"]');

@@ -103,11 +103,14 @@
       };
     });
     log('isLoading=' + (typeof w.WLStudio.isLoading === 'function' ? w.WLStudio.isLoading() : 'n/a'));
-    var actors = (topic.steps[1].demo.add || []).map(function (o) { return o.name; });
-    var backdrop = (topic.steps[2].demo.add || [])[0].name;
+    var byId = function (id) { return topic.steps.filter(function (s) { return s.id === id; })[0]; };
+    var importStep = byId('p1');
+    var backdropStep = byId('p2');
+    var actors = (importStep.demo.add || []).map(function (o) { return o.name; });
+    var backdrop = (backdropStep.demo.add || [])[0].name;
     log('step 1 imports: ' + actors.join(', ') + '   step 2 backdrop: ' + backdrop);
 
-    watch(drive.run(topic.steps[1], null, topic)).then(function (ok) {
+    watch(drive.run(importStep, null, topic)).then(function (ok) {
       var hand = drive.cursor().state();
       log('step 1 finished: ' + ok + '   targets now: ' + names().join(', '));
       log('  plus lit while the library was closed in ' + seen.plus + ' samples, ringed inside the' +
@@ -119,7 +122,7 @@
       log('  library closed afterwards: ' + (doc().querySelectorAll('[class*="library-item_library-item"]').length === 0));
 
       var withAlias = actors.map(function (n) {
-        var add = (topic.steps[1].demo.add || []).filter(function (o) { return o.name === n; })[0];
+        var add = (importStep.demo.add || []).filter(function (o) { return o.name === n; })[0];
         var ref = add && add.sprite ? String(add.sprite).replace('@', '') : null;
         var key = 'guide.sprite.' + ref;
         var alias = ref ? w.StudioI18n.t(key) : n;
@@ -130,7 +133,7 @@
       log(absent.length ? '  MISSING: ' + absent.join(', ') : '  all actors present under the lesson\'s names');
 
       seen.plus = 0; seen.tile = 0; seen.picker = 0; seen.hand = 0; seen.stray = 0;
-      return watch(drive.run(topic.steps[2], null, topic)).then(function (ok2) {
+      return watch(drive.run(backdropStep, null, topic)).then(function (ok2) {
         var stage = w.WLStudio.vm.runtime.targets[0];
         var costumes = (stage.getCostumes() || []).map(function (c) { return c.name; });
         var showing = costumes[stage.currentCostume];

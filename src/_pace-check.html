@@ -56,12 +56,19 @@
      The last case is the one action a lesson used to do without a hand: pressing the green flag.
      `flag: true` asks the page to prove that the press came from the hand — that the tip was on the
      button at the moment it pressed — and that the program actually started. */
+  /* Cases name their step by id, not by position: removing a step from every lesson (the empty
+     stage that used to open them) must not quietly point these at the step next door. */
   var CASES = [
-    { topic: '501-bp01', idx: 1, what: 'four actors, nine seconds of copy' },
-    { topic: '501-bp02', idx: 1, what: 'four actors, the shortest copy' },
-    { topic: '501-bp03', idx: 2, what: 'a backdrop on its own' },
-    { topic: 'motion', idx: 0, what: 'the green flag, pressed by hand', flag: true }
+    { topic: '501-bp01', step: 'p1', what: 'four actors, nine seconds of copy' },
+    { topic: '501-bp02', step: 'p1', what: 'four actors, the shortest copy' },
+    { topic: '501-bp03', step: 'p2', what: 'a backdrop on its own' },
+    { topic: 'motion', step: 'a1', what: 'the green flag, pressed by hand', flag: true }
   ];
+
+  function indexOf(topic, id) {
+    for (var k = 0; k < topic.steps.length; k++) if (topic.steps[k].id === id) return k;
+    return -1;
+  }
 
   var seen = null;
   var results = [];
@@ -162,10 +169,11 @@
       var c = CASES[i++];
       var shelf = (w.StudioGuideLessons || []).concat(w.StudioGuideRefs || [], w.StudioGuideTopics || []);
       var topic = shelf.filter(function (t) { return t.id === c.topic; })[0];
-      if (!topic || !topic.steps[c.idx]) { log('  (skipped ' + c.topic + ' — not in the data)'); return next(); }
+      var at = topic ? indexOf(topic, c.step) : -1;
+      if (!topic || at < 0) { log('  (skipped ' + c.topic + '/' + c.step + ' — not in the data)'); return next(); }
 
       seen = null;
-      guide.open(c.topic, c.idx);
+      guide.open(c.topic, at);
       var btn = guide.el.querySelector('.wl-g-demo');
       if (!btn) { log('RESULT FAIL: ' + c.topic + ' has no 示範 button'); return; }
       btn.click();
@@ -215,7 +223,7 @@
     }
 
     function report(c, s) {
-      if (!s) { log('  ' + c.topic + '/' + c.idx + ': nothing ran'); return { ok: false }; }
+      if (!s) { log('  ' + c.topic + '/' + c.step + ': nothing ran'); return { ok: false }; }
       var lastPress = s.presses.length ? s.presses[s.presses.length - 1].t : 0;
       var lastArrival = s.arrivals.length ? s.arrivals[s.arrivals.length - 1].t : 0;
       var lastAction = Math.max(lastPress, lastArrival, s.built || 0);
@@ -229,7 +237,7 @@
       var gaps = [];
       for (var k = 1; k < s.presses.length; k++) gaps.push(Math.round(s.presses[k].t - s.presses[k - 1].t));
       var stalled = gaps.some(function (g) { return g > 3000; });
-      log('  ' + c.topic + '/' + (c.idx) + '  ' + c.what);
+      log('  ' + c.topic + '/' + c.step + '  ' + c.what);
       log('    narration ended at ' + (ended === null ? '??' : Math.round(ended) + 'ms') +
           ' (clip length ' + (s.total / 1000).toFixed(1) + 's)');
       log('    presses ' + s.presses.map(function (p) { return Math.round(p.t) + (p.open ? 't' : 'p'); }).join(' '));
@@ -257,7 +265,7 @@
          is the hand still working after the voice has stopped. A stall is exempt: a library that
          took three seconds to open one dialog has already been reported as such on its own line. */
       return { ok: over !== null && (over <= 3000 || stalled) && flagOk, over: over,
-               case: c.topic + '/' + c.idx, stall: stalled, flag: !!c.flag };
+               case: c.topic + '/' + c.step, stall: stalled, flag: !!c.flag };
     }
 
     function finish() {

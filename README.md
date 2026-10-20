@@ -119,6 +119,11 @@ be rung and then started by the guide on the child's behalf, which is the one
 thing the rest of this avoids. Nothing is pressed on a scene change: the stage is
 rebuilt by the guide, and a hand on a picture that nobody chose would be theatre.
 
+Which also settles what a step may be. The lessons used to open on an empty stage,
+with a ring around it and nothing to press; that step is gone. A demonstration is
+already a new project, so the step could only point at nothing — and a first step
+that points at nothing teaches the child that the rings mean nothing.
+
 The click is synthesised rather than sampled: a band-passed noise burst for the
 tick and a fast-falling triangle for the body, both gone in under a tenth of a
 second. It follows the narration's mute — a child who turned the voice off asked
