@@ -455,6 +455,11 @@
       var live = narrate
         ? Promise.resolve(narrate(keys, { hold: true, from: 1 })).then(null, function () { return null; })
         : Promise.resolve(null);
+      /* `perform` is handed the whole clock, not just the sentence gates: the demonstration spreads
+         its own pauses across whatever time the narration has, so a step with four actors walks
+         faster than a step with one and neither one outlives its words. */
+      var plan = null;
+      live.then(function (n) { plan = n || null; }, function () { plan = null; });
 
       /* Until the handle arrives we do not know whether there is a clock at all, so the fallback is
          the pause a silent step has always had: long enough to look at the marks before they move. */
@@ -463,6 +468,9 @@
       var firstMove = true;
       var sync = {
         live: false,
+        clock: function () {
+          return plan ? { start: plan.start, total: plan.total || 0, first: plan.first || 0 } : null;
+        },
         at: function (i) {
           var pace = function () { return wait(i === 0 ? MARKS_BEAT : 0).then(function () { return true; }); };
           var p = sync.live && live ? live.then(function (n) { return n ? n.at(i) : pace(); }) : pace();

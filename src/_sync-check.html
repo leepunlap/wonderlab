@@ -14,8 +14,11 @@
 
   The three numbers that matter:
     sentence 0 begins at 2500ms   → the ring on the plus appears then, not at 1000ms (prepare)
-    sentence 1 begins at 6000ms   → the first tile is pressed after that
-    the narration ends at 9000ms  → but the plus was pressed at ~3000ms, so nothing waited it out
+    the plus is pressed at ~3400ms → and the walk into the library starts with it: the copy's second
+                                    sentence describes the actors arriving, so waiting for it would
+                                    leave the picture standing still and then rushing (that is the
+                                    defect tools/check_pace.mjs measures in milliseconds)
+    the narration ends at 9000ms  → the first press is long before it, so nothing waited it out
 
   Run it:
       WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
@@ -170,7 +173,9 @@
       var ringOk = seen.ringAt !== null && seen.ringAt >= CUE0 - 120 && seen.ringAt <= CUE0 + 600;
       /* the plus must come after the sentence that names it, and long before the last word */
       var plusOk = !!plus && plus.t >= CUE0 - 60 && plus.t <= CUE0 + 2200;
-      var tileOk = !!tile && tile.t >= CUE1 - 60;
+      /* the walk follows the library opening, not the sentence that names the actors: present tense
+         copy describes what is happening, and the hand is already happening */
+      var tileOk = !!tile && !!plus && tile.t >= plus.t + 200 && tile.t < CUE2;
       /* the point of the whole thing: the picture is inside the narration, not after it */
       var insideOk = !!plus && plus.t < CUE2;
       /* the lesson's names are not the library's: the imports are renamed on arrival, so the stage
@@ -181,7 +186,7 @@
       log('  ring kept sentence 0: ' + (ringOk ? 'yes' : 'NO — ' +
           (seen.ringAt === null ? 'no ring at all' : 'at ' + Math.round(seen.ringAt) + 'ms')));
       log('  plus kept sentence 0: ' + (plusOk ? 'yes' : 'NO — ' + (plus ? Math.round(plus.t) + 'ms' : 'no press')));
-      log('  first tile kept sentence 1: ' + (tileOk ? 'yes' : 'NO — ' + (tile ? Math.round(tile.t) + 'ms' : 'no tile press')));
+      log('  the walk followed the library: ' + (tileOk ? 'yes' : 'NO — ' + (tile ? Math.round(tile.t) + 'ms' : 'no tile press')));
       log('  the picture ran inside the words: ' + (insideOk ? 'yes' : 'NO — the plus waited the narration out'));
       log('  every actor arrived: ' + (stageOk ? 'yes — ' + present.join(', ') : 'NO — only ' + present.join(', ')));
       log('  presses: ' + seen.presses.length + ' for ' + actors.length + ' actors (expected ' +

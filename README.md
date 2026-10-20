@@ -57,6 +57,8 @@ python3 dual_e2e.py         # Dual mode tests
 python3 module_matrix.py    # Module isolation
 
 npm run check:guide         # The guide's topics, opcodes and words line up
+npm run check:pace          # Every step can be shown before the voice moves on
+npm run check               # both of the above
 ```
 
 `check:guide` reads `src/studio-guide-topics.js` as data and checks it against the
@@ -66,6 +68,8 @@ word resolvable, every `focus` pointing at a region the driver knows, every mark
 using one of the three shapes and an anchor that exists, and the three locale
 files carrying the same key set. Editing a topic is the common way to break the
 guide, and this catches it without a page load.
+
+`check:pace` is covered under [Timing](#timing) below.
 
 Two pages exist for looking at the pane by hand: `src/_i18n-check.html` walks the
 shell in all three languages and ends with `ALL PASS`, `src/_i18n-layout.html`
@@ -89,7 +93,8 @@ synthesise at once. `EDGE_TTS` overrides the binary if it is not on `PATH`.
 
 Voices, per language: `zh-HK-HiuMaanNeural` (Cantonese — the copy is Hong Kong
 Chinese, so a Mandarin voice would be reading a translation), `zh-CN-XiaoxiaoNeural`,
-`en-GB-SoniaNeural`, all at `-5%` for a teaching pace.
+`en-GB-SoniaNeural`. `-5%` is the teaching pace they are baked at; a line whose
+step needs longer is baked slower, down to `-22%` — see [Timing](#timing-can-the-hand-keep-up).
 
 Each clip carries its own cue track, generated from Edge's word timings, so the
 subtitle is the timing the voice actually used rather than an estimate. A line
@@ -147,6 +152,45 @@ Anchors are regions (`flag`, `stage`, `sprites`, `palette`, `flyout`, `workspace
 an input or a dropdown, or any CSS selector as a last resort. A mark whose target
 is not on screen is skipped rather than drawn in the wrong place: a missing mark
 is a lost hint, but a mark round the wrong thing is a lesson in the wrong thing.
+
+## Timing: can the hand keep up?
+
+A step is only a demonstration if the action finishes while the sentence about it
+is still being spoken. That is a budget, not a matter of taste, and it is checked
+as one.
+
+Every narrated step has a **cost** (`tools/pace.mjs`) and a **window**. The cost
+is the action's parts added up — the beat before the plus, the press, the modal,
+the walk to the tile, the hold on the tile, the close, the actor landing, the
+breath after — each with a fixed floor and a compressible part. The window comes
+from the clip's own cue track: from the first word plus a lead to the last word
+about the last action. The question `check:pace` asks of all seven topics, every
+step, in all three languages is simply whether cost fits in window.
+
+There are two levers, and the tools use both:
+
+- **The voice slows down.** Each line is baked at its own rate, solved from the
+  step's cost and the copy's length (between `-5%` and `-22%`). The rate is
+  written into `manifest.json` and is part of the filename hash, so re-running
+  `build:voice` re-synthesises only the lines that needed to change.
+- **The pauses compress.** The driver measures how much room is left when the
+  step starts (`squeezeOf` in `src/studio-guide-drive.js`) and shortens the
+  compressible parts down to 45% if it must. Standing still is the one thing it
+  will not cut below.
+
+When neither is enough, the answer is **more words, not slower speech**: a clip
+already at `-22%` that still cannot cover its step is reported as "this step needs
+a sentence", never as "say it slower still". That is the case `check:pace` fails
+on, and it is the only failure mode it has that text cannot fix immediately.
+
+```bash
+npm run check:pace      # → the tightest twelve steps, or the failures
+```
+
+The arithmetic is checked without a browser; `src/_pace-check.html` (part of
+`npm run check:pages`) then plays three real steps under the real narration and
+real hand and reports the gap between the last action and the last word. A stall
+there is labelled as the library being slow to decode, not as bad pacing.
 
 ## The copy is spoken Cantonese
 

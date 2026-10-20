@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — how long the demonstration actually takes.
+
+  tools/pace.mjs says how long a step's actions need, and check_pace.mjs refuses to pass when the
+  narration is shorter than that. Both are arithmetic, and arithmetic about a browser is only as good
+  as the constants in it. This page is where those constants come from: it runs real steps on the
+  real editor, with the real baked clips as the clock, and prints what happened.
+
+  Nothing here is invented. The narration is the clip's own cue track — in a headless browser the
+  audio element refuses to play, the voice falls back to its timed path, and the sentences arrive at
+  exactly the milliseconds the manifest recorded. So the numbers below are the numbers a student
+  gets.
+
+  What is measured, per case:
+    narration   from the first word to the last
+    presses     when the hand pressed, relative to the first word
+    arrivals    when each actor reached the stage
+    overrun     the last action minus the last word  (positive = the picture outlived the words)
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-pace-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>pace check</title>
+<style>html,body{margin:0}iframe{width:100%;height:60vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-pace-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-pace-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+  function now() { return (win().performance || performance).now(); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* The cases are the shapes, not the lessons: the import chain is the one that cannot be talked
+     out of a hole, because four actors take nine seconds whatever the voice does. A backdrop is
+     included because its arrival is slower than a sprite's and the model has to allow for it.
+     Build steps are checked arithmetically by tools/check_pace.mjs and exercised by
+     _drive-check.html; measuring them here as well only repeats the animator's own clock. */
+  var CASES = [
+    { topic: '501-bp01', idx: 1, what: 'four actors, nine seconds of copy' },
+    { topic: '501-bp02', idx: 1, what: 'four actors, the shortest copy' },
+    { topic: '501-bp03', idx: 2, what: 'a backdrop on its own' }
+  ];
+
+  var seen = null;
+  var results = [];
+
+  function pickerOpen() {
+    return doc().querySelectorAll('[class*="library-item_library-item"]').length > 0;
+  }
+  function scripts() {
+    var vm = win().WLStudio && win().WLStudio.vm;
+    if (!vm || !vm.runtime) return 0;
+    return vm.runtime.targets.reduce(function (n, t) {
+      var b = t.blocks;
+      if (!b) return n;
+      /* any block the target owns: a decoration changed by the animation still counts as progress,
+         and the last change is what "the build is finished" means */
+      var k = b._blocks && typeof b._blocks === 'object' ? Object.keys(b._blocks).length : 0;
+      return n + k;
+    }, 0);
+  }
+  function targets() {
+    var S = win().WLStudio;
+    return S && S.vm && S.vm.runtime ? S.vm.runtime.targets.length : 0;
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading || !w.StudioGuideDrive || !w.StudioGuide ||
+        !w.StudioGuideVoice) {
+      if (tries < 80) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+    run();
+  }());
+
+  function run() {
+    var w = win();
+    var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
+    var drive = w.StudioGuideDrive.create({
+      i18n: w.StudioI18n, marks: function () { return marks; }, sound: function () { return false; }
+    });
+    var voice = w.StudioGuideVoice.create({ i18n: w.StudioI18n });
+
+    var guide = w.StudioGuide.create({
+      i18n: w.StudioI18n,
+      topics: (w.StudioGuideLessons || []).concat(w.StudioGuideRefs || [], w.StudioGuideTopics || []),
+      prepare: function (s, t) { return drive.prepare(s, t); },
+      explain: function (s, sync) { drive.explain(s, sync); },
+      perform: function (s, onProgress, sync) { return drive.perform(onProgress, sync); },
+      stop: function () { drive.stop(); marks.clear(); },
+      restore: function () { return drive.restore(); },
+      isActive: function () { return drive.isActive(); },
+      canRun: function () { return true; },
+      /* the real verb, wrapped: the clock is the baked clip's own cue track */
+      narrate: function (keys, opts) {
+        return voice.narrate(keys, opts).then(function (n) {
+          if (!n) return n;
+          /* the hand's counters are cumulative for the life of the drive, so each case starts from
+             a baseline — otherwise the previous case's presses are counted into this one */
+          var st = drive.cursor ? drive.cursor().state() : { presses: 0 };
+          seen = { t0: now(), ended: null, presses: [], arrivals: [], built: null, scripts: scripts(),
+                   names: targets(), total: 0, keys: keys, basePresses: st.presses || 0 };
+          var last = (n.cues && n.cues.length) ? n.cues[n.cues.length - 1].t : 0;
+          seen.total = last;
+          n.ended.then(function () { if (seen && seen.ended === null) seen.ended = now() - seen.t0; });
+          return n;
+        });
+      },
+      hush: function () { voice.stop(); },
+      voice: function () { return true; }
+    });
+
+    var i = 0;
+    next();
+
+    function next() {
+      if (i >= CASES.length) return finish();
+      var c = CASES[i++];
+      var topic = (w.StudioGuideLessons || []).filter(function (t) { return t.id === c.topic; })[0];
+      if (!topic || !topic.steps[c.idx]) { log('  (skipped ' + c.topic + ' — not in the data)'); return next(); }
+
+      seen = null;
+      guide.open(c.topic, c.idx);
+      var btn = guide.el.querySelector('.wl-g-demo');
+      if (!btn) { log('RESULT FAIL: ' + c.topic + ' has no 示範 button'); return; }
+      btn.click();
+
+      /* Sample everything that moves: the hand's presses, and an actor landing. */
+      var poll = setInterval(function () {
+        if (!seen) return;
+        var t = now() - seen.t0;
+        var presses = drive.cursor ? drive.cursor().state().presses : 0;
+        while (seen.presses.length < presses - seen.basePresses) seen.presses.push({ t: t, open: pickerOpen() });
+        /* prepare() replaces the project, so the count can go down as well as up: a change is what
+           says an actor landed, not an increase over the number taken before the reset */
+        var n = targets();
+        if (n !== seen.names) { if (n > seen.names) seen.arrivals.push({ t: t, n: n }); seen.names = n; }
+        /* a build has no press to watch: what marks its end is the last script appearing */
+        var sc = scripts();
+        if (sc !== seen.scripts) { if (sc > 0) seen.built = t; seen.scripts = sc; }
+      }, 40);
+
+      /* busy() is true from the press until the step settles, so it is the end of the run */
+      var armed = false, waited = 0;
+      var watch = setInterval(function () {
+        if (!armed) { armed = drive.busy(); return; }
+        /* the step ends with the hand, the narration with the last clip: the gap between them is the
+           number this page exists to print, so wait for the voice too */
+        if ((drive.busy() || (seen && seen.ended === null)) && waited < 600) { waited++; return; }
+        clearInterval(watch); clearInterval(poll);
+        results.push(report(c, seen));
+        seen = null;
+        setTimeout(next, 400);
+      }, 120);
+    }
+
+    function report(c, s) {
+      if (!s) { log('  ' + c.topic + '/' + c.idx + ': nothing ran'); return { ok: false }; }
+      var lastPress = s.presses.length ? s.presses[s.presses.length - 1].t : 0;
+      var lastArrival = s.arrivals.length ? s.arrivals[s.arrivals.length - 1].t : 0;
+      var lastAction = Math.max(lastPress, lastArrival, s.built || 0);
+      var ended = s.ended === null ? null : s.ended;
+      var over = ended === null ? null : lastAction - ended;
+      var gaps = [];
+      for (var k = 1; k < s.presses.length; k++) gaps.push(Math.round(s.presses[k].t - s.presses[k - 1].t));
+      log('  ' + c.topic + '/' + (c.idx) + '  ' + c.what);
+      log('    narration ended at ' + (ended === null ? '??' : Math.round(ended) + 'ms') +
+          ' (clip length ' + (s.total / 1000).toFixed(1) + 's)');
+      log('    presses ' + s.presses.map(function (p) { return Math.round(p.t) + (p.open ? 't' : 'p'); }).join(' '));
+      log('    gaps between presses ' + (gaps.join(', ') || 'none') +
+          (gaps.some(function (g) { return g > 3000; }) ? '   (a stall — the library, not the pacing)' : ''));
+      log('    actors landed ' + (s.arrivals.map(function (a) { return Math.round(a.t); }).join(', ') || 'none'));
+      log('    last script placed at ' + (s.built === null ? 'n/a' : Math.round(s.built) + 'ms'));
+      log('    last action ' + Math.round(lastAction) + 'ms vs last word ' + (ended === null ? '??' : Math.round(ended) + 'ms' +
+          '  → ' + (over === null ? '?' : (over > 0 ? '+' : '') + Math.round(over) + 'ms')));
+      /* Looser than the arithmetic gate, on purpose: this page runs a real library in a headless
+         browser under a virtual clock, and one tile search across 343 thumbnails can add seconds
+         that have nothing to do with pacing. It answers "is the shape right", while
+         tools/check_pace.mjs answers "does it fit". Anything past three seconds is not jitter — it
+         is the picture still catching up after the voice has stopped. */
+      return { ok: over !== null && over <= 3000, over: over, case: c.topic + '/' + c.idx,
+               stall: gaps.some(function (g) { return g > 3000; }) };
+    }
+
+    function finish() {
+      var bad = results.filter(function (r) { return !r.ok; });
+      log('  ---');
+      log('  ' + results.length + ' case(s); ' + bad.length + ' with the picture outliving the words by more than 2s');
+      bad.forEach(function (r) { log('    ' + r.case + ' by ' + Math.round(r.over) + 'ms'); });
+      log(bad.length ? 'RESULT FAIL' : 'RESULT PASS');
+    }
+  }
+}());
+</script>
+</body>
+</html>

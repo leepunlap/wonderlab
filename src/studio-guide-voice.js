@@ -237,10 +237,17 @@
       var mine = seq;
 
       var reached = 0, waiters = [], done = false, planP = null;
+      /* `start` is when the first word is asked for, `total` how long the whole narration lasts and
+         `first` where the body's first sentence begins — together they are the budget a demonstration
+         has, and studio-guide-drive.js spends it. */
+      var startedAt = Date.now();
       var finish;
       var n = {
         spoken: false,
         cues: [],
+        start: startedAt,
+        total: 0,
+        first: 0,
         ended: new Promise(function (r) { finish = r; }),
         at: function (i) {
           return planP.then(function (p) {
@@ -302,6 +309,9 @@
       planP = planFor(list).then(function (p) {
         if (mine !== seq) return p;
         n.cues = p.cues;
+        n.total = p.total;
+        var e = p.entries[from];
+        n.first = e ? e.start + (e.cues[0] ? e.cues[0].t : 0) : 0;
         start(p);
         return p;
       });

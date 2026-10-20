@@ -3,7 +3,8 @@
  * Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
  *
  * WHAT THIS IS
- * `_drive-check.html`, `_mode-check.html`, `_library-check.html` and `_import-check.html` load the
+ * `_drive-check.html`, `_mode-check.html`, `_library-check.html`, `_import-check.html`,
+ * `_sync-check.html`, `_pace-check.html` and `_voice-sheet.html` load the
  * real page in a frame, press the real buttons and print one line: RESULT PASS or RESULT FAIL. This
  * is the runner, so the checks are one command and not a paragraph of Chrome flags nobody will
  * remember.
@@ -30,6 +31,7 @@ const PAGES = [
   { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' },
   { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' },
   { file: '_sync-check.html', out: 'wl-sync-out', what: '畫面跟着旁白的句子走' },
+  { file: '_pace-check.html', out: 'wl-pace-out', what: '示範趕得上旁白的時間' },
   { file: '_voice-sheet.html', out: 'wl-voice-out', what: '每句旁白 都有錄音' }
 ];
 

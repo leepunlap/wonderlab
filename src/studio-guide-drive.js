@@ -436,7 +436,9 @@
       /* The pause the caller asked for is the budget for the whole approach, not time on top of it:
          a hand that arrives and a ring that waits are the same beat, and only one of them says
          "press this". */
-      var lead = opts.lead || 900;
+      /* the lead is the longest pause in the whole walk, so it is the first thing the clock takes
+         away when a step has more to show than to say */
+      var lead = opts.lead || Math.round(900 * (opts.squeeze || 1));
       var approach = Math.min(560, lead);
       return reach(button, lead).then(function (there) {
         return wait(there ? Math.max(140, lead - approach) : lead);
@@ -463,19 +465,23 @@
      * The picker closes on every selection, so a second actor needs the plus again: it is pressed
      * quietly, because the step has already made the point once.
      */
-    function chooseTile(o) {
+    function chooseTile(o, opts) {
+      opts = opts || {};
       var kind = o['do'] === 'add_backdrop' ? 'backdrop' : 'sprite';
       var name = o.name;
       var alias = spriteName(o.sprite || o.name);
       var before = targetIds();
-      var front = pickerOpen() ? Promise.resolve(true) : openPicker(kind, { ring: false, lead: 420 });
+      var front = pickerOpen() ? Promise.resolve(true) : openPicker(kind, { ring: false, lead: 420 * (opts.squeeze || 1) });
       return front.then(function (ok) {
         if (ok === false) return false;
         return findTile(name).then(function (tile) {
           if (!tile) { closePicker(); if (C()) C().hide(); return false; }
           /* the ring the sentence put on the plus has done its job; the pill on the tile is better */
           clearMarks();
-          var hold = 900;
+          /* How long the tile is ringed before it is pressed. The caller sets it from the clock: a
+             step with four actors cannot afford the same 900ms on each of them that a step with one
+             can, and holding it anyway is how a demonstration ends up finishing after the voice. */
+          var hold = Math.round(900 * (opts.squeeze || 1));
           var walk = Math.min(560, hold);
           return reach(tile, hold).then(function (there) {
             // the pill says what the lesson calls it, which is not what the library calls it
@@ -497,7 +503,10 @@
             return until(function () { return !pickerOpen(); }, 50, 100);
           }).then(function (closed) {
             if (!closed) { closePicker(); return false; }
-            return arrived(kind, name, alias, before, kind === 'backdrop' ? 12000 : 4000);
+            /* Long enough for a costume still being fetched: a sprite that lands a moment after the
+               patience ran out used to be counted as a miss, and the fallback then added a second
+               copy of it. */
+            return arrived(kind, name, alias, before, kind === 'backdrop' ? 12000 : 6000);
           });
         });
       });
@@ -522,10 +531,15 @@
         var one = list[i], at = i++;
         if (opts.onProgress) { try { opts.onProgress(at + 1, list.length); } catch (e) { /* the count is not the step */ } }
         var gate = (at === 0 && opts.gateTile) ? opts.gateTile : Promise.resolve(true);
+        var ids = targetIds();
         return gate.then(function (ok) {
           if (ok === false) return false;
-          return chooseTile(one).then(function (picked) {
-            if (picked) return wait(one.after || 320).then(tile);
+          return chooseTile(one, opts).then(function (picked) {
+            if (picked) return wait(one.after || Math.round(320 * (opts.squeeze || 1))).then(tile);
+            /* A "no" from the picker can still be a yes from the editor: the actor may have landed a
+               few milliseconds after the patience ran out. Adding it again would put two on the
+               stage, so the stage is asked before the fallback is taken. */
+            if (targetIds().length > ids.length) return wait(one.after || 240).then(tile);
             return Promise.resolve(addDirect(one)).then(function () {
               return wait(one.after || 450);
             }, function (e) {
@@ -667,6 +681,63 @@
         return wait(60).then(check);
       }
       return check();
+    }
+
+    /**
+     * How much the hand can afford to linger, from the clock the narration handed over.
+     *
+     * The same arithmetic as tools/pace.mjs, coarser on purpose: this only decides whether a tile is
+     * ringed for 900ms or 320ms, and being 10% off is a slightly brisk demonstration, not a wrong
+     * one. What it must not do is let a four-actor step walk at the pace of a one-actor step, which
+     * is what "the picture finishes after the voice" used to mean.
+     *
+     * 1 = no hurry. 0.45 = the shortest pause that still reads as a pause.
+     */
+    var HURRY = 0.45;
+
+    function estimateBlocks(scripts) {
+      var top = 0, nested = 0;
+      function walk(node, depth) {
+        if (!node || typeof node !== 'object') return;
+        if (Object.prototype.toString.call(node) === '[object Array]') {
+          for (var i = 0; i < node.length; i++) walk(node[i], depth);
+          return;
+        }
+        if (typeof node.op !== 'string') return;
+        if (depth === 0) top++; else nested++;
+        for (var k in node) {
+          if (k === 'op' || !Object.prototype.hasOwnProperty.call(node, k)) continue;
+          var v = node[k];
+          if (v && typeof v === 'object') walk(v, depth + 1);
+        }
+      }
+      (scripts || []).forEach(function (sc) { walk(sc.blocks || [], 0); });
+      return { top: top, nested: nested };
+    }
+
+    function squeezeOf(clock, adds, scripts, keys) {
+      if (!clock || !clock.total) return 1;
+      /* Two piles, because only one of them can be given away: the press, the modal, the walk to the
+         tile and the actor landing take what they take, while the lead, the ringed hold and the beat
+         after are ours to shorten. The pace is what is left over divided by what can move. */
+      var room = clock.total - (clock.first || 0) - 150;
+      var fixed = 0, shrink = 0;
+      if (adds.length) {
+        fixed += 340; shrink += 900;                       // the plus: press + library paint
+        adds.forEach(function (a, i) {
+          if (i > 0) { fixed += 340; shrink += 420; }      // reopening the library for the next one
+          fixed += 890; shrink += 1220;                    // find, press, close, landing + hold, beat
+          if (a['do'] === 'add_backdrop') fixed += 600;    // a backdrop is a whole picture
+        });
+      }
+      if (scripts.length) {
+        var c = estimateBlocks(scripts);
+        fixed += Math.min(14000, 400 + c.top * 850 + c.nested * 480);
+      }
+      (keys || []).forEach(function () { fixed += 400; });
+      if (!fixed && !shrink) return 1;
+      if (room >= fixed + shrink) return 1;
+      return Math.max(HURRY, Math.min(1, (room - fixed) / Math.max(1, shrink)));
     }
 
     /* ---------- the public verbs ---------- */
@@ -815,6 +886,10 @@
       /* Imports first, in the order the lesson asked for them: a script can only be built on an
          actor that is already on the stage. When the step is only about importing, the counts under
          the button are the actors' — the block animation is not running, so nothing else is using it. */
+      /* the clock the narration handed over: from the body's first sentence to its last word */
+      var squeeze = squeezeOf(sync && sync.clock ? sync.clock() : null, adds, scripts, demo.keys);
+      if (root.console && squeeze < 1) console.info('[guide] hand at ' + Math.round(squeeze * 100) + '% pace');
+
       var chain = Promise.resolve(true);
       if (adds.length) {
         var first = adds[0];
@@ -826,9 +901,12 @@
         var alreadyRung = !!(showMarks && showMarks.count && showMarks.count() > 0) &&
           marksFor(st.step, 'say').some(function (mk) { return mk && mk.at === region; });
         chain = importAll(adds, {
-          open: step(function () { return openPicker(region === 'addBackdrop' ? 'backdrop' : 'sprite', { ring: !alreadyRung }); }),
-          gateTile: beat(),
+          open: step(function () { return openPicker(region === 'addBackdrop' ? 'backdrop' : 'sprite', { ring: !alreadyRung, squeeze: squeeze }); }),
+          /* No separate beat for the first tile: the sentence that names the actors describes them
+             arriving, so the walk begins as the library opens and runs under that sentence. */
+          gateTile: null,
           alive: alive,
+          squeeze: squeeze,
           onProgress: scripts.length ? null : onProgress
         });
       }

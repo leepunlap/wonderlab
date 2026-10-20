@@ -34,6 +34,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { describeMisread, findMisread } from './pronunciation.mjs';
+import { rates, BASE_RATE } from './pace.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
@@ -42,11 +43,19 @@ const CLI = process.env.EDGE_TTS || 'edge-tts';
 const CONCURRENCY = Number(process.env.VOICE_JOBS || 4);
 const PIPELINE = 2;   // bump when the cue track changes shape: entries from older runs are redone
 
+/**
+ * `rate` is the base reading speed: a little under normal, which is what a demonstration wants. A
+ * body is read slower than that when its own step needs longer to show than it takes to say —
+ * tools/pace.mjs works out how much, per step, per language, from the actions the step performs and
+ * the clip that was baked last time. A changed rate changes the file's hash, so exactly the lines
+ * that need to be slower are the lines that get re-synthesised.
+ */
 const LOCALES = {
   'zh-Hant': { voice: 'zh-HK-HiuMaanNeural', rate: '-5%' },
   'zh-Hans': { voice: 'zh-CN-XiaoxiaoNeural', rate: '-5%' },
   en: { voice: 'en-GB-SoniaNeural', rate: '-5%' }
 };
+const pct = (n) => (n > 0 ? '+' : '') + n + '%';
 
 /* ---------- the words ---------- */
 /**
@@ -153,6 +162,10 @@ function synthesize({ text, voice, rate }) {
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
+  /* How slowly each body has to be read to leave room for what its step demonstrates. Read from the
+     manifest of the last run, so this converges in one pass and is stable on a re-run. */
+  const pace = rates();
+
   const jobs = [];
   const spoken = {};
   Object.keys(LOCALES).forEach((locale) => {
@@ -163,7 +176,10 @@ async function main() {
     keys.forEach((key) => {
       const text = String(dict[key] || '').trim();
       spoken[locale][key] = text;
-      if (text) jobs.push({ locale, key, text, ...LOCALES[locale] });
+      if (!text) return;
+      const slow = pace[key + '|' + locale];
+      const rate = slow == null ? LOCALES[locale].rate : pct(slow);
+      jobs.push({ locale, key, text, ...LOCALES[locale], rate });
     });
   });
 
@@ -201,6 +217,8 @@ async function main() {
         clips[id] = {
           file: name,
           ms: cues.length ? cues[cues.length - 1].t + cues[cues.length - 1].d : 0,
+          // kept so the pacing check can tell "slow" from "was supposed to be slow"
+          rate: Number(String(job.rate).replace('%', '')),
           cues
         };
         done++;
@@ -223,7 +241,9 @@ async function main() {
     } catch (e) { before = {}; }
   }
   Object.keys(before).forEach((id) => {
-    if (before[id] && before[id].file && fs.existsSync(path.join(OUT, before[id].file))) clips[id] = before[id];
+    if (!before[id] || !before[id].file || !fs.existsSync(path.join(OUT, before[id].file))) return;
+    // a manifest from before rates were recorded: the file was baked at the base rate
+    clips[id] = { rate: BASE_RATE, ...before[id] };
   });
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
 
