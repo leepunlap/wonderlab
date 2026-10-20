@@ -109,7 +109,9 @@
       return names[ref];
     }
 
-    /** `{ k: 'guide.say.hello' }` anywhere a block holds text, resolved at build time. */
+    /** `{ k: 'guide.say.hello' }` anywhere a block holds text, resolved at build time. The same for
+     *  `{ var: { k: ... } }` — a reporter that reads a variable has to carry the name the locale gave
+     *  it, or it would name a variable nobody created. */
     function resolveBlock(b) {
       var o = {};
       Object.keys(b || {}).forEach(function (k) {
@@ -118,6 +120,8 @@
           if (Array.isArray(v)) o[k] = v.map(resolveBlock);
           else if (v.op) o[k] = resolveBlock(v);
           else if (v.k) o[k] = T(v.k);
+          else if (v['var'] && v['var'].k) o[k] = { 'var': T(v['var'].k) };
+          else if (v.list && v.list.k) o[k] = { list: T(v.list.k) };
           else o[k] = v;
         } else o[k] = v;
       });

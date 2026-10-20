@@ -701,6 +701,538 @@
           }
         }
       ])
+    },
+
+    /* ---------------------------------------------------------------- 15 · 飛機大戰 2.0 */
+    {
+      id: '501-bp15',
+      kind: 'lesson',
+      icon: '<path d="M3 12h9"/><path d="M12 7l7 5-7 5z"/><path d="M5 8v8"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Rocketship', sprite: '@ship' },
+        { do: 'add_sprite', name: 'Ghost', sprite: '@foe' },
+        { do: 'add_sprite', name: 'Lightning', sprite: '@bolt' },
+        { do: 'add_sprite', name: 'Star', sprite: '@power' }
+      ], 'Spaceship').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@ship',
+            scripts: [
+              { sprite: '@ship', id: 'l151', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'right arrow' }, { op: 'motion_pointindirection', DIRECTION: 90 }, move(8)] },
+              { sprite: '@ship', id: 'l152', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'left arrow' }, { op: 'motion_pointindirection', DIRECTION: -90 }, move(8)] }
+            ],
+            keys: ['ArrowRight', 'ArrowLeft'],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }]
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@bolt',
+            scripts: [
+              { sprite: '@bolt', id: 'l153', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'space' }, { op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }] },
+              { sprite: '@bolt', id: 'l154', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: 0, Y: -110 }, repeat(12, [{ op: 'motion_changeyby', DY: 16 }]),
+                { op: 'control_delete_this_clone' }] }
+            ],
+            keys: [' '],
+            run: 3200
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@foe',
+            scripts: [
+              { sprite: '@foe', id: 'l155', blocks: [flag, { op: 'looks_hide' }, forever([wait(1.6), { op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])] },
+              { sprite: '@foe', id: 'l156', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -170, TO: 170 }, Y: 150 },
+                { op: 'motion_glidesecstoxy', SECS: 2, X: 0, Y: -160 }, { op: 'control_delete_this_clone' }] }
+            ],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@foe',
+            scripts: [{
+              sprite: '@foe', id: 'l157',
+              blocks: [{ op: 'control_start_as_clone' },
+                forever([
+                  ifThen(touching('bolt'), [
+                    { op: 'control_wait_until', CONDITION: { op: 'operator_not', OPERAND: touching('bolt') } },
+                    { op: 'control_delete_this_clone' },
+                    { op: 'data_changevariableby', VARIABLE: word('guide.l50115.score'), VALUE: 1 },
+                    say('guide.l50115.hit', 1.6)
+                  ])
+                ])]
+            }],
+            annotate: [{ shape: 'square', at: 'field:sensing_touchingobject/TOUCHINGOBJECTMENU', label: 'guide.act.pick', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't5',
+          demo: {
+            project: EMPTY, focus: '@power',
+            scripts: [
+              { sprite: '@power', id: 'l158', blocks: [flag, { op: 'looks_hide' }, forever([wait(2.4),
+                ifThen({ op: 'operator_equals', OPERAND1: { op: 'operator_random', FROM: 1, TO: 2 }, OPERAND2: 1 },
+                  [{ op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])])] },
+              { sprite: '@power', id: 'l159', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -170, TO: 170 }, Y: 150 },
+                { op: 'motion_glidesecstoxy', SECS: 2, X: 0, Y: -120 },
+                ifThen(touching('ship'), [{ op: 'event_broadcast', BROADCAST_INPUT: word('guide.l50115.shield') },
+                  say('guide.l50115.pick', 1.6)]),
+                { op: 'control_delete_this_clone' }] }
+            ],
+            run: 3200
+          }
+        },
+        {
+          id: 't6',
+          demo: {
+            project: EMPTY, focus: '@bolt',
+            scripts: [
+              { sprite: '@bolt', id: 'l15a', blocks: [{ op: 'event_whenbroadcastreceived', BROADCAST_OPTION: word('guide.l50115.fire') },
+                { op: 'looks_show' }, { op: 'motion_glidesecstoxy', SECS: 1.2, X: 0, Y: -120 },
+                { op: 'control_delete_this_clone' }] },
+              { sprite: '@foe', id: 'l15b', blocks: [flag, forever([wait(3),
+                { op: 'event_broadcast', BROADCAST_INPUT: word('guide.l50115.fire') }])] }
+            ],
+            run: 3200
+          }
+        }
+      ])
+    },
+
+    /* ---------------------------------------------------------------- 18 · 守衛大作戰（下） */
+    {
+      id: '502-bp02',
+      kind: 'lesson',
+      icon: '<rect x="4" y="10" width="16" height="10" rx="5"/><path d="M8 10V6"/><path d="M16 10V6"/><path d="M4 15h16"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Ball', sprite: '@slime' },
+        { do: 'add_sprite', name: 'Orange', sprite: '@orange' },
+        { do: 'add_sprite', name: 'Ghost', sprite: '@violet' },
+        { do: 'add_sprite', name: 'Sun', sprite: '@sun' }
+      ], 'Blue Sky').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@slime',
+            scripts: [
+              { sprite: '@slime', id: 'l21a', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'right arrow' }, move(8)] },
+              { sprite: '@slime', id: 'l21b', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'left arrow' }, move(-8)] }
+            ],
+            keys: ['ArrowRight', 'ArrowLeft'],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }]
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@slime',
+            scripts: [
+              { sprite: '@slime', id: 'l22a', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'space' },
+                ifThen({ op: 'operator_gt', OPERAND1: { 'var': word('guide.l50202.energy') }, OPERAND2: 0 },
+                  [{ op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])] },
+              { sprite: '@slime', id: 'l22b', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                repeat(12, [{ op: 'motion_changeyby', DY: 14 }]), { op: 'control_delete_this_clone' }] }
+            ],
+            keys: [' '],
+            run: 3200
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@sun',
+            scripts: [
+              { sprite: '@sun', id: 'l23a', blocks: [flag, { op: 'looks_hide' }, forever([
+                wait({ op: 'operator_random', FROM: 1, TO: 3 }), { op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])] },
+              { sprite: '@sun', id: 'l23b', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -170, TO: 170 }, Y: 150 },
+                { op: 'motion_glidesecstoxy', SECS: 1.6, X: 0, Y: -100 }, wait(1.2),
+                { op: 'control_delete_this_clone' }] }
+            ],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@slime',
+            scripts: [{
+              sprite: '@slime', id: 'l24a',
+              blocks: [flag, forever([
+                ifThen(touching('sun'), [{ op: 'data_changevariableby', VARIABLE: word('guide.l50202.energy'), VALUE: 1 },
+                  say('guide.l50202.charge', 1.4)]),
+                ifThen(touching('violet'), [{ op: 'data_changevariableby', VARIABLE: word('guide.l50202.life'), VALUE: -1 },
+                  say('guide.l50202.hurt', 1.4)])])]
+            }],
+            annotate: [{ shape: 'square', at: 'field:sensing_touchingobject/TOUCHINGOBJECTMENU', label: 'guide.act.pick', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't5',
+          demo: {
+            project: EMPTY, focus: '@slime',
+            scripts: [{
+              sprite: '@slime', id: 'l25a',
+              blocks: [flag, forever([
+                ifThen({ op: 'operator_equals', OPERAND1: { 'var': word('guide.l50202.life') }, OPERAND2: 0 },
+                  [say('guide.l50202.lose', 2), { op: 'control_stop', STOP_OPTION: 'all' }])])]
+            }],
+            run: 3000
+          }
+        }
+      ])
+    },
+
+    /* ---------------------------------------------------------------- 21 · 擊鼓小達人（下） */
+    {
+      id: '502-bp05',
+      kind: 'lesson',
+      icon: '<circle cx="12" cy="12" r="7"/><path d="M12 5V3"/><path d="M12 21v-2"/><path d="M5 12H3"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Sun', sprite: '@sun' },
+        { do: 'add_sprite', name: 'Button1', sprite: '@face' },
+        { do: 'add_sprite', name: 'Key', sprite: '@key' }
+      ], 'Concert').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@sun',
+            scripts: [{
+              sprite: '@sun', id: 'l51a',
+              blocks: [flag,
+                ifThen({ op: 'operator_lt', OPERAND1: { op: 'sensing_distanceto', DISTANCETOMENU: word('guide.l50205.face') }, OPERAND2: 100 },
+                  [{ op: 'event_broadcast', BROADCAST_INPUT: word('guide.l50205.perfect') }]),
+                say('guide.l50205.proc', 2)]
+            }],
+            annotate: [{ shape: 'square', at: 'field:sensing_distanceto/DISTANCETOMENU', label: 'guide.act.pick', when: 'built' }],
+            run: 3000
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@face',
+            scripts: [
+              { sprite: '@face', id: 'l52a', blocks: [{ op: 'event_whenbroadcastreceived', BROADCAST_OPTION: word('guide.l50205.perfect') },
+                { op: 'data_changevariableby', VARIABLE: word('guide.l50205.combo'), VALUE: 1 },
+                { op: 'looks_changesizeby', CHANGE: 20 }, { op: 'looks_seteffectto', EFFECT: 'GHOST', VALUE: 40 },
+                say('guide.l50205.combo2', 1.6)] },
+              { sprite: '@face', id: 'l52b', blocks: [flag, { op: 'looks_setsizeto', SIZE: 100 },
+                { op: 'looks_cleargraphiceffects' }, { op: 'data_setvariableto', VARIABLE: word('guide.l50205.combo'), VALUE: 0 }] }
+            ],
+            annotate: [{ shape: 'square', at: 'field:data_changevariableby/VARIABLE', label: 'guide.act.type', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@face',
+            scripts: [{
+              sprite: '@face', id: 'l53a',
+              blocks: [flag, { op: 'looks_hide' }, { op: 'motion_gotoxy', X: -140, Y: -60 },
+                repeat(12, [{ op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }, { op: 'motion_changexby', DX: 20 }]),
+                say('guide.l50205.bar', 2)]
+            }, {
+              sprite: '@face', id: 'l53b',
+              blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' }, { op: 'looks_setsizeto', SIZE: 24 }]
+            }],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@sun',
+            scripts: [{
+              sprite: '@sun', id: 'l54a',
+              blocks: [flag, { op: 'looks_setsizeto', SIZE: 100 }, wait(1.2),
+                ifThen({ op: 'operator_gt', OPERAND1: { 'var': word('guide.l50205.combo') }, OPERAND2: 9 },
+                  [say('guide.l50205.gradeS', 2)]),
+                ifThen({ op: 'operator_and',
+                  OPERAND1: { op: 'operator_gt', OPERAND1: { 'var': word('guide.l50205.combo') }, OPERAND2: 5 },
+                  OPERAND2: { op: 'operator_not', OPERAND: { op: 'operator_gt', OPERAND1: { 'var': word('guide.l50205.combo') }, OPERAND2: 9 } } },
+                  [say('guide.l50205.gradeA', 2)])]
+            }],
+            run: 3200
+          }
+        },
+        {
+          id: 't5',
+          demo: {
+            project: EMPTY, focus: '@key',
+            scripts: [
+              { sprite: '@key', id: 'l55a', blocks: [flag, { op: 'looks_hide' }, repeat(3, [{ op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])] },
+              { sprite: '@key', id: 'l55b', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -120, TO: 120 }, Y: -20 },
+                say('guide.l50205.level', 2)] }
+            ],
+            run: 3000
+          }
+        }
+      ])
+    },
+
+    /* ---------------------------------------------------------------- 24 · 貪吃蛇（下） */
+    {
+      id: '502-bp08',
+      kind: 'lesson',
+      icon: '<path d="M3 16c4 0 4-8 8-8s4 8 8 8"/><path d="M17 8h4"/><circle cx="21" cy="8" r="1"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Snake', sprite: '@snake' },
+        { do: 'add_sprite', name: 'Apple', sprite: '@food' },
+        { do: 'add_sprite', name: 'Strawberry', sprite: '@berry' }
+      ], 'Woods').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@snake',
+            scripts: [{
+              sprite: '@snake', id: 'l81a',
+              blocks: [flag, forever([
+                move(6),
+                ifThen({ op: 'operator_or',
+                  OPERAND1: { op: 'operator_gt', OPERAND1: { op: 'operator_mathop', OPERATOR: 'abs', NUM: { op: 'motion_xposition' } }, OPERAND2: 228 },
+                  OPERAND2: { op: 'operator_gt', OPERAND1: { op: 'operator_mathop', OPERATOR: 'abs', NUM: { op: 'motion_yposition' } }, OPERAND2: 168 } },
+                  [say('guide.l50208.over', 2), { op: 'control_stop', STOP_OPTION: 'all' }])])]
+            }],
+            annotate: [{ shape: 'square', at: 'field:operator_mathop/OPERATOR', label: 'guide.act.pick', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@snake',
+            scripts: [{
+              sprite: '@snake', id: 'l82a',
+              blocks: [flag, { op: 'data_deletealloflist', LIST: word('guide.l50208.body') }, forever([
+                ifThen({ op: 'data_listcontainsitem', LIST: word('guide.l50208.body'), ITEM: { op: 'operator_join', STRING1: { op: 'motion_xposition' }, STRING2: { op: 'motion_yposition' } } },
+                  [say('guide.l50208.hit', 2), { op: 'control_stop', STOP_OPTION: 'all' }]),
+                { op: 'data_addtolist', LIST: word('guide.l50208.body'), ITEM: { op: 'operator_join', STRING1: { op: 'motion_xposition' }, STRING2: { op: 'motion_yposition' } } },
+                wait(0.3)])]
+            }],
+            annotate: [{ shape: 'square', at: 'field:data_addtolist/LIST', label: 'guide.act.pick', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@berry',
+            scripts: [
+              { sprite: '@berry', id: 'l83a', blocks: [flag, forever([wait(2.2), { op: 'looks_nextcostume' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -180, TO: 180 }, Y: { op: 'operator_random', FROM: -130, TO: 130 } }])] },
+              { sprite: '@snake', id: 'l83b', blocks: [flag, forever([ifThen(touching('berry'), [say('guide.l50208.special', 1.6)])])] }
+            ],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@snake',
+            scripts: [{
+              sprite: '@snake', id: 'l84a',
+              blocks: [flag, forever([
+                ifThen({ op: 'operator_equals', OPERAND1: { op: 'looks_costumenumbername', NUMBER_NAME: 'number' }, OPERAND2: 1 },
+                  [{ op: 'data_addtolist', LIST: word('guide.l50208.body'), ITEM: word('guide.l50208.seg') },
+                    { op: 'data_addtolist', LIST: word('guide.l50208.body'), ITEM: word('guide.l50208.seg') },
+                    { op: 'data_changevariableby', VARIABLE: word('guide.l50208.score'), VALUE: 20 },
+                    say('guide.l50208.grow', 1.6)]),
+                ifThen({ op: 'operator_equals', OPERAND1: { op: 'looks_costumenumbername', NUMBER_NAME: 'number' }, OPERAND2: 2 },
+                  [say('guide.l50208.shrink', 1.6), { op: 'data_changevariableby', VARIABLE: word('guide.l50208.score'), VALUE: -20 }])])]
+            }],
+            run: 3200
+          }
+        },
+        {
+          id: 't5',
+          demo: {
+            project: EMPTY, focus: '@snake',
+            scripts: [{
+              sprite: '@snake', id: 'l85a',
+              blocks: [flag, { op: 'data_setvariableto', VARIABLE: word('guide.l50208.speed'), VALUE: 0.8 },
+                forever([
+                  move(6),
+                  ifThen({ op: 'operator_equals', OPERAND1: { 'var': word('guide.l50208.speed') }, OPERAND2: 0.5 },
+                    [say('guide.l50208.fast', 1.6)]),
+                  wait({ 'var': word('guide.l50208.speed') })])]
+            }],
+            run: 3200
+          }
+        }
+      ])
+    },
+
+    /* ---------------------------------------------------------------- 28 · 兔子數列 */
+    {
+      id: '502-bp12',
+      kind: 'lesson',
+      icon: '<path d="M8 20V10"/><path d="M8 10c0-4 2-6 4-6s4 2 4 6v4"/><path d="M16 14c2 0 3 2 3 4"/><circle cx="18" cy="8" r="1"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Rabbit', sprite: '@rabbit' }
+      ], 'Hay Field').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@rabbit',
+            scripts: [{
+              sprite: '@rabbit', id: 'l121',
+              blocks: [flag, say('guide.l50212.proc', 2.6)]
+            }],
+            run: 2800
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@rabbit',
+            scripts: [{
+              sprite: '@rabbit', id: 'l122',
+              blocks: [flag, { op: 'data_setvariableto', VARIABLE: word('guide.l50212.n'), VALUE: 5 },
+                { op: 'data_setvariableto', VARIABLE: word('guide.l50212.sum'), VALUE: 0 },
+                { op: 'control_repeat_until', CONDITION: { op: 'operator_equals', OPERAND1: { 'var': word('guide.l50212.n') }, OPERAND2: 1 },
+                  SUBSTACK: [
+                    { op: 'data_changevariableby', VARIABLE: word('guide.l50212.sum'), VALUE: { 'var': word('guide.l50212.n') } },
+                    { op: 'data_changevariableby', VARIABLE: word('guide.l50212.n'), VALUE: -1 }] },
+                say('guide.l50212.step2', 2)]
+            }],
+            annotate: [{ shape: 'square', at: 'field:data_setvariableto/VALUE', label: 'guide.act.type', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@rabbit',
+            scripts: [{
+              sprite: '@rabbit', id: 'l123',
+              blocks: [flag, { op: 'data_setvariableto', VARIABLE: word('guide.l50212.prev'), VALUE: 1 },
+                { op: 'data_setvariableto', VARIABLE: word('guide.l50212.curr'), VALUE: 1 },
+                repeat(5, [
+                  { op: 'data_setvariableto', VARIABLE: word('guide.l50212.next'),
+                    VALUE: { op: 'operator_add', NUM1: { 'var': word('guide.l50212.prev') }, NUM2: { 'var': word('guide.l50212.curr') } } },
+                  { op: 'data_setvariableto', VARIABLE: word('guide.l50212.prev'), VALUE: { 'var': word('guide.l50212.curr') } },
+                  { op: 'data_setvariableto', VARIABLE: word('guide.l50212.curr'), VALUE: { 'var': word('guide.l50212.next') } }]),
+                say('guide.l50212.step3', 2)]
+            }],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@rabbit',
+            scripts: [{
+              sprite: '@rabbit', id: 'l124',
+              blocks: [flag, { op: 'motion_gotoxy', X: -140, Y: -80 },
+                repeat(6, [{ op: 'pen_stamp' }, { op: 'motion_changexby', DX: 40 }]),
+                say('guide.l50212.done', 2)]
+            }],
+            annotate: [{ shape: 'square', at: 'flyout:first', label: 'guide.act.drag' }],
+            run: 3200
+          }
+        }
+      ])
+    },
+
+    /* ---------------------------------------------------------------- 30 · 收集水源（下） */
+    {
+      id: '502-bp14',
+      kind: 'lesson',
+      icon: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/><path d="M9 14c0 2 1 3 3 3"/>',
+      steps: opening([
+        { do: 'add_sprite', name: 'Crystal', sprite: '@drop' },
+        { do: 'add_sprite', name: 'Sailboat', sprite: '@boat' }
+      ], 'Beach Malibu').concat([
+        {
+          id: 't1',
+          demo: {
+            project: EMPTY, focus: '@drop',
+            scripts: [
+              { sprite: '@drop', id: 'l141', blocks: [flag, { op: 'looks_hide' }, forever([wait(2),
+                { op: 'control_create_clone_of', CLONE_OPTION: '_myself_' }])] },
+              { sprite: '@drop', id: 'l142', blocks: [{ op: 'control_start_as_clone' }, { op: 'looks_show' },
+                { op: 'motion_gotoxy', X: { op: 'operator_random', FROM: -180, TO: 180 }, Y: { op: 'operator_random', FROM: -120, TO: 120 } },
+                wait(2.4), { op: 'control_delete_this_clone' }] }
+            ],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't2',
+          demo: {
+            project: EMPTY, focus: '@boat',
+            scripts: [
+              { sprite: '@boat', id: 'l143', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'right arrow' },
+                { op: 'motion_changexby', DX: 20 }, { op: 'event_broadcast', BROADCAST_INPUT: word('guide.l50214.right') }] },
+              { sprite: '@boat', id: 'l144', blocks: [{ op: 'event_whenkeypressed', KEY_OPTION: 'left arrow' },
+                { op: 'motion_changexby', DX: -20 }, { op: 'event_broadcast', BROADCAST_INPUT: word('guide.l50214.left') }] }
+            ],
+            keys: ['ArrowRight', 'ArrowLeft'],
+            annotate: [{ shape: 'circle', at: 'stage', label: 'guide.act.watch' }]
+          }
+        },
+        {
+          id: 't3',
+          demo: {
+            project: EMPTY, focus: '@drop',
+            scripts: [{
+              sprite: '@drop', id: 'l145',
+              blocks: [flag, forever([
+                ifThen({ op: 'operator_lt', OPERAND1: { op: 'operator_mathop', OPERATOR: 'abs', NUM: { op: 'operator_subtract', NUM1: { op: 'motion_xposition' }, NUM2: { op: 'motion_xposition' } } }, OPERAND2: 100 },
+                  [say('guide.l50214.near', 1.6)]),
+                wait(0.4)])]
+            }],
+            annotate: [{ shape: 'square', at: 'field:operator_mathop/OPERATOR', label: 'guide.act.pick', when: 'built' }],
+            run: 3200
+          }
+        },
+        {
+          id: 't4',
+          demo: {
+            project: EMPTY, focus: '@drop',
+            scripts: [{
+              sprite: '@drop', id: 'l146',
+              blocks: [flag, { op: 'control_wait_until', CONDITION: touching('boat') },
+                { op: 'data_changevariableby', VARIABLE: word('guide.l50214.score'), VALUE: 1 },
+                say('guide.l50214.got', 1.6), { op: 'control_delete_this_clone' }]
+            }],
+            run: 3000
+          }
+        },
+        {
+          id: 't5',
+          demo: {
+            project: EMPTY, focus: '@drop',
+            scripts: [{
+              sprite: '@drop', id: 'l147',
+              blocks: [flag, forever([wait(2),
+                { op: 'motion_gotoxy',
+                  X: { op: 'operator_add', NUM1: { op: 'operator_random', FROM: -180, TO: 180 }, NUM2: 0 },
+                  Y: { op: 'operator_random', FROM: -120, TO: 120 } }]),
+                say('guide.l50214.fix', 2)]
+            }],
+            run: 3200
+          }
+        }
+      ])
     }
   ];
 }(typeof window !== 'undefined' ? window : this));
