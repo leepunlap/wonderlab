@@ -418,4 +418,4 @@ Bernard：「audit YAI classes… need to show everything available」。
   - 按鍵 11／14 → 馬達 6 的「夾取／拋射」脈衝序列（`重複直到` 放開鍵 → 設 -160／120 → 等 0.3s → 反向 → 等 0.3s），最後 `停止直流馬達`。
 - 共 6 顆直流馬達；使用 `arduino_dcMotor_espSetDcMotor`、`arduino_bluetoothController_espReadBluetoothControllerButton/Joystick`。
 
-**關鍵限制：** 這些是 **Arduino／藍牙手柄積木**，非標準 Scratch 積木，`src/opcodes.json` 白名單無此類 → studio 的 demo 引擎**無法渲染**。因此 YAI 遠端操控教學不能做成 Wonder Lab 逐步示範；與「硬體＝課室教材頁、不做 Wonder Lab」的既定方針一致，應做成課室教材頁（文字＋積木邏輯解說＋程式截圖）。**教學形態待 Bernard 拍板**（見同輪對話）。
+**關鍵限制：** 這些是 **Arduino／藍牙手柄積木**，非標準 Scratch 積木，`src/opcodes.json` 白名單無此類 → studio 的 demo 引擎**無法渲染**。因此 YAI 遠端操控教學不能做成 Wonder Lab 逐步示範；與「硬體＝課室教材頁、不做 Wonder Lab」的既定方針一致，應做成課室教材頁（文字＋積木邏輯解說＋程式截圖）。**2026-10-21 已定案**：維持課室教材頁形態，並改由 `iits-lessons-build/build_yai_lessons.py` 依 `yai_lessons_data/*.json` 產生（`classfiles/YAI/{index.html, lessons/remote-control/index.html}`），使頁面可由「腳本＋中繼資料」重建，符合「材料在 OneDrive、腳本在 git」的策略；同時修正課頁相對路徑（`lessons/<slug>/` 需 `../../` 才能取到 `assets/` 與首頁，原手寫頁僅 `../`，實瀏覽會失效）。輸出 HTML 視為產物，不納入 git。
