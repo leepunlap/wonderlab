@@ -364,6 +364,58 @@ RESULT PASS
 
 補句之後連鎖反應值得記下：文案變長 → have 變長 → `rateFor` 要求的速率變快 → 已烘的 clip 速率過期 → 再烘又微調 —— `check_pace` 的第三判準（烘焙速率與要求不符即 FAIL）就是為抓這個尾巴而設，三輪後零殘留。
 
-**L2／L3 的定義不夠（事實，待 Bernard 決定）。** 全部六十課課頁（L2 三十、L3 三十）只有「搭建步驟 N」圖片＋一句本課重點；編程在 UC-Mind 硬件端做，教案 PDF 是教學對白。沒有積木、沒有步驟分解可供嚮導逐步示範 —— 不能憑空建。可行形態二擇一：另立「圖＋旁白」的步驟類型（只演圖片、不假裝示範），或只做知識卡。L4 硬件課（十六課用 UC-Mind 主控板）同理，屬另一環境。
+**L2／L3（及 L4 硬件課）不在 Wonder Lab 嚮導範圍（2026-10-21 決定：停用，見第十七節）。** 六十課課頁（L2 三十、L3 三十）只有「搭建步驟 N」圖片＋一句本課重點；編程在 UC-Mind 硬件端做，教案 PDF 是教學對白——這部分內容屬課室教材（classfiles），本就在嚮導之外，不該搬進嚮導。L4 硬件課十六課同理（UC-Mind 主控板）。嚮導只服務 L4 軟件課（Scratch）：定義充足，已建完。
 
 驗證：`check:guide` 30 主題 131 步 PASS；`check:pace` 390 段旁白（130 步 × 三語）PASS，最慢 −21%；`check:pages` 七項 PASS。
+
+## 十七、Wonder Lab 嚮導範圍決定（2026-10-21）
+
+**決定（Bernard）：** L2／L3（UCMAKE 硬件）與 L4 硬件課（UC-Mind 主控板）**不做** Wonder Lab 嚮導，暫停、標為停用，直至另行通知。這些課的內容**留在課室教材 pages（classfiles）**，不搬進嚮導。L4 軟件課（Scratch）是唯一保留在嚮導裡的範圍，已建完。
+
+**最終範圍：**
+
+| 區塊 | 平台 | 嚮導 | 內容歸屬 |
+|---|---|---|---|
+| L4 軟件課 | Scratch | ✅ 16 課全建（10 `ready`＋6 `soon`） | 嚮導＋課室教材 雙軌 |
+| L2（30）、L3（30） | UCMAKE 硬件 | ❌ 停用 | 課室教材 pages |
+| L4 硬件課（16） | UC-Mind 主控板 | ❌ 停用 | 課室教材 pages |
+
+**決定依據：** 嚮導的 demo 引擎渲染 Scratch 積木；L2／L3／L4 硬件課的積木是 UCMAKE／UC-Mind 另一套，無法用同一條路「逐步示範」。這與「無物可示範就不假裝示範」的規則一致——與其假裝 Scratch 示範，不如讓內容留在課室教材頁（已有本課重點／難點、搭建步驟圖、AI 延伸課程）。
+
+**代碼現狀（已符合決定，無需刪除）：** `src/studio-guide-lessons.js` 僅含 16 個 `50x-bp` 課（L4 軟件），`grep` 全 `src/` 無任何 `30x`／`40x` 課號；`local-lab/lab/manifest.json` 中 `status: 'hw'` 的 16 課均未被建入嚮導。
+
+**課室教材 pages 即內容家：** `classfiles/L2|L3|L4/lessons/<slug>/index.html` 每課含本課重點／難點、搭建步驟（圖）、AI 延伸課程與 AI 學伴側欄；L2／L3／L4 各 32 課（目錄另含 assets 與 index）。原始課件在 OneDrive `03_Academia/IITS/common/`（curriculum 課卡、`Innovation Practice` 手冊、`courses-old` 的 pptx＋教案 PDF）——課頁若需補足細節，從那裡取，不要搬進嚮導。
+
+**審計確認（2026-10-21）：** 針對 16 課 `hw` 逐頁核對 `classfiles/L4/lessons/<slug>/index.html`：全部存在且內容充實（27–39KB），均含「本課重點／難點」；16 頁 `ucmake` 與 `studio-` 內嵌引用數皆為 0、`data-guide｜嚮導｜陪練｜示範` 標籤皆為 0——純課室內容頁，不內嵌實驗室引擎、不留 Wonder Lab 嚮導入口，停掉硬件課後無懸空連結。頁內唯一「開啟」是 YouTube AI 延伸影片（L4 通用）。結論：16 課硬件內容確實全在課室教材頁、與範圍決定一致，無缺頁無補漏。對稱確認 L4 共 32 課（501/502 各 01–16）皆有課室頁，其中 16 軟件課雙軌、16 硬件課單軌。
+
+## 十八、YAI 課程素材審計（2026-10-21）
+
+Bernard：「audit YAI classes… need to show everything available」。
+
+**YAI 是獨立產品線**（YAI 機械人＋藍牙手柄），不同於 UC-Mind／UCMAKE；不在先前的 L2／L3／L4 範圍決定內，故單列。
+
+**素材分布（兩處）：**
+
+- 專案 `classfiles/YAI/`：
+  - `student/` 12 件：`00-從入場到頒獎台.pdf`、`01-YAI規則講解`～`09-自制積木` 共 9 份 pptx、`10-參考程序-變量.sb3`、`11-參考程序-無變量.sb3`、`YAI-無廢城市參考程序.sb3`、`YAI-無廢城市套裝明細.pdf`。
+  - `teacher/` 2 件：`第二(三)課：機器人運動.pptx`、`YAI-無廢城市參考程序（變量）注釋.sb3`。
+  - `software/` → symlink 至 `/var/www/iits/classfiles/L1/software`。
+  - `lessons/` **仍空**——YAI 課室教材頁尚未建。
+- OneDrive `03_Academia/IITS/common/`：
+  - `tests/hk/preview/` 72 份：`YAI_L0`–`YAI_L4` 各 `P1`–`P5`，雙語版＋教師版（HTML／PDF／manifest.json）。
+  - `courses-old/YAI/`：`YAI-Level-2`（28 課，每課 .doc 教案，含螺旋槳／陀螺／滑輪組／紅綠燈／雙足機器人等）、`YAI-Level-3`（約 25 課，含「可遙控的小車」「巡線小車」「倒車雷達」等 .doc 教案，部分附 .pptx）。
+  - `images/product-photos/`：`yai_textbook_covers.png`、`yai_robot_challenge_banner.png`（產品照／挑戰 banner）。
+  - `student manual/` **無 YAI**（只有 Early Discovery 與 Innovation Practice 101–502）。
+  - 註：`YAI-无废城市_课件/` 於此掛載（`OneDrive-HongKongCyberforce`）未找到；「無廢城市參考程式」sb3 已收錄於專案 `classfiles/YAI/student/`。
+
+**遠端操控樣本程式＝`classfiles/YAI/student/YAI-无废城市参考程序.sb3`**（即 Bernard 說的「remote control scratch sb3」）。解碼結果：
+
+- `當 Arduino 啟動` → `設定變數 SPEED2 = 150` → `重複執行`：
+  - 搖桿 [2] 大於 160 → 前進（馬達 1/2/5/4，部分取負向）；小於 80 → 後退。
+  - 搖桿 [1] 大於 160 → 左移（SPEED2）；小於 80 → 右移。
+  - 按鍵 20／19／17／18 → 原地旋轉與機械臂動作（馬達 1/2/5/4 不同正負組合）。
+  - 按鍵 6／5 → 馬達 3（±70／80，機械臂升降）。
+  - 按鍵 11／14 → 馬達 6 的「夾取／拋射」脈衝序列（`重複直到` 放開鍵 → 設 -160／120 → 等 0.3s → 反向 → 等 0.3s），最後 `停止直流馬達`。
+- 共 6 顆直流馬達；使用 `arduino_dcMotor_espSetDcMotor`、`arduino_bluetoothController_espReadBluetoothControllerButton/Joystick`。
+
+**關鍵限制：** 這些是 **Arduino／藍牙手柄積木**，非標準 Scratch 積木，`src/opcodes.json` 白名單無此類 → studio 的 demo 引擎**無法渲染**。因此 YAI 遠端操控教學不能做成 Wonder Lab 逐步示範；與「硬體＝課室教材頁、不做 Wonder Lab」的既定方針一致，應做成課室教材頁（文字＋積木邏輯解說＋程式截圖）。**教學形態待 Bernard 拍板**（見同輪對話）。
