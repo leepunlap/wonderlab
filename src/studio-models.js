@@ -284,9 +284,17 @@
     function load() {
       loadSession();
       return fetch(statusApi, { method: 'GET', credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          /* A deployment with no model endpoint at all is not a failure to report: there is nothing
+             to choose from, so the pill goes away. The teachers' playground runs on the lesson
+             service, which serves /lab/playground and no /status/, and a red notice in the
+             conversation for a control the teacher never asked for is pure noise. */
+          if (r.status === 404) { wrap.hidden = true; return null; }
+          return r.json();
+        })
         .then(function (data) {
-          if (!data || !data.ok) {
+          if (!data) return null;
+          if (!data.ok) {
             onError((data && data.error) || T('models.loadFailed'));
             return null;
           }

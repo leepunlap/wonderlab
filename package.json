@@ -17,7 +17,8 @@
     "check:pages": "node tools/check_pages.mjs",
     "audit:lessons": "node tools/audit_lessons.mjs",
     "build:voice": "node tools/build_voice.mjs",
-    "build": "node tools/build.mjs"
+    "build": "node tools/build.mjs",
+    "build:playground": "node tools/build_playground.mjs"
   },
   "wonderlab": {
     "scratchGuiGitHead": "970132883d63286762783448d4d487dcefedabf8",

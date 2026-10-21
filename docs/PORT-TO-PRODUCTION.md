@@ -88,3 +88,31 @@ Two temptations, both wrong:
   it should never learn what a lesson is.
 - **Making a helper load-bearing again.** The matrix exists because `trace.onRun` was unguarded
   and turned `?trace=0` into a dead editor. Any addition must keep the matrix green.
+
+## The playground is a second package, not the lesson shell
+
+The teachers' portal used to mount `lab-frame.html` — the **lesson** shell — and call it a
+playground, handing it a throwaway lesson. Everything that makes the standalone page a teaching
+surface (the 指南 tab, `studio-guide*.js` and its 示範 driver, the voice, the chat pane, the model
+pill) lives in `src/index.html` and was never part of that build, so the portal's playground had no
+tutorial at all. The work existed; the mount did not.
+
+Two packages now come out of this repo, and they are not interchangeable:
+
+| command | page | what it is |
+|---|---|---|
+| `npm run build` | `dist/studio-<hex>/lab-frame.html` | the lesson shell: mounted inside an L4 lesson by `lab.js` |
+| `npm run build:playground` | `dist-playground/playground-<hex>/index.html` | the standalone playground, mounted by the teachers' portal in an iframe |
+
+Deployment: copy `playground-<hex>/` next to the other lab folders
+(`classfiles/L4/lessons/assets/lab/`) and add `"playground": "playground-<hex>/"` to
+`assets/lab/manifest.json` (plus its `.gz`). The portal reads that key exactly as it reads
+`"studio"`; nothing in the portal knows a path. Production nginx must treat
+`playground-<hex>/` as immutable, the same one-year rule the `studio-` folders already get.
+
+The endpoint is not compiled in. The page reads `?api=` and falls back to `/api/ai/lab/studio`
+(the development server). The portal passes `?api=/api/ai/lab/playground`, because a playground
+turn and a lesson turn are different routes in the same service.
+
+Keep the previous `playground-<hex>/` for one deploy: a tab left open in a classroom still asks
+for the folder it booted from.

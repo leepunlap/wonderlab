@@ -86,6 +86,14 @@
   I.boot();
   function T(k, p) { return I.t(k, p); }
 
+  /* The playground the teachers' portal mounts is this same page inside an iframe, and it is served
+     from a content-hashed folder under /files/L4/lessons/assets/lab/. Two things therefore cannot be
+     compiled in: the endpoint it talks to (a lesson turn and a playground turn are different routes)
+     and whether the upstream asset library is open. Both come from the query string, and both fall
+     back to the standalone development defaults, so `python3 server/studio_server.py` is unchanged. */
+  var Q = new URLSearchParams(window.location.search);
+  var API = Q.get('api') || '/api/ai/lab/studio';
+
   /* The pane's codes and the editor's are two vocabularies for the same three languages — Scratch
      says zh-tw / zh-cn. This table is the only place they meet; the shell itself never learns what
      the pane calls a language. */
@@ -146,7 +154,7 @@
   chat.bindOutside();
 
   var modelSelector = StudioModels.create({
-    api: '/api/ai/lab/studio',
+    api: API,
     i18n: I,
     ui: {
       onChange: function (id) { if (window.console) console.log('[models] switched to:', id); },
@@ -158,7 +166,7 @@
   if ($('wl-export')) $('wl-export').addEventListener('click', function () { S.exportVersions(); });
 
   var S = StudioApp.create({
-    root: '#wl-editor', api: '/api/ai/lab/studio', library: true, ucmake: true,
+    root: '#wl-editor', api: API, library: true, ucmake: true,
     locale: editorLocale(I.locale()),
     i18n: I,
     modelSelector: modelSelector,  // Pass model selector to app
