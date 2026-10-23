@@ -60,7 +60,7 @@
 
     /* ---- 指南: the second tab. Every topic and step is addressed by id, so these keys are the only
        place a topic's words live - see studio-guide-topics.js for the structure they belong to. ---- */
-    'guide.intro': '課堂逐步帶你由零開始砌完一堂；操作參考係十張卡，唔記得邊個掣就搵佢；基本操作係幾個短主題。每一步都可以按「示範」，由編輯器自己動手做一次畀你睇。示範會暫時借用畫布，按「返回我的作品」就會還原。',
+    'guide.intro': '呢個指南分四個程度：Tutorial 由零開始，帶你識晒成個編輯器（概念、每粒掣、每個功能）；L2、L3、L4 就一級一級加深。每一步都可以按「示範」，由編輯器自己動手做一次畀你睇。示範會暫時借用畫布，按「返回我的作品」就會還原。',
     'guide.stepCount': '{n} 步',
     'guide.back': '全部主題',
     'guide.steps': '步驟',
@@ -111,6 +111,10 @@
     'guide.section.lesson': '課堂逐步',
     'guide.section.ref': '操作參考',
     'guide.section.basic': '基本操作',
+    'guide.level.basic': 'Tutorial',
+    'guide.level.l2': 'L2',
+    'guide.level.l3': 'L3',
+    'guide.level.l4': 'L4',
     'guide.act.pick': '揀呢隻色',
 
     /* Actors, by reference: a demonstration names them what the lesson names them, so the blocks
@@ -611,6 +615,110 @@
 
     /* The context line is assembled from parts, not concatenated in code: English puts the count
        after the noun and joins with commas, Chinese puts it before and joins with 、. */
+    'guide.basics.title': '入門：第一個程式',
+    'guide.basics.sub': '由零開始，一步一步',
+    'guide.basics.intro': '呢一級專畀未開過 Scratch 嘅你：先帶你睇一次個畫面、認識九類積木、學識拖積木、改數字、疊埋一齊、撳綠旗執行。睇完，你就可以寫到自己嘅第一個程式。',
+
+    'guide.basics.b1.title': 'Scratch 係咩嚟？',
+    'guide.basics.b1.body': 'Scratch 係用積木砌程式嘅工具，唔使打 code。與其淨係講，不如做畀你睇：指標會由積木區拖兩塊積木出嚟，「咔」一聲接埋，再撳綠旗。之後你會見到隻角色郁、講嘢、變大、仲有聲出。之後每一步都係咁：指標做，你睇住；睇完，你就可以砌自己第一個程式。',
+
+    'guide.basics.b2.title': '舞台：你嘅作品喺邊度演出',
+    'guide.basics.b2.body': '中間嗰個大框就係「舞台」（Stage），所有角色喺呢度表演，你寫嘅程式效果都喺呢度睇到。舞台左上角有兩個數（x 同 y），係角色嘅位置座標。舞台上方有一排掣：綠旗開始、紅色停止掣、縮細／放大舞台，同埋全螢幕。舞台下面仲可以揀「背景」，好似幫話劇換布景咁。',
+
+    'guide.basics.b3.title': '角色清單：你嘅演員喺邊',
+    'guide.basics.b3.body': '舞台左下角係「角色清單」（Sprite 區），入面列出咗依家所有角色，例如隻貓、隻狗。撳右上角嗰個貓仔圖案「加角色」掣，就可以喺角色庫揀新演員，又或者自己畫一個、由電腦 upload 一張相都得。撳一撳清單入面某個角色，就會揀中佢；之後你疊嘅積木，全部都係落喺呢隻角色身上。',
+
+    'guide.basics.b4.title': '積木區同程式區：積木喺邊、程式喺邊',
+    'guide.basics.b4.body': '左邊係「積木區」（Blocks Palette），入面有九類標準積木，按顏色分門別類，好似工具箱咁；最下面仲有一個 UCMake 硬件分類。撳其中一類，右邊就會彈出一排呢類嘅積木（叫 flyout）。中間右面係「程式區」（Scripts／代碼區），你由積木區拖出嚟嘅積木，就會疊喺呢度，變成隻角色嘅程式。',
+
+    'guide.basics.b5.title': '綠旗同紅掣：開始同停止',
+    'guide.basics.b5.body': '舞台上面有兩個好重要嘅掣：綠色嘅「旗」（Green Flag）同紅色嘅「停止掣」。當你寫好程式，撳一下綠旗，所有「當綠旗被按下」嘅積木就會一齊開始行；想停，就撳紅色掣。幾乎每個 Scratch 程式，都係靠綠旗嚟開波。',
+
+    'guide.basics.b6.title': '九類積木（上）：動作 · 外觀 · 聲音 · 事件',
+    'guide.basics.b6.body': 'Scratch 嘅標準積木按顏色分九類，另外仲有一個 UCMake 硬件分類。第一組：🔵 動作（Motion）管隻角色點郁——行幾步、轉幾度、去邊個位置；🟣 外觀（Looks）管佢點樣睇——講嘢、換衫（造型）、變大細、改透明度；🟪 聲音（Sound）管發聲、彈奏音樂；🟡 事件（Events）係「開關」——「當綠旗被按下」「當呢隻角色被撳」「當掣被撳」呢啲起動積木，都喺呢度。',
+
+    'guide.basics.b7.title': '九類積木（下）：控制 · 偵測 · 運算 · 變數 · 自製',
+    'guide.basics.b7.body': '第二組：🟠 控制（Control）管程式點行——重複、如果、等候、停止；🩵 偵測（Sensing）問周圍嘅嘢——掂到邊度未、掣撳咗未、鼠標喺邊；🟢 運算（Operators）做數學同文字——加減、大過細過、隨機數；🔴 變數（Variables）幫你記住一個會變嘅數（例如分數、生命值）；🟤 自製積木（My Blocks）等你將幾塊積木打包成一塊，方便重用。下次見到某種顏色，你就大概知佢管咩。',
+
+    'guide.basics.b8.title': '積木嘅形狀：邊塊接邊塊',
+    'guide.basics.b8.body': '積木嘅形狀，決定佢擺喺邊。有三種基本形狀：①「帽積木」——頂平、底凹，好似返學戴嘅帽，係程式嘅起點，例如「當綠旗被按下」，一定要擺最上面。②「堆疊積木」——上下都係凹凸，可以一塊疊一塊，排成直行。③「報告積木」——橢圓形或者尖角六角形，入面裝住一個數值或者「真／假」（例如「10」、「碰到邊緣？」），要塞入其他積木嘅空格入面，唔可以單獨擺。仲有「C 形積木」（例如「重複」），個肚可以包住其他積木。認得形狀，你就知點樣接。',
+
+    'guide.basics.b9.title': '第一個動作：由積木區拖一塊出嚟',
+    'guide.basics.b9.body': '我哋試一次。喺左邊「動作」類，拎起「移動 10 步」呢塊，拖去中間程式區，放低。你會見到佢出咗喺程式區——但仲未接任何嘢，所以撳綠旗都未會郁，因為仲欠一個「開關」。',
+
+    'guide.basics.b10.title': '改積木入面嘅數字',
+    'guide.basics.b10.body': '每塊積木中間白色嘅空格叫「輸入框」，可以改。撳實「移動」積木入面嗰個「10」，打多個數，例如「50」，隻角色就會行遠啲。改數字，係 Scratch 最常用嘅操作之一。',
+
+    'guide.basics.b11.title': '疊埋一齊，撳綠旗行一次',
+    'guide.basics.b11.body': '而家將「當綠旗被按下」呢塊帽積木，拖去「移動」上面，兩塊「咔」一聲接埋，就係你第一個程式喇。撳舞台上面嘅綠旗，「移動 10 步」就會行一次，隻角色向前走。恭喜，你寫咗第一個 Scratch 程式！',
+
+    'guide.basics.b12.title': '加多一個角色一齊玩',
+    'guide.basics.b12.body': '一個角色有時唔夠玩。撳左下角「加角色」掣，可以再揀多隻角色出嚟。每隻角色都有自己嘅程式區，所以你可以寫「貓行、狗又跳」，兩條故事線同時發生。呢一步係俾未加過角色嘅你；如果你已經識，可以直接去下一級。',
+
+    'guide.levels': '程度',
+    'guide.act.look': '睇呢度',
+
+    'guide.stage.title': '舞台同背景',
+    'guide.stage.sub': '作品演出的地方',
+    'guide.stage.intro': '舞台係角色表演嘅地方。呢一章睇清楚舞台嘅座標、控制同背景。',
+    'guide.stage.st1.title': '舞台：作品喺呢度演出',
+    'guide.stage.st1.body': '中間個大框就係舞台。所有角色喺呢度郁、講嘢、變大細，你寫嘅程式效果全部喺呢度睇到。舞台中心點係 (0, 0)：向右 x 越大，向上 y 越大；x 由 -240 到 240，y 由 -180 到 180。',
+    'guide.stage.st2.title': '舞台控制：縮細、放大、全螢幕',
+    'guide.stage.st2.body': '舞台右上角有幾個掣：可以將舞台縮細或者放大（寫程式時想睇多啲積木就縮細），亦可以撳「全螢幕」睇演出。呢啲掣只係改你睇嘅方式，唔會改你嘅程式。',
+    'guide.stage.st3.title': '背景：幫舞台換布景',
+    'guide.stage.st3.body': '舞台下方有「背景」，撳「+」就可以由背景庫揀一張，或者自己畫、上載圖片。背景可以有多張，用「下一個背景」積木切換，好似話劇換布景。',
+
+    'guide.sprites.title': '角色',
+    'guide.sprites.sub': '你嘅演員',
+    'guide.sprites.intro': '角色（Sprite）就係喺舞台上面做嘢嘅演員。呢一章教你揀角色、加角色，同埋管理佢哋。',
+    'guide.sprites.sp1.title': '角色清單：揀邊個角色',
+    'guide.sprites.sp1.body': '舞台左下角就係角色清單，列出晒所有角色。撳一撳某個角色就揀中佢；之後你喺程式區疊嘅積木，全部落喺呢隻角色身上。每隻角色都有自己嘅程式、造型同音效。',
+    'guide.sprites.sp2.title': '新增角色',
+    'guide.sprites.sp2.body': '撳角色清單右上角嘅「+」（加角色），可以喺角色庫揀一隻、自己畫一隻，或者上載圖片。新角色會出現喺清單，你可以即刻幫佢寫程式。',
+    'guide.sprites.sp3.title': '角色資訊欄：位置、大小、方向',
+    'guide.sprites.sp3.body': '揀中角色之後，清單上面會見到佢嘅資料：名、x、y、大小（%）、方向（度），同埋「顯示／隱藏」。改呢啲數字可以直接移動或者縮放角色。右鍵角色仲可以複製、刪除、匯出。',
+
+    'guide.scripts.title': '程式區',
+    'guide.scripts.sub': '喺邊度砌程式',
+    'guide.scripts.intro': '程式區（Scripts）係你疊積木嘅地方。呢一章講清楚點樣整理積木。',
+    'guide.scripts.sc1.title': '程式區：積木疊埋一齊',
+    'guide.scripts.sc1.body': '中間嘅空白位置就係程式區。由左邊積木區拖一塊積木過嚟，再拖第二塊疊上去，「咔」一聲接埋，就係一段程式。積木只會喺凹凸位啱嘅地方先吸得住，所以好難砌錯。',
+    'guide.scripts.sc2.title': '拆走：將積木拖返去積木區',
+    'guide.scripts.sc2.body': '想刪走一塊積木，將佢拖返去左邊積木區放手就得；拎走中間嗰塊，下面嘅會自己接返埋。想複製就右鍵揀「複製」，或者按住 Alt／Option 拖一份出嚟；右鍵仲可以加「註解」，寫低你嘅想法，方便之後睇得明。',
+
+    'guide.tabs.title': '造型、音效、變數、自訂積木',
+    'guide.tabs.sub': '編輯器嘅其他分頁',
+    'guide.tabs.intro': '程式分頁以外，編輯器仲有造型、音效，同埋變數、自訂積木。呢一章逐個講。',
+    'guide.tabs.tb1.title': '三個分頁：程式、造型、音效',
+    'guide.tabs.tb1.body': '左上角有三個分頁：「程式」用嚟砌積木；「造型」用嚟畫或者換角色嘅外觀；「音效」用嚟錄音或者加入聲音。撳一下分頁就切換，唔會影響你嘅程式。',
+    'guide.tabs.tb2.title': '造型編輯器',
+    'guide.tabs.tb2.body': '喺「造型」分頁，你可以用畫筆、畫線、畫圓形方形、加文字、填色、橡皮擦，亦可以選取、移動、複製、翻轉同復原。每隻角色可以有好多個造型，切換造型就做到動畫。',
+    'guide.tabs.tb3.title': '音效',
+    'guide.tabs.tb3.body': '喺「音效」分頁，你可以錄音、由電腦匯入聲音，或者由音效庫揀。加咗之後，用「播放音效」積木就可以喺程式入面播。',
+    'guide.tabs.tb4.title': '變數同監視器',
+    'guide.tabs.tb4.body': '喺「變數」類積木撳「建立一個變數」，就可以整一個記住數字或者文字嘅空格，例如分數、生命值。整好之後可以喺舞台上面「顯示監視器」，一路睇住個值點變。',
+    'guide.tabs.tb5.title': '自訂積木（My Blocks）',
+    'guide.tabs.tb5.body': '「自訂積木」可以將一組常用嘅積木打包，變成你自己嘅積木，之後一拖就用。啱晒重複用嘅動作，令程式短啲、易讀啲。',
+
+    /* The words the hand looks for on the screen: a tap on `menu:file` finds the menu whose own
+       label is this, in whatever language the editor is showing. Not translations of the guide's
+       prose — copies of the editor's own wording, so the press lands on the real item. */
+    'guide.menu.file': '檔案',
+    'guide.menu.edit': '編輯',
+    /* the variable the manual demonstrates with, and what the sprite says when it is set */
+    'guide.var.score': '分數',
+    'guide.say.score': '我嘅分數！',
+
+    'guide.menu.title': '選單、存檔同 AI 學伴',
+    'guide.menu.sub': '檔案同其他功能',
+    'guide.menu.intro': '最後一章：選單列、存檔載入，同埋右邊嘅 AI 學伴。',
+    'guide.menu.mn1.title': '選單列',
+    'guide.menu.mn1.body': '最上面嘅選單列有「檔案」（開新、儲存、由電腦載入）、「編輯」（復原、回復）、「教學」、「設定」（例如加速模式），同埋語言選擇。唔記得某個功能喺邊，多數都喺呢度。',
+    'guide.menu.mn2.title': '存檔、載入同匯出',
+    'guide.menu.mn2.body': '「檔案 → 儲存到電腦」會將成個作品存做 .sb3 檔；「由電腦載入」就開返之前存嘅檔。老師亦可以幫你匯出，交功課或者保存進度。',
+    'guide.menu.mn3.title': 'AI 學伴',
+    'guide.menu.mn3.body': '右邊係「AI 學伴」。喺「對話」分頁，你可以用文字講想做咩，AI 會幫你砌積木或者解釋；「指南」分頁就係你而家睇緊嘅教學。每次改動都會記錄版本，可以回復。',
+
     'chat.ctx.prefix': '送出時會附上：',
     'chat.ctx.program': '你的程式：{scripts} 段、{blocks} 個積木',
     'chat.ctx.hand': '你自己改了 {n} 段',

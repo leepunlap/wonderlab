@@ -189,7 +189,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-g-index, .wl-g-topic-page { display: flex; flex-direction: column; gap: 10px; }
 .wl-g-intro { margin: 0; font-size: .82rem; line-height: 1.55; color: var(--wl-muted); }
 
-/* 新手 / 熟手: two buttons, because the reader knows which one they are */
+/* Tutorial / L2 / L3 / L4: four pills, one shelf shown at a time */
 .wl-g-mode { display: flex; gap: 4px; padding: 3px; background: var(--wl-pane);
   border: 1px solid var(--wl-line); border-radius: 999px; }
 .wl-g-mbtn { flex: 1 1 0; font: inherit; font-size: .8rem; font-weight: 600; padding: 6px 10px; min-height: 32px;
@@ -217,7 +217,7 @@ body { background: var(--wl-bg); color: var(--wl-text); overflow: hidden;
 .wl-g-h { margin: 0; font-size: .98rem; font-weight: 700; min-width: 0; }
 
 /* the rail is a progress bar you can press: one bar per step, the current one filled */
-.wl-g-rail { display: flex; gap: 6px; padding: 2px 0; }
+.wl-g-rail { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
 .wl-g-dot { width: 34px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: var(--wl-line); cursor: pointer; }
 .wl-g-dot:hover { background: #b9c2cc; }
 .wl-g-dot.is-done { background: #9fd0d8; }

@@ -82,6 +82,7 @@
     {
       id: '501-bp01',
       kind: 'lesson',
+      level: 'l4',
       icon: '<circle cx="12" cy="12" r="7"/><path d="M12 5V2"/><path d="M9 4l3-2 3 2"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Mouse1', sprite: '@mouse' },
@@ -140,6 +141,7 @@
     {
       id: '501-bp02',
       kind: 'lesson',
+      level: 'l4',
       icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 3v10"/><path d="M16 21V11"/><path d="M3 16h9"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Ball', sprite: '@slime' },
@@ -211,6 +213,7 @@
     {
       id: '501-bp03',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M12 3v6"/><path d="m9 6 3-3 3 3"/><path d="M12 9 6 15"/><path d="M12 9l6 6"/><path d="M12 9v6"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Ben', sprite: '@boy' },
@@ -273,6 +276,7 @@
     {
       id: '501-bp04',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M3 3v18h18"/><circle cx="9" cy="15" r="2"/><path d="m9 15 6-6"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Dove', sprite: '@dove' },
@@ -325,6 +329,7 @@
     {
       id: '501-bp07',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M12 3l9 16H3z"/><path d="M12 3v16"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Fish', sprite: '@fish' },
@@ -393,6 +398,7 @@
     {
       id: '501-bp10',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M9 8h6"/><path d="M9 16h6"/><path d="M12 8v8"/><path d="M5 12h14"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Elephant', sprite: '@calf' },
@@ -455,6 +461,7 @@
     {
       id: '501-bp13',
       kind: 'lesson',
+      level: 'l4',
       icon: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M4 12h16"/><path d="M8 8V5"/><path d="M16 8V5"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Chick', sprite: '@chick' },
@@ -523,6 +530,7 @@
     {
       id: '502-bp03',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M12 21v-6"/><path d="M12 15l-4-4h8z"/><path d="M12 11 8 7h8z"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Tree1', sprite: '@tree' }
@@ -586,6 +594,7 @@
     {
       id: '502-bp06',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Wizard Girl', sprite: '@girl' },
@@ -649,6 +658,7 @@
     {
       id: '502-bp09',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M3 8c4 0 4 8 8 8s4-8 8-8"/><path d="M3 16c4 0 4-8 8-8"/><path d="M21 8h-3"/><path d="M3 8h3"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Wizard Girl', sprite: '@girl' },
@@ -707,6 +717,7 @@
     {
       id: '501-bp15',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M3 12h9"/><path d="M12 7l7 5-7 5z"/><path d="M5 8v8"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Rocketship', sprite: '@ship' },
@@ -813,6 +824,7 @@
     {
       id: '502-bp02',
       kind: 'lesson',
+      level: 'l4',
       icon: '<rect x="4" y="10" width="16" height="10" rx="5"/><path d="M8 10V6"/><path d="M16 10V6"/><path d="M4 15h16"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Ball', sprite: '@slime' },
@@ -899,6 +911,7 @@
     {
       id: '502-bp05',
       kind: 'lesson',
+      level: 'l4',
       icon: '<circle cx="12" cy="12" r="7"/><path d="M12 5V3"/><path d="M12 21v-2"/><path d="M5 12H3"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Sun', sprite: '@sun' },
@@ -990,6 +1003,7 @@
     {
       id: '502-bp08',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M3 16c4 0 4-8 8-8s4 8 8 8"/><path d="M17 8h4"/><circle cx="21" cy="8" r="1"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Snake', sprite: '@snake' },
@@ -1082,6 +1096,7 @@
     {
       id: '502-bp12',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M8 20V10"/><path d="M8 10c0-4 2-6 4-6s4 2 4 6v4"/><path d="M16 14c2 0 3 2 3 4"/><circle cx="18" cy="8" r="1"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Rabbit', sprite: '@rabbit' }
@@ -1155,6 +1170,7 @@
     {
       id: '502-bp14',
       kind: 'lesson',
+      level: 'l4',
       icon: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/><path d="M9 14c0 2 1 3 3 3"/>',
       steps: opening([
         { do: 'add_sprite', name: 'Crystal', sprite: '@drop' },

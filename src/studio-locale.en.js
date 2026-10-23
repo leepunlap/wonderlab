@@ -63,7 +63,7 @@
     'chat.bootFailed': 'The editor did not load',
 
     /* ---- Guide: the second tab (see studio-guide-topics.js for the structure) ---- */
-    'guide.intro': 'Lessons walk you through one lesson from nothing at all. “How do I…” is ten cards for the button you cannot find. The basics are short topics on the editor itself. Most steps have a “Show me” button that makes the editor do it in front of you. A demonstration borrows the canvas for a moment; “Back to my project” puts your work back.',
+    'guide.intro': 'The guide has four levels: Tutorial teaches the whole editor from scratch — concepts, every button, every feature; L2, L3 and L4 go deeper, one step at a time. Most steps have a “Show me” button that makes the editor do it in front of you. A demonstration borrows the canvas for a moment; “Back to my project” puts your work back.',
     'guide.stepCount': '{n} steps',
     'guide.back': 'All topics',
     'guide.steps': 'Steps',
@@ -114,6 +114,10 @@
     'guide.section.lesson': 'Lessons, step by step',
     'guide.section.ref': 'How do I…',
     'guide.section.basic': 'The basics',
+    'guide.level.basic': 'Tutorial',
+    'guide.level.l2': 'L2',
+    'guide.level.l3': 'L3',
+    'guide.level.l4': 'L4',
     'guide.act.pick': 'Pick this colour',
 
     /* Actors, by reference: a demonstration names them what the lesson names them, so the blocks the
@@ -608,6 +612,107 @@
     'guide.actors.t1.body': 'Sprites are added from the sprite pane on the right. This demonstration puts two on the stage: Pico on the left, Lumo on the right.',
     'guide.actors.t2.title': 'Two sprites, each doing its own thing',
     'guide.actors.t2.body': 'Whichever sprite is selected owns the blocks you can see. This script belongs to Lumo alone: it turns as it moves.',
+
+    'guide.basics.title': 'Getting started: your first program',
+    'guide.basics.sub': 'From zero, step by step',
+    'guide.basics.intro': 'This level is for anyone who has never used Scratch. We walk the screen once, meet the nine block families, then learn to drag a block, change a number, snap blocks together, and press the green flag to run. By the end you will have written your first program.',
+
+    'guide.basics.b1.title': 'What is Scratch?',
+    'guide.basics.b1.body': 'Scratch is a visual tool: you build programs by snapping coloured blocks together, no typing code. Rather than describe it, here it is happening — the pointer drags two blocks out of the palette, snaps them together and presses the green flag, and the Sprite moves, talks, grows and makes a sound on the Stage. Every step after this works the same way: the hand does it while you read, then you do it yourself.',
+
+    'guide.basics.b2.title': 'The Stage: where your project performs',
+    'guide.basics.b2.body': 'The big panel in the middle is the Stage. Every character acts here, and every effect of your program shows up here. Top-left you see two numbers (x and y) — the selected sprite’s position. Above the stage is a row of controls: the green flag to start, the red stop button, the stage-size toggle, and full screen. Under the stage you can pick a Backdrop, like changing the set for a play.',
+
+    'guide.basics.b3.title': 'The Sprite list: your cast',
+    'guide.basics.b3.body': 'Bottom-left is the Sprite list, showing every character in your project — the cat, the dog, and so on. Click the cat icon (Add Sprite) at the top-right of that area to pick a new actor from the library, paint one, or upload an image. Click a sprite in the list to select it; any blocks you stack afterward belong to that sprite.',
+
+    'guide.basics.b4.title': 'The Blocks palette and the Scripts area',
+    'guide.basics.b4.body': 'On the left is the Blocks palette, holding nine standard families of blocks grouped by colour, like a toolbox — plus a UCMake hardware family at the bottom. Click a family and a column of its blocks (the flyout) appears to the right of the palette. The large area on the right is the Scripts (Code) area: drag blocks out of the palette and stack them here to build a sprite’s program.',
+
+    'guide.basics.b5.title': 'The green flag and the red stop',
+    'guide.basics.b5.body': 'Two important buttons sit above the stage: the green Flag and the red Stop. Once your program is ready, click the green flag and every “when green flag clicked” block starts at once. To stop, click the red button. Almost every Scratch program begins with the green flag.',
+
+    'guide.basics.b6.title': 'Nine block families (1 of 2): Motion · Looks · Sound · Events',
+    'guide.basics.b6.body': 'Scratch’s standard blocks come in nine colour-coded families, plus a UCMake hardware family. First group: Motion (blue) moves a sprite — steps, turns, go-to. Looks (purple) changes how it appears — speech, costumes, size, transparency. Sound (pink) plays sounds and music. Events (yellow) are the switches — “when green flag clicked”, “when this sprite clicked”, “when key pressed” all live here.',
+
+    'guide.basics.b7.title': 'Nine block families (2 of 2): Control · Sensing · Operators · Variables · My Blocks',
+    'guide.basics.b7.body': 'Second group: Control (orange) decides how the program flows — repeat, if, wait, stop. Sensing (cyan) asks about the world — touching something, a key pressed, the mouse position. Operators (green) do math and text — add, compare, pick a random number. Variables (red) remember a value that changes, like a score or health. My Blocks (brown) let you wrap several blocks into one reusable block. Spot the colour and you’ll know what it does.',
+
+    'guide.basics.b8.title': 'Block shapes: what connects to what',
+    'guide.basics.b8.body': 'A block’s shape tells you where it fits. Three basic shapes: (1) Hat blocks — flat top, scooped bottom, like a school cap — start a script (e.g. “when green flag clicked”) and must sit on top. (2) Stack blocks — notched top and bottom — snap one under another in a vertical column. (3) Reporter blocks — oval or hexagonal, holding a value or a true/false (like “10” or “touching edge?”) — these drop into the gaps of other blocks, never stand alone. There are also C-shaped blocks (like “repeat”) whose belly holds other blocks. Learn the shapes and you know how to connect.',
+
+    'guide.basics.b9.title': 'First motion: drag a block out',
+    'guide.basics.b9.body': 'Let’s try. From the Motion family, pick up the “move 10 steps” block and drag it into the Scripts area, then drop it. You’ll see it appear — but it isn’t attached to anything yet, so the green flag won’t move the sprite. It still needs a switch.',
+
+    'guide.basics.b10.title': 'Change the number inside a block',
+    'guide.basics.b10.body': 'The white gap in a block is an input box you can edit. Click into the “10” inside the move block and type another number, say “50”, and the sprite will travel farther. Editing numbers is one of the most common things you’ll do in Scratch.',
+
+    'guide.basics.b11.title': 'Snap them together, then press the flag',
+    'guide.basics.b11.body': 'Now drag the “when green flag clicked” hat block onto the move block; they click together into your first program. Press the green flag above the stage and “move 10 steps” runs once — the sprite steps forward. Congratulations, you wrote your first Scratch program!',
+
+    'guide.basics.b12.title': 'Add another sprite to play with',
+    'guide.basics.b12.body': 'One sprite is sometimes not enough. Click “Add Sprite” (bottom-left) to bring in another actor. Each sprite has its own Scripts area, so you can write “the cat walks while the dog jumps” — two storylines at once. This step is for anyone who hasn’t added a sprite yet; if you already know how, skip to the next level.',
+
+    'guide.levels': 'Levels',
+    'guide.act.look': 'Look here',
+
+    'guide.stage.title': 'The stage and backdrops',
+    'guide.stage.sub': 'Where your project performs',
+    'guide.stage.intro': 'The stage is where your sprites perform. This chapter covers its coordinates, its controls and its backdrops.',
+    'guide.stage.st1.title': 'The stage: where your project performs',
+    'guide.stage.st1.body': 'The large frame in the middle is the stage. Sprites move, talk and change size here, and everything your program does is visible here. The centre of the stage is (0, 0): x increases to the right, y increases upward; x runs from -240 to 240 and y from -180 to 180.',
+    'guide.stage.st2.title': 'Stage controls: smaller, larger, full screen',
+    'guide.stage.st2.body': 'The buttons at the top-right of the stage shrink or enlarge it (a smaller stage leaves more room for blocks) and switch to full screen for a performance. They change how you view the stage, never the program itself.',
+    'guide.stage.st3.title': 'Backdrops: giving the stage a set',
+    'guide.stage.st3.body': 'Below the stage is the backdrop slot. Click “+” to choose one from the library, paint your own or upload an image. A project can have several backdrops, switched with the “next backdrop” block, like changing the set between scenes.',
+
+    'guide.sprites.title': 'Sprites',
+    'guide.sprites.sub': 'Your actors',
+    'guide.sprites.intro': 'A sprite is an actor that performs on the stage. This chapter covers choosing one, adding one, and managing them.',
+    'guide.sprites.sp1.title': 'The sprite list: choosing an actor',
+    'guide.sprites.sp1.body': 'The sprite list sits at the bottom-left of the stage and shows every sprite. Click one to select it; every block you stack in the Scripts area then belongs to that sprite. Each sprite has its own scripts, costumes and sounds.',
+    'guide.sprites.sp2.title': 'Adding a sprite',
+    'guide.sprites.sp2.body': 'Click “+” at the top-right of the sprite list (Add Sprite) to choose one from the library, paint your own, or upload an image. The new sprite appears in the list and you can start coding it straight away.',
+    'guide.sprites.sp3.title': 'Sprite info: position, size, direction',
+    'guide.sprites.sp3.body': 'Once a sprite is selected, its details appear above the list: name, x, y, size (%), direction (degrees), and Show/Hide. Editing these numbers moves or scales the sprite. Right-click a sprite to duplicate, delete or export it.',
+
+    'guide.scripts.title': 'The Scripts area',
+    'guide.scripts.sub': 'Where you build programs',
+    'guide.scripts.intro': 'The Scripts area is where you stack blocks. This chapter covers keeping it tidy.',
+    'guide.scripts.sc1.title': 'The Scripts area: blocks stacked together',
+    'guide.scripts.sc1.body': 'The empty space in the middle is the Scripts area. Drag a block from the palette on the left, then drag a second one onto it; they click together into a script. Blocks only stick where their notches fit, which is why it is hard to build one wrong.',
+    'guide.scripts.sc2.title': 'Taking one out: drag it back to the palette',
+    'guide.scripts.sc2.body': 'To delete a block, drag it back to the palette on the left and let go; take one out of the middle and the ones below it close up again. To duplicate, right-click and choose Duplicate, or hold Alt/Option and drag a copy out. Right-click also adds a comment, where you can write down what you were thinking.',
+
+    'guide.tabs.title': 'Costumes, sounds, variables, My Blocks',
+    'guide.tabs.sub': 'The editor’s other tabs',
+    'guide.tabs.intro': 'Besides the Code tab, the editor has Costumes and Sounds, plus variables and custom blocks. This chapter takes them one at a time.',
+    'guide.tabs.tb1.title': 'Three tabs: Code, Costumes, Sounds',
+    'guide.tabs.tb1.body': 'There are three tabs at the top-left: Code is where you build blocks; Costumes is where you paint or swap a sprite’s look; Sounds is where you record or import audio. Clicking a tab switches view and never changes your program.',
+    'guide.tabs.tb2.title': 'The costume editor',
+    'guide.tabs.tb2.body': 'In the Costumes tab you can use the brush, line, circle and square tools, add text, fill with colour, erase, and select, move, duplicate, flip and undo. A sprite can have many costumes; switching between them is how you animate.',
+    'guide.tabs.tb3.title': 'Sounds',
+    'guide.tabs.tb3.body': 'In the Sounds tab you can record, import audio from your computer, or pick from the sound library. Once added, the “play sound” block plays it from your program.',
+    'guide.tabs.tb4.title': 'Variables and monitors',
+    'guide.tabs.tb4.body': 'In the Variables category, click “Make a Variable” to create a slot that holds a number or some text — a score, a number of lives. You can then “show variable” on the stage to watch its value change as the program runs.',
+    'guide.tabs.tb5.title': 'My Blocks (custom blocks)',
+    'guide.tabs.tb5.body': '“My Blocks” bundles a group of blocks into a block of your own, ready to drag out whenever you need it. It is ideal for an action you repeat, keeping the program short and readable.',
+
+    /* the editor's own wording, so a tap on `menu:file` finds the real item on the menu bar */
+    'guide.menu.file': 'File',
+    'guide.menu.edit': 'Edit',
+    'guide.var.score': 'score',
+    'guide.say.score': 'My score!',
+
+    'guide.menu.title': 'Menus, saving and the AI companion',
+    'guide.menu.sub': 'Files and other features',
+    'guide.menu.intro': 'The last chapter: the menu bar, saving and loading, and the AI companion on the right.',
+    'guide.menu.mn1.title': 'The menu bar',
+    'guide.menu.mn1.body': 'The menu bar along the top has File (new, save, load from your computer), Edit (undo, restore), Tutorials, Settings (such as turbo mode), and the language chooser. If you cannot remember where a feature lives, it is usually here.',
+    'guide.menu.mn2.title': 'Saving, loading and exporting',
+    'guide.menu.mn2.body': '“File → Save to your computer” stores the whole project as an .sb3 file; “Load from your computer” opens one you saved earlier. A teacher can also export it for you, to hand in work or keep your progress.',
+    'guide.menu.mn3.title': 'The AI companion',
+    'guide.menu.mn3.body': 'On the right is the AI companion. In the Chat tab you can describe what you want in words and the AI will build blocks or explain them; the Guide tab is the lesson you are reading now. Every change is kept as a version you can restore.',
 
     'chat.ctx.prefix': 'Sent with: ',
     'chat.ctx.program': 'your program: {scripts} scripts, {blocks} blocks',

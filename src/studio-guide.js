@@ -116,7 +116,7 @@
 
     /* Where the student is. Kept out of the DOM so a language change, a resize or returning from a
        demonstration re-paints the same place rather than the beginning. */
-    var view = { kind: 'index', topic: 0, step: 0 };
+    var view = { kind: 'index', level: 'basic', topic: 0, step: 0 };
     var marks = {};          // "topicId/stepId" -> 'running' | 'done' | 'failed'
     var progress = null;     // { done, total } while a demonstration is running
     var phase = null;        // 'ready' | 'speak' | 'show': what the running step is doing
@@ -145,23 +145,29 @@
     function keyStep(t, s, name) { return 'guide.' + t.id + '.' + s.id + '.' + name; }
     function stepKey(t, s) { return t.id + '/' + s.id; }
 
-    /* The order the index shows them in: a lesson the student is in first, then the cards they look
-       up, then the basics. A kind with nothing in it is not offered. */
-    var SECTIONS = [
-      { id: 'lesson', key: 'guide.section.lesson' },
-      { id: 'ref', key: 'guide.section.ref' },
-      { id: 'basic', key: 'guide.section.basic' }
+    /* The order the index shows them in: 基礎 first (the fundamentals), then L2, L3, L4 — each a
+       harder shelf of the same course. A level with nothing in it is not offered. */
+    var LEVELS = [
+      { id: 'basic', key: 'guide.level.basic' },
+      { id: 'l2', key: 'guide.level.l2' },
+      { id: 'l3', key: 'guide.level.l3' },
+      { id: 'l4', key: 'guide.level.l4' }
     ];
-    function kindOf(t) { return (t && t.kind) || 'basic'; }
-    function inSection(id) {
+    function levelOf(t) { return (t && t.level) || 'basic'; }
+    /* Within a shelf: the manual's own chapters first, then the reference cards, then the lesson
+       projects. `kind` is the only hint a topic carries about what it is, so it is what sorts them;
+       a topic with no kind is a chapter of the manual. Ties keep array order. */
+    var KIND_RANK = { ref: 1, lesson: 2 };
+    function rankOf(t) { return (t && t.kind && KIND_RANK[t.kind]) || 0; }
+    function inLevel(id) {
       return topics.map(function (t, i) { return { t: t, i: i }; })
-        .filter(function (x) { return kindOf(x.t) === id; });
+        .filter(function (x) { return levelOf(x.t) === id; })
+        .sort(function (a, b) { return rankOf(a.t) - rankOf(b.t) || a.i - b.i; });
     }
 
-    /** The steps this reader is walking: 熟手 mode leaves the `basic` ones out of the course. */
+    /** The steps in a topic. Every step is shown: the pills pick a shelf, not a filter over it. */
     function stepsOf(t) {
-      var pro = mode() === 'pro';
-      return (t.steps || []).filter(function (s) { return !(pro && s && s.basic); });
+      return (t.steps || []).filter(function (s) { return s && s.id; });
     }
     function stepCount(t) { return stepsOf(t).length; }
     function currentTopic() { return topics[view.topic] || null; }
@@ -181,28 +187,24 @@
     }
 
     /**
-     * 新手 or 熟手. Two buttons, not a checkbox: a nine-year-old does not know what a "beginner
-     * mode" is, but knows whether they have used this before. The choice is honoured everywhere at
-     * once — the index counts fewer steps and the rail has fewer dots — because it is the course
-     * that changed, not a filter over it.
+     * Tutorial / L2 / L3 / L4. The four shelves of one course, as a row of pills; one is shown at a
+     * time and the list below it is that shelf's chapters. Same segmented look as the old 新手/熟手
+     * toggle, because it is the same control: pick a level, and the index follows.
      */
-    function renderMode() {
-      var pro = mode() === 'pro';
+    function renderPills() {
       var wrap = h('div', 'wl-g-mode');
       wrap.setAttribute('role', 'group');
-      wrap.setAttribute('aria-label', T('guide.mode'));
-      [{ id: 'new', key: 'guide.mode.new' }, { id: 'pro', key: 'guide.mode.pro' }].forEach(function (o) {
-        var b = h('button', 'wl-g-mbtn' + ((o.id === 'pro') === pro ? ' is-on' : ''));
+      wrap.setAttribute('aria-label', T('guide.levels'));
+      LEVELS.forEach(function (lv) {
+        var on = view.level === lv.id;
+        var b = h('button', 'wl-g-mbtn' + (on ? ' is-on' : ''));
         b.type = 'button';
-        b.textContent = T(o.key);
-        b.setAttribute('aria-pressed', String((o.id === 'pro') === pro));
+        b.textContent = T(lv.key);
+        b.setAttribute('aria-pressed', String(on));
         b.addEventListener('click', function () {
-          if ((o.id === 'pro') === pro) return;
+          if (view.level === lv.id) return;
           halt();
-          mode(o.id);
-          /* The step you were on may not exist in the other mode — a 熟手 course is shorter — so
-             the walk restarts from the beginning of the same topic rather than landing nowhere. */
-          view = { kind: view.kind, topic: view.topic, step: 0 };
+          view = { kind: 'index', level: lv.id, topic: 0, step: 0 };
           paint();
         });
         wrap.appendChild(b);
@@ -213,36 +215,31 @@
     function renderIndex() {
       var box = h('div', 'wl-g-index');
       box.appendChild(h('p', 'wl-g-intro', T('guide.intro')));
-      box.appendChild(renderMode());
+      box.appendChild(renderPills());
 
-      SECTIONS.forEach(function (sec) {
-        var items = inSection(sec.id);
-        if (!items.length) return;
-        box.appendChild(h('h3', 'wl-g-sec', T(sec.key)));
-        var list = h('div', 'wl-g-list');
-        items.forEach(function (x) {
-          var t = x.t;
-          var b = h('button', 'wl-g-topic');
-          b.type = 'button';
-          var badge = h('span', 'wl-g-ico');
-          badge.appendChild(ic(t.icon || ICON_CHEV));
-          b.appendChild(badge);
+      var list = h('div', 'wl-g-list');
+      inLevel(view.level).forEach(function (x) {
+        var t = x.t;
+        var b = h('button', 'wl-g-topic');
+        b.type = 'button';
+        var badge = h('span', 'wl-g-ico');
+        badge.appendChild(ic(t.icon || ICON_CHEV));
+        b.appendChild(badge);
 
-          var main = h('span', 'wl-g-tmain');
-          main.appendChild(h('span', 'wl-g-ttitle', T(keyTopic(t, 'title'))));
-          var sub = keyTopic(t, 'sub'), subText = T(sub);
-          main.appendChild(h('span', 'wl-g-tsub', subText === sub ? T('guide.stepCount', { n: stepCount(t) }) : subText));
-          b.appendChild(main);
+        var main = h('span', 'wl-g-tmain');
+        main.appendChild(h('span', 'wl-g-ttitle', T(keyTopic(t, 'title'))));
+        var sub = keyTopic(t, 'sub'), subText = T(sub);
+        main.appendChild(h('span', 'wl-g-tsub', subText === sub ? T('guide.stepCount', { n: stepCount(t) }) : subText));
+        b.appendChild(main);
 
-          var chev = h('span', 'wl-g-chev');
-          chev.appendChild(ic(ICON_CHEV));
-          b.appendChild(chev);
+        var chev = h('span', 'wl-g-chev');
+        chev.appendChild(ic(ICON_CHEV));
+        b.appendChild(chev);
 
-          b.addEventListener('click', function () { go(x.i, 0); });
-          list.appendChild(b);
-        });
-        box.appendChild(list);
+        b.addEventListener('click', function () { go(x.i, 0); });
+        list.appendChild(b);
       });
+      box.appendChild(list);
       return box;
     }
 
@@ -338,13 +335,19 @@
       prev.addEventListener('click', function () { halt(); go(view.topic, Math.max(0, view.step - 1)); });
       pager.appendChild(prev);
 
-      var last = view.step >= steps.length - 1, more = view.topic < topics.length - 1;
+      /* Next stays inside the shelf: the pills are a filter over the course, so walking off the end
+         of a level goes back to its index rather than into a chapter of a different level. */
+      var lv = inLevel(view.level), pos = -1;
+      lv.forEach(function (x, k) { if (x.i === view.topic) pos = k; });
+      var last = view.step >= steps.length - 1;
+      var more = pos >= 0 && pos < lv.length - 1;
+      var nextTopic = more ? lv[pos + 1].i : -1;
       var next = h('button', 'wl-btn wl-small wl-g-next', T(last ? (more ? 'guide.nextTopic' : 'guide.back') : 'guide.next'));
       next.type = 'button';
       next.addEventListener('click', function () {
         halt();
         if (!last) go(view.topic, view.step + 1);
-        else if (more) go(view.topic + 1, 0);
+        else if (more) go(nextTopic, 0);
         else goIndex();
       });
       pager.appendChild(next);
@@ -382,12 +385,12 @@
     /* Nav is a re-paint plus a scroll reset: the body is the scroll container, so a step change that
        kept its offset would open the next step halfway down. */
     function go(topicIndex, stepIndex) {
-      view = { kind: 'topic', topic: topicIndex, step: stepIndex };
+      view = { kind: 'topic', level: view.level, topic: topicIndex, step: stepIndex };
       paint();
       bodyBox.scrollTop = 0;
     }
     function goIndex() {
-      view = { kind: 'index', topic: view.topic, step: 0 };
+      view = { kind: 'index', level: view.level, topic: view.topic, step: 0 };
       paint();
       bodyBox.scrollTop = 0;
     }

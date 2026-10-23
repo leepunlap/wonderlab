@@ -4,3 +4,5 @@ dist/
 *.log
 *.gz
 dist-playground/
+src/assets/voice/*.mp3
+.voice-samples/

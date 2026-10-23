@@ -48,7 +48,16 @@
     addSprite: ['[class*="sprite-selector_add-button"]', '[aria-label*="選擇角色"]', '[aria-label*="Choose a Sprite"]'],
     addBackdrop: ['[class*="stage-selector_add-button"]', '[aria-label*="選擇背景"]', '[aria-label*="Choose a Backdrop"]'],
     /* the library, once it is open: the grid of tiles the ring lands in */
-    library: ['[class*="library_library-scroll-grid"]', '[class*="library_library"]']
+    library: ['[class*="library_library-scroll-grid"]', '[class*="library_library"]'],
+    /* Controls the manual names by name, so every "this button" lands on the real thing:
+       the green flag's neighbour (stop), the stage-size toggle, the row of stage controls,
+       the Code/Costumes/Sounds tabs, the sprite-info fields, and the AI pane's own tabs. */
+    stop: ['[class*="stop-all_stop-all-button"]', '[aria-label="Stop"]'],
+    stageSize: ['[class*="stage-size-toggle-group"]'],
+    stageHeader: ['[class*="stage-header_stage-header"]'],
+    tabs: ['.react-tabs__tab-list', '[class*="react-tabs__tab-list"]'],
+    spriteInfo: ['[class*="sprite-info_sprite-info"]', '[class*="sprite-info_row-primary"]'],
+    chatTabs: ['[class*="wl-tabs"]']
   };
 
   function create(cfg) {

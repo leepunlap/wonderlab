@@ -55,7 +55,21 @@
     /* The two buttons a newcomer is looking for and cannot name. They are what "import a sprite" and
        "set a background" mean, so the ring goes round the button, not round the pane. */
     addSprite: ['[class*="sprite-selector_add-button"]', '[aria-label*="選擇角色"]', '[aria-label*="Choose a Sprite"]'],
-    addBackdrop: ['[class*="stage-selector_add-button"]', '[aria-label*="選擇背景"]', '[aria-label*="Choose a Backdrop"]']
+    addBackdrop: ['[class*="stage-selector_add-button"]', '[aria-label*="選擇背景"]', '[aria-label*="Choose a Backdrop"]'],
+    /* the other half of "start and stop": a step that names the red button has to stop there, not
+       quietly in the VM, or the one control a child uses most is the only one never shown */
+    stop: ['[class*="stop-all_stop-all-button"]', '[aria-label="Stop"]'],
+    /* the rest of the screen a step can name — and now press. Kept in step with studio-guide-marks.js
+       REGION: a ring and a tap on the same word have to land on the same thing. */
+    flyout: ['.blocklyFlyout'],
+    workspace: ['.blocklyWorkspace'],
+    toolbar: ['[class*="menu-bar_menu-bar"]'],
+    library: ['[class*="library_library-scroll-grid"]', '[class*="library_library"]'],
+    stageSize: ['[class*="stage-size-toggle-group"]'],
+    stageHeader: ['[class*="stage-header_stage-header"]'],
+    tabs: ['[class*="react-tabs__tab-list"]'],
+    spriteInfo: ['[class*="sprite-info_sprite-info"]', '[class*="sprite-info_row-primary"]'],
+    chatTabs: ['[class*="wl-tabs"]']
   };
 
   function create(cfg) {
@@ -202,11 +216,26 @@
       return r;
     }
 
-    /** Ring a named region of the editor (`addSprite`, `stage`, `flag`…), labelled from the locale. */
+    /**
+     * Ring a named region of the editor (`addSprite`, `stage`, `flag`…), labelled from the locale.
+     *
+     * The hand goes first. A ring drawn on an empty stage says "something is here"; a hand that
+     * walks across the screen and stops on the sprite list says "look here" — and it says it in the
+     * half second before the ring lands, which is the half second the sentence is being read in.
+     */
     function point(region, ms) {
       var list = REGION[region];
       if (!list) return;
-      ringEl(firstOf(list), T('guide.point.' + region), ms);
+      var el = firstOf(list);
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      handTo(r).then(function () {
+        /* the editor may have swapped the pane underneath the walk (a language change, a step
+           undone); a ring round a node that is no longer laid out is a ring round nothing */
+        var now = el.getBoundingClientRect();
+        if (!now.width || !now.height) return;
+        ringEl(el, T('guide.point.' + region), ms);
+      });
     }
 
     /**
@@ -242,6 +271,175 @@
         setTimeout(function () { if (C()) C().hide(); }, 420);
         return true;
       });
+    }
+
+    /**
+     * Press the red button with the hand, and stop the project on the same tick.
+     *
+     * The mirror of `pressFlag`, for the same reason: a step that says "the red one stops it" while
+     * the program stops by itself has taught the student that the button is decoration. The button
+     * is where the hand goes; `vm.stopAll()` is what the button does.
+     */
+    function pressStop(opts) {
+      opts = opts || {};
+      var c = C(), vm = VM();
+      var button = c ? firstOf(REGION.stop) : null;
+      function halt() { if (vm) { try { vm.stopAll(); } catch (e) { /* the step still ends */ } } }
+      if (!button) { halt(); return Promise.resolve(false); }
+      var sq = opts.squeeze || 1;
+      return reach(button, Math.round(620 * sq)).then(pressHere).then(function () {
+        halt();
+        setTimeout(function () { if (C()) C().hide(); }, 420);
+        return true;
+      });
+    }
+
+    /* ---------- taps: pressing the control the sentence names ---------- */
+    /**
+     * Everything a step can name that is not a block: a tab, a menu, a category, a sprite in the
+     * list, the button that shrinks the stage.
+     *
+     * These are the sentences the guide used to get away with. "撳一下分頁就切換" drew a ring round
+     * the tab row and changed nothing; the student read the words and still had to find the thing and
+     * decide to press it. Now the hand walks over and presses it, and the pane really switches — the
+     * same reason the flag is pressed at the flag and the red button at the red button.
+     *
+     * Every target is looked up in the live DOM at the moment of the tap, and a control that is not
+     * there is skipped: a missed tap is a step that says a little less, a wrong click is a broken one.
+     */
+    var openedMenus = [];
+
+    /** The innermost element holding exactly this text: React's handler is often on it, and a click
+        there bubbles to whatever wraps it. */
+    function deepestWith(el, text) {
+      if (!el || !el.children) return el;
+      for (var i = 0; i < el.children.length; i++) {
+        if (((el.children[i].textContent) || '').trim() === text) return deepestWith(el.children[i], text);
+      }
+      return el;
+    }
+
+    /**
+     * The element a `taps` entry points at.
+     *
+     *   'stageSize'        a REGION key (see the table above)
+     *   'stageSize:0'      the nth button inside it — the toggle group holds two
+     *   'tab:1'            the nth tab of the Code/Costumes/Sounds row
+     *   'chat:0'           the nth tab of the AI pane
+     *   'cat:myBlocks'     a palette category, by the id the toolbox knows it by
+     *   'sprite:@lumo'     a sprite in the list, by its @ref
+     *   'menu:file'        a menu-bar entry, by `guide.menu.<name>` in the reader's language
+     */
+    function tapTarget(at) {
+      var d = root.document;
+      if (!at) return null;
+      var s = String(at);
+      var n, list, i;
+
+      function nth(sel, k) { return d.querySelectorAll(sel)[k] || null; }
+
+      if (s.indexOf('tab:') === 0) {
+        n = parseInt(s.slice(4), 10) || 0;
+        return nth('[class*="react-tabs__tab-list"] [role="tab"]', n) || nth('[role="tab"]', n);
+      }
+      if (s.indexOf('chat:') === 0) return nth('.wl-tabs .wl-tab', parseInt(s.slice(5), 10) || 0);
+      if (s.indexOf('sprite:') === 0) {
+        var nm = spriteName(s.slice(7));
+        var ns = d.querySelectorAll('[class*="sprite-selector-item_sprite-name"]');
+        for (i = 0; i < ns.length; i++) {
+          if (((ns[i].textContent) || '').trim().indexOf(nm) === 0) return ns[i];
+        }
+        return null;
+      }
+      if (s.indexOf('cat:') === 0) {
+        var ws = root.StudioCore && root.StudioCore.workspace ? root.StudioCore.workspace() : null;
+        var tb = ws && ws.getToolbox ? ws.getToolbox() : null;
+        var item = tb && tb.getToolboxItemById ? tb.getToolboxItemById(s.slice(4)) : null;
+        return item && item.getDiv ? item.getDiv() : null;
+      }
+      if (s.indexOf('menu:') === 0) {
+        var key = 'guide.menu.' + s.slice(5), text = T(key);
+        if (text === key) return null;                     // the locale has no word for this menu
+        var bar = firstOf(REGION.toolbar);
+        if (!bar) return null;
+        list = bar.querySelectorAll('[class*="menu-bar_menu-bar-item"], [role="menuitem"], li');
+        for (i = 0; i < list.length; i++) {
+          if (((list[i].textContent) || '').trim() === text) return deepestWith(list[i], text);
+        }
+        return null;
+      }
+      /* 'stageSize:1' — the second button of the group, for the step that shrinks then restores */
+      if (s.indexOf(':') > 0) {
+        n = parseInt(s.slice(s.indexOf(':') + 1), 10) || 0;
+        var host = firstOf(REGION[s.slice(0, s.indexOf(':'))] || []);
+        if (!host) return null;
+        var btns = host.querySelectorAll('button, [role="button"]');
+        return btns.length ? (btns[n] || btns[0]) : host;
+      }
+      return firstOf(REGION[s] || [s]);
+    }
+
+    /**
+     * Walk to a control, ring it, press it.
+     *
+     * `toggle` presses twice, which is how the menu bar opens and shuts: a menu left hanging over the
+     * stage covers the canvas the rest of the step, and the next one, is trying to show.
+     */
+    function tapOne(o, squeeze) {
+      o = o || {};
+      var el = tapTarget(o.at);
+      if (!el) return Promise.resolve(false);
+      var sq = squeeze || 1;
+      if (o.ring !== false) ringEl(el, T(o.label || 'guide.act.click'), o.ringMs || 2000);
+      var hold = Math.round((o.hold || 620) * sq);
+      var walk = Math.min(560, hold);
+      return reach(el, hold).then(function (there) {
+        return wait(there ? Math.max(140, hold - walk) : hold);
+      }).then(pressHere).then(function () {
+        el.click();
+        if (!o.toggle && String(o.at).indexOf('menu:') === 0) openedMenus.push(el);
+        if (!o.toggle) return wait(Math.round((o.after || 460) * sq));
+        /* the second press is the one that shuts it; no beat here, the menu is not the lesson */
+        return wait(Math.round(600 * sq)).then(function () {
+          el.click();
+          return wait(Math.round(340 * sq));
+        });
+      });
+    }
+
+    /**
+     * Whatever a step opened, shut again: the next step's canvas is underneath it.
+     *
+     * Guarded rather than blind — if the menu has already gone (a click elsewhere, a pane swap) the
+     * press is dropped, because pressing a closed menu opens it and leaves it hanging over the very
+     * thing the step is about to point at.
+     */
+    function closeMenus() {
+      if (!openedMenus.length) return Promise.resolve();
+      var list = openedMenus.slice();
+      openedMenus = [];
+      return list.reduce(function (p, el) {
+        return p.then(function () {
+          var open = root.document.querySelector('[class*="menu-bar_menu-bar-menu"]');
+          if (!open) return;
+          try { el.click(); } catch (e) { /* it may already be gone */ }
+          return wait(170);
+        });
+      }, Promise.resolve());
+    }
+
+    /**
+     * The taps of one moment, a beat each: one press per sentence, in the order the copy says them.
+     * `beat` is the caller's gate — a step that is being read aloud waits for its sentence, one that
+     * is not moves at the hand's own pace.
+     */
+    function tapsAll(list, squeeze, beat) {
+      return (list || []).reduce(function (p, o) {
+        return p.then(function (ok) {
+          if (ok === false) return false;
+          return beat(function () { return tapOne(o, squeeze); });
+        });
+      }, Promise.resolve(true));
     }
 
     /* ---------- keys ---------- */
@@ -443,6 +641,24 @@
       var c = C();
       if (!c) return Promise.resolve(false);
       return c.moveToEl(node, Math.min(560, ms));
+    }
+
+    /**
+     * Walk the hand to a rectangle before anything is drawn round it.
+     *
+     * A ring that appears with nothing travelling towards it is a caption, not a demonstration: the
+     * student has to find the thing it circles, and by the time they have, the sentence has moved
+     * on. The hand arrives first and the ring lands under it, so the eye is already there when the
+     * words arrive.
+     *
+     * Skipped while the block animation is running. That animation brings its own arrow and drags
+     * with it; two arrows pointing at two different things is worse than one arrow and a ring.
+     */
+    function handTo(r, ms) {
+      var c = C();
+      if (!c || !r || !r.width || !r.height) return Promise.resolve(false);
+      try { if (anim() && anim().busy && anim().busy()) return Promise.resolve(false); } catch (e) {}
+      return c.moveTo(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), ms);
     }
 
     /**
@@ -811,8 +1027,15 @@
       if (!m) return;
       var list = marksFor(step, 'say');
       if (!list.length) { m.clear(); return; }
-      /* no narration, no clock: draw at once, which is what a silent step has always done */
-      if (!sync || !sync.live) { m.draw(list); return; }
+      /* No narration, no clock: draw at once, which is what a silent step has always done — but the
+         hand still walks to the first thing named, because a silent step is still a step. */
+      if (!sync || !sync.live) {
+        var head = list[0];
+        Promise.resolve(handTo(head && m.at ? m.at(head.at) : null)).then(function () {
+          try { m.draw(list); } catch (e) { /* a mark is never a reason to lose the step */ }
+        });
+        return;
+      }
 
       var groups = [], order = [];
       list.forEach(function (mk) {
@@ -824,7 +1047,14 @@
       order.forEach(function (c) {
         Promise.resolve(sync.at(c)).then(function (ok) {
           if (ok === false) return;
-          try { m.add(groups[c]); } catch (e) { /* a mark is never a reason to lose the step */ }
+          /* The hand goes to the first thing this sentence names, and the ring is drawn once it has
+             arrived — the sentence and the place meet, instead of the place waiting for the reader
+             to find it. One hand per sentence: the rest of the group is ringed where it sits. */
+          var lead = groups[c][0];
+          var rect = (lead && m.at) ? m.at(lead.at) : null;
+          Promise.resolve(handTo(rect)).then(function () {
+            try { m.add(groups[c]); } catch (e) { /* a mark is never a reason to lose the step */ }
+          });
         });
       });
     }
@@ -953,6 +1183,18 @@
         });
       }
 
+      /* Presses before the blocks: a step that says "pick the sprite first" has to have picked it
+         before the hand starts dragging blocks onto it. `after: true` is for the ones the copy saves
+         for last — the tab you switch to once the program is built. */
+      var taps = demo.taps || [];
+      var tapsBefore = taps.filter(function (o) { return !(o && o.after); });
+      var tapsAfter = taps.filter(function (o) { return !!(o && o.after); });
+
+      chain = chain.then(function (ok) {
+        if (!ok || !alive()) return false;
+        return tapsAll(tapsBefore, squeeze, step);
+      });
+
       chain = chain.then(function (ok) {
         if (!ok || !alive()) return false;
 
@@ -978,14 +1220,28 @@
             var later = marksFor(st.step, 'built');
             var m = marks();
             if (later.length && m) {
-              after = after.then(function () { return m.draw(later); }).then(function () { return wait(900); });
+              after = after.then(function () {
+                /* the number has a place now that the block is on the canvas: send the hand to it
+                   first, so "change this" is said about a box the eye is already on */
+                var first = later[0];
+                return handTo(m.at ? m.at(first.at) : null);
+              }).then(function () {
+                return m.draw(later);
+              }).then(function () { return wait(900); });
+            }
+            if (tapsAfter.length) {
+              after = after.then(function () { return tapsAll(tapsAfter, squeeze, step); });
             }
             if (demo.run) {
               after = after.then(function () { return step(function () {
                 return pressFlag({ squeeze: squeeze }).then(function () { return wait(demo.run); });
-              }); }).then(function (go) {
+              });               }).then(function (go) {
                 if (go === false) return false;
+                /* a step about stopping stops at the button, with the hand on it; anything else
+                   just ends, which is what it has always done */
+                if (demo.stop) return pressStop({ squeeze: squeeze });
                 try { vm.stopAll(); } catch (e) {}
+                return true;
               });
             }
             (demo.keys || []).forEach(function (key) {
@@ -996,6 +1252,8 @@
         });
       });
       return chain.then(function (ok) {
+        return closeMenus().then(function () { return ok; });
+      }).then(function (ok) {
         busyNow = false;
         clearMarks();
         // where the stage is now, so the next press knows whether it is moving on or going back
@@ -1028,6 +1286,8 @@
       clearMarks();
       // a demonstration that was interrupted mid-import must not leave the library over the canvas
       if (pickerOpen()) closePicker();
+      // nor a menu it opened and had no time to shut
+      closeMenus();
       // the hand goes with the rest: an arrow left on screen points at a step that has stopped
       if (C()) C().hide();
       try { if (anim() && anim().busy()) anim().skip(); } catch (e) {}

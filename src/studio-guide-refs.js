@@ -47,6 +47,7 @@
     {
       id: 'refSprite',
       kind: 'ref',
+      level: 'basic',
       icon: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 8h4"/><path d="M19 6v4"/>',
       steps: [
         {
@@ -76,6 +77,7 @@
     {
       id: 'refBackdrop',
       kind: 'ref',
+      level: 'basic',
       icon: '<rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="m4 17 4.5-4.5L14 18"/><path d="m14 13 3.5-3.5L21 13"/>',
       steps: [
         {
@@ -103,6 +105,7 @@
     {
       id: 'refScene',
       kind: 'ref',
+      level: 'basic',
       icon: '<path d="M4 7h10"/><path d="m12 4 3 3-3 3"/><path d="M20 17H10"/><path d="m12 20-3-3 3-3"/>',
       steps: [
         {
@@ -133,6 +136,7 @@
     {
       id: 'refTouch',
       kind: 'ref',
+      level: 'basic',
       icon: '<circle cx="8" cy="12" r="4"/><circle cx="16" cy="12" r="4"/>',
       steps: [
         {
@@ -164,6 +168,7 @@
     {
       id: 'refColor',
       kind: 'ref',
+      level: 'basic',
       icon: '<path d="M12 3a9 9 0 1 0 0 18 2.5 2.5 0 0 0 0-5 2.5 2.5 0 0 1 0-5H12"/>',
       steps: [
         {
@@ -199,6 +204,7 @@
     {
       id: 'refSound',
       kind: 'ref',
+      level: 'basic',
       icon: '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>',
       steps: [
         {
@@ -224,6 +230,7 @@
     {
       id: 'refCostume',
       kind: 'ref',
+      level: 'basic',
       icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 21"/>',
       steps: [
         {
@@ -248,6 +255,7 @@
     {
       id: 'refVar',
       kind: 'ref',
+      level: 'basic',
       icon: '<path d="M4 7h7"/><path d="M4 12h7"/><path d="M4 17h7"/><path d="M15 6l5 6-5 6"/>',
       steps: [
         {
@@ -281,6 +289,7 @@
     {
       id: 'refMove',
       kind: 'ref',
+      level: 'basic',
       icon: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
       steps: [
         {
@@ -309,6 +318,7 @@
     {
       id: 'refClone',
       kind: 'ref',
+      level: 'basic',
       icon: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
       steps: [
         {

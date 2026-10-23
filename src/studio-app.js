@@ -51,8 +51,22 @@
   var DEFAULT_ASSETS = [
       { id: '15f37ae440b58748a8169885bd5123d0', type: 'ImageVector', fmt: 'SVG', url: 'assets/backdrop.svg' },
       { id: 'daa0565aa66cfdfa4ddf0e4054092968', type: 'ImageVector', fmt: 'SVG', url: 'assets/sprite-a.svg' },
-      { id: 'dd382de37d368241a1231e2558b0fcaf', type: 'ImageVector', fmt: 'SVG', url: 'assets/sprite-b.svg' }
+      { id: 'dd382de37d368241a1231e2558b0fcaf', type: 'ImageVector', fmt: 'SVG', url: 'assets/sprite-b.svg' },
+      /* One sound, so a demonstration can say "and it makes a sound" and then make one. It is the
+         "pop" that ships in the package's defaults/, fetched as bytes because a wav read as text is
+         not a wav. A sprite that owns a sound is the only way a 播放聲音 block has anything to play.
+         The other wav in defaults/ — 83c36d806dc92327b9e7049a565c6bff — is Scratch's "Meow", the
+         cat sound of the empty project (the sprite library tags it animals/cat). It was used here
+         first, which is how a step that says "makes a sound" came out as a cat. */
+      { id: '83a9787d4cb6f3b7632b4ddfebf74367', type: 'Sound', fmt: 'WAV', url: 'defaults/83a9787d4cb6f3b7632b4ddfebf74367.wav' }
     ];
+
+  /** The sound every sprite of a demonstration project is given. 11025 Hz, 16-bit mono, 258 samples
+      (about 23 ms): read off the wav's own header, because scratch-vm asks for the rate and the
+      sample count, not the bytes, and a wrong sample count truncates the sound. */
+  var DEMO_SOUND = { name: 'pop', assetId: DEFAULT_ASSETS[3].id,
+                     md5ext: DEFAULT_ASSETS[3].id + '.wav', dataFormat: 'wav',
+                     rate: 11025, sampleCount: 258 };
 
   /**
    * The names a new project gives itself, per editor locale.
@@ -107,9 +121,13 @@
       st.builtinHelper._store(st.AssetType.Project, st.DataFormat.JSON,
                               enc.encode(JSON.stringify(project || defaultProject(locale))), '0');
       (assets || []).forEach(function (a) {
-        if (!a || !a.text || !a.type || !a.fmt || !a.id) return;
+        if (!a || !a.type || !a.fmt || !a.id) return;
         if (!st.AssetType[a.type] || !st.DataFormat[a.fmt]) return;
-        st.builtinHelper._store(st.AssetType[a.type], st.DataFormat[a.fmt], enc.encode(a.text), a.id);
+        /* Text for the drawings, the fetched bytes for a sound: a wav decoded as UTF-8 is noise, and
+           a noise sample is worse than no sample, because it fails in the one place nobody looks. */
+        var bytes = a.bytes || (a.text ? enc.encode(a.text) : null);
+        if (!bytes) return;
+        st.builtinHelper._store(st.AssetType[a.type], st.DataFormat[a.fmt], bytes, a.id);
       });
       // The asset library. Without a web store, any costume or sound that was not seeded above can
       // never be fetched, the project load never finishes, and the editor never comes up - a lesson
@@ -142,6 +160,11 @@
       ready: false, versions: [], hist: [], lastSent: null, busy: false,
       api: cfg.api || '/api/ai/lab/studio'
     };
+
+    /* Whether the sound really arrived. A sprite is only given a sound once the bytes are in the
+       store: a sound declared but never seeded makes the VM fetch it, fail to decode it, and refuse
+       to open the project at all — a demonstration that cannot start is worse than a silent one. */
+    var soundReady = false;
 
     // STOCK MODE. `?stock=1` (or cfg.stock) boots verbatim scratch-gui and nothing of ours:
     // no locale patch, no DOM rules, no AI, no animation, no UC-Make blocks. It is the answer to
@@ -207,6 +230,18 @@
       return Promise.all(
         [fetch('opcodes.json').then(function (r) { return r.json(); })].concat(
           DEFAULT_ASSETS.concat(cfg.assets || []).map(function (a) {
+            /* Sounds are binary: `r.text()` would decode the bytes as UTF-8 and hand the VM a wav
+               that is not one. Everything else here is an SVG, which is text by definition. */
+            if (a.type === 'Sound') {
+              return fetch(a.url).then(function (r) {
+                if (!r.ok) return null;                       // a 404 is not a wav; say nothing
+                return r.arrayBuffer();
+              }).then(function (b) {
+                /* a wav under a kilobyte is an error page wearing a wav's name */
+                if (b && b.byteLength > 1024) { a.bytes = new Uint8Array(b); soundReady = true; }
+                return a;
+              }, function () { return a; });
+            }
             return fetch(a.url).then(function (r) { return r.text(); }).then(function (t) { a.text = t; return a; });
           })
         )
@@ -581,6 +616,11 @@
         t.size = s.size == null ? 100 : +s.size;
         // the second seeded sprite is a different drawing, not a different asset id
         if (+s.costume) t.costumes = [t.costumes[1], t.costumes[0]];
+        /* A sprite with no sound cannot demonstrate making one, and the guide's first step says a
+           sprite can move, talk, grow and make a sound. Given one only if the wav really loaded:
+           a sound declared but never seeded makes the VM fetch it, fail to decode it, and refuse
+           to open the project at all — a demonstration that cannot start is worse than a mute one. */
+        if (soundReady) t.sounds = [DEMO_SOUND];
         t.layerOrder = i + 1;
         return t;
       }));

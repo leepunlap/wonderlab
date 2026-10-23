@@ -49,8 +49,11 @@ const spec = JSON.parse(readFileSync(join(SRC, 'opcodes.json'), 'utf8')).opcodes
 /* The picture follows the sentences, so the sentences have to exist: the gate that starts a ring or
    a press fires on a cue, and a body with no cue track has no beat to fire on, in that language. */
 const VOICE = JSON.parse(readFileSync(join(SRC, 'assets/voice/manifest.json'), 'utf8'));
+/* Mirrors REGION in src/studio-guide-marks.js: the names a mark may be anchored to. Kept in step with
+   that table by hand — a name the table does not have is a mark that is never drawn, which is why the
+   check exists. */
 const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar',
-  'addSprite', 'addBackdrop']);
+  'addSprite', 'addBackdrop', 'library', 'stop', 'stageSize', 'stageHeader', 'tabs', 'spriteInfo', 'chatTabs']);
 const SHAPES = new Set(['square', 'circle']);
 const KINDS = new Set(['lesson', 'ref', 'basic']);
 /* The library is outside this repo, so a missing file is a skip, not a failure: what it guards is
