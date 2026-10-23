@@ -15,6 +15,13 @@
      page measures the rectangle: when a sentence names a corner of the stage, the ring drawn for that
      sentence has to be inside the stage it names.
 
+  3. A CIRCLE ROUND SOMETHING A CIRCLE CANNOT HOLD. An ellipse round a 44px button clears its corners
+     and holds all of it; the same ellipse round the stage passes well inside the four corners, so a
+     quarter of the thing being named — corners included — lies outside the ring that names it. The
+     renderer now measures this and draws a rectangle instead, but the data still says `circle`, and
+     data that says the wrong shape will be read as intent by whoever edits it next. So this page
+     measures every region a step asks to have circled and fails the ones that cannot be.
+
   Run it:
       WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
       npm run check:pages            (or open /_region-check.html)
@@ -162,7 +169,29 @@
       log(cornerBad ? cornerBad + ' of ' + corners + ' place word(s) contradict where the ring is'
         : (corners ? 'all ' + corners + ' place word(s) agree with where the ring is drawn' : 'no place words to check'));
 
-      log(cornerBad || missingN ? 'RESULT FAIL' : 'RESULT PASS');
+      /* ---------- 4. a circle is only asked for where a circle can hold the thing ---------- */
+      var roundBad = 0, roundSeen = 0, roundOffenders = {};
+      topics.forEach(function (t) {
+        (t.steps || []).forEach(function (st) {
+          (((st && st.demo) || {}).annotate || []).forEach(function (m) {
+            var at = m && m.at;
+            if (!at || STATE_ONLY.test(String(at)) || (m.shape || 'circle') === 'square') return;
+            var r = box(at);
+            if (!r || roundOffenders[at]) return;
+            roundSeen++;
+            if (marks.fitsCircle(r)) return;
+            roundOffenders[at] = 1;
+            roundBad++;
+            log('  SHAPE: ' + t.id + '/' + st.id + ' asks for a circle round ' + at + ', which is ' +
+              Math.round(r.width) + '×' + Math.round(r.height) +
+              ' — an ellipse that size leaves the corners outside the ring');
+          });
+        });
+      });
+      log(roundBad ? roundBad + ' of ' + roundSeen + ' circled target(s) are too wide or tall to be circled'
+        : (roundSeen ? 'all ' + roundSeen + ' circled target(s) are shapes a circle can hold' : 'no circles to check'));
+
+      log(cornerBad || missingN || roundBad ? 'RESULT FAIL' : 'RESULT PASS');
     });
   })();
 }());
