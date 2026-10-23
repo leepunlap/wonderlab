@@ -51,8 +51,8 @@ const PIPELINE = 2;   // bump when the cue track changes shape: entries from old
  * that need to be slower are the lines that get re-synthesised.
  */
 const LOCALES = {
-  'zh-Hant': { voice: 'zh-HK-HiuMaanNeural', rate: '-5%' },
-  'zh-Hans': { voice: 'zh-CN-XiaoxiaoNeural', rate: '-5%' },
+  'zh-Hant': { voice: 'zh-HK-WanLungNeural', rate: '-5%' },
+  'zh-Hans': { voice: 'zh-CN-YunjianNeural', rate: '-5%' },
   en: { voice: 'en-GB-RyanNeural', rate: '-5%' }
 };
 const pct = (n) => (n > 0 ? '+' : '') + n + '%';
