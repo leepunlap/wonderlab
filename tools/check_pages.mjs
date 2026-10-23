@@ -4,11 +4,14 @@
  *
  * WHAT THIS IS
  * `_drive-check.html`, `_mode-check.html`, `_library-check.html`, `_import-check.html`,
- * `_sync-check.html`, `_grow-check.html`, `_region-check.html`, `_walk-check.html`,
+ * `_sync-check.html`, `_grow-check.html`, `_region-check.html`,
  * `_pace-check.html` and `_voice-sheet.html` load the
  * real page in a frame, press the real buttons and print one line: RESULT PASS or RESULT FAIL. This
  * is the runner, so the checks are one command and not a paragraph of Chrome flags nobody will
  * remember.
+ *
+ * The one check that is not here is `_walk-check.html`: it runs a program on the stage, which on a
+ * virtual clock costs tens of minutes to read. `npm run check:walk` runs it in real time instead.
  *
  * It does NOT start the studio server: the server needs WL_LIBRARY (the sprite library is not in
  * this checkout) and a port that is already free, and guessing either would turn a missing library
@@ -33,8 +36,11 @@ const PAGES = [
   { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' },
   { file: '_sync-check.html', out: 'wl-sync-out', what: '畫面跟着旁白的句子走' },
   { file: '_grow-check.html', out: 'wl-grow-out', what: '程式跟住句子一齊長' },
+  /* `_walk-check.html` is deliberately not here. It runs a program on the stage, and a running VM is
+     the most expensive thing a software renderer can draw: on this runner's virtual clock the page
+     takes tens of minutes to be read, whatever it found. `npm run check:walk` runs the same page in
+     real time and is a matter of seconds. */
   { file: '_region-check.html', out: 'wl-region-out', what: '指着嘅嘢真係喺畫面度' },
-  { file: '_walk-check.html', out: 'wl-walk-out', what: '講到郁，畫面就真係郁' },
   /* 800x600, the size it was written for: this is the one page that measures milliseconds, and a
      headless browser measures them on a virtual clock that the software renderer inflates with every
      frame it draws — at 1440x900 the same step reads 42s slower, which is SwiftShader, not pacing.

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — 旁白講到嘅嘢，畫面係咪真係做緊？
+
+  WHY THIS PAGE EXISTS
+  入門第二步嘅旁白有一句：「舞台下面有一行角色資料……x 同 y 就係角色喺舞台上嘅位置座標——角色
+  一郁，呢兩個數就跟住變。」嗰句講緊嘅時候，畫面要做兩件事：綠旗要喺呢一句先撳（講到「郁」先
+  郁，唔係郁完先講），而圈要落喺嗰行資料上面——唔係落喺舞台上。兩樣都錯過：圈曾經畫喺舞台，而
+  角色喺旁白講第一句時已經行完，學生聽到「一郁」嗰陣畫面早就停咗。
+
+  呢一頁量三件事，全部喺真嘅頁面上、用真嘅 VM、真嘅積木：
+    1. 角色真係郁咗（VM 入面嘅 x 變咗），而唔係淨係積木砌好就算；
+    2. 郁嘅第一吓唔早過講「郁」嗰一句（runAt）——講到先郁；
+    3. 每一句圈住嘅控件，係嗰句講到嘅控件：第一句舞台、第二句角色資料嗰行、第三句舞台標題、
+       第四句背景掣。
+
+  THE CLOCK
+  旁白嘅時間軸係手動開：呢一頁自己決定第幾句「開始講」，同 `_grow-check.html` 一樣。靠喇叭
+  或者靠牆鐘嘅測試，冇人可以用同一個方法跑第二次；而 `--virtual-time-budget` 之下，砌積木要
+  幾耐係軟件渲染話事，寫死一個毫秒數只會令部機慢落嚟。所以每一步都係「等到件事發生」，有上限，
+  冇預計時間。
+
+  `?step=<topic>/<step>` 可以換另一個步驟行同一套檢查：分唔清係步驟定係檢查壞咗嗰陣，呢個就係
+  分別嘅方法。
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-walk-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>walk check</title>
+<style>html,body{margin:0}iframe{width:100%;height:78vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-walk-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-walk-out');
+  /* `?post=<port>` hands the result to tools/check_walk.mjs as soon as it exists. A running VM is the
+     most expensive thing a software renderer can draw, and under --virtual-time-budget that cost is
+     paid once per virtual second whether or not the step has finished — twenty minutes to read a
+     result the page reached in twenty seconds. Real time, and a page that reports itself, is seconds. */
+  var POST = (/[?&]post=(\d+)/.exec(location.search) || [])[1] | 0;
+  function log(s) {
+    out.textContent += '\n' + s;
+    if (POST && /RESULT (PASS|FAIL)/.test(s)) {
+      try {
+        fetch('http://127.0.0.1:' + POST + '/', {
+          method: 'POST', mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: out.textContent
+        });
+      } catch (e) { /* the runner is not listening; the DOM still has it */ }
+    }
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+  function now() { return (win().performance || performance).now(); }
+
+  /* What each sentence should ring, taken from the step's own `annotate` rather than written here: a
+     harness that knows one step's four sentences misreads every other step it is pointed at, which is
+     worse than useless — it reports a pass for sentences it never looked at. One sentence may name
+     more than one control, and any of them counts. */
+  var EXPECTED = [];                // cue -> [region names]
+  var NAMED = [];                   // every region named anywhere, for telling rings apart
+  function expect(demo) {
+    (demo.annotate || []).forEach(function (a) {
+      if (!a || !a.at) return;
+      var cue = a.cue | 0;
+      if (!EXPECTED[cue]) EXPECTED[cue] = [];
+      if (EXPECTED[cue].indexOf(a.at) < 0) EXPECTED[cue].push(a.at);
+      if (NAMED.indexOf(a.at) < 0) NAMED.push(a.at);
+    });
+    return Object.keys(EXPECTED).reduce(function (m, k) { return Math.max(m, +k); }, 0) + 1;
+  }
+  function at() { return Math.round(now() - seen.t0); }
+  var seen = { t0: 0, at: [], samples: [], rings: [], editingMover: false, error: null };
+  var MARKS = null;      // the marks layer, once the editor has one
+
+  /** Which controls are ringed right now. Expensive: called a handful of times, never in a poll. */
+  function snap() {
+    try {
+      var on = [];
+      ringBoxes().forEach(function (box) {
+        var name = ownerOf(box);
+        if (name && on.indexOf(name) < 0) on.push(name);
+      });
+      seen.rings.push({ t: Math.round(now() - seen.t0), on: on });
+    } catch (e) {
+      seen.error = seen.error || (e && e.message);
+    }
+  }
+
+  /* ---- the clock: this page says when a sentence begins, and nothing else does ---- */
+  var released = -1, waiters = [];
+  var clock = {
+    spoken: true,
+    cues: [{ t: 0, text: 'zero' }, { t: 1, text: 'one' }, { t: 2, text: 'two' }, { t: 3, text: 'three' }],
+    ended: new Promise(function () {}),      // this page ends the step, not the clock
+    at: function (i) {
+      if (i <= released) return Promise.resolve(true);
+      return new Promise(function (res) { waiters.push({ i: i, res: res }); });
+    }
+  };
+  function release(i) {
+    released = i;
+    seen.at[i] = Math.round(now() - seen.t0);
+    waiters = waiters.filter(function (w) {
+      if (w.i > i) return true;
+      w.res(true);
+      return false;
+    });
+  }
+
+  /* Wait until `ok()` is true. The cap is a virtual-time budget, and every virtual second is a frame
+     the software renderer has to draw: 200000 of them with a VM running costs a quarter of an hour of
+     real time and proves nothing that 40000 does not. A step that cannot build in forty virtual
+     seconds is broken; say so and stop. */
+  function until(ok, ms) {
+    var left = ms || 40000;
+    return new Promise(function (res) {
+      (function poll() {
+        if (ok()) return res(true);
+        if (left <= 0) return res(false);
+        left -= 40;
+        setTimeout(poll, 40);
+      }());
+    });
+  }
+
+  /* ---- what the page measures ---- */
+  function mover() {
+    var t = win().WLStudio.vm.runtime.targets.filter(function (x) { return !x.isStage; })[0];
+    return t || null;
+  }
+  /** Blocks on the canvas right now, in the VM rather than in the DOM: the DOM is the animation.
+      Counted by walking, because a script in the snapshot is a tree — a block hanging under another
+      block is a block too, and counting only the top level reports two blocks as one. */
+  function blocks() {
+    try {
+      var p = win().WLStudio.ops().snapshot(win().WLStudio.vm).program;
+      var n = 0;
+      (function walk(v) {
+        if (!v || typeof v !== 'object') return;
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (typeof v.op === 'string') n++;
+        Object.keys(v).forEach(function (k) { if (k !== 'op') walk(v[k]); });
+      }(p));
+      return n;
+    } catch (e) { return -1; }
+  }
+  /** How many blocks the step's own data asks for: the build is finished when they are all there, and
+      "at least one" is satisfied by the hat alone, which then reports a program as built while the
+      hand is still dragging the block that moves the sprite. */
+  function wanted(scripts) {
+    var n = 0;
+    (function walk(v) {
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) { v.forEach(walk); return; }
+      if (typeof v.op === 'string') n++;
+      Object.keys(v).forEach(function (k) { if (k !== 'op') walk(v[k]); });
+    }(scripts.map(function (s) { return s.blocks; })));
+    return n;
+  }
+  function running() {
+    try { return win().WLStudio.vm.runtime.threads.length > 0; } catch (e) { return false; }
+  }
+  /** the row of numbers under the stage: name, x, y, size, direction */
+  function infoValues() {
+    var e = doc().querySelector('[class*="sprite-info_sprite-info"]');
+    if (!e) return [];
+    return Array.prototype.map.call(e.querySelectorAll('input'), function (i) { return i.value; });
+  }
+
+  /* Which control is a ring actually sitting on? A ring is a <g> holding one ellipse or rect (the
+     shape) plus the label's pill and text; the shape is the child without a `wl-mark-` class. */
+  function ringBoxes() {
+    var gs = doc().querySelectorAll('.wl-marks .wl-mark.is-on');
+    var boxes = [];
+    Array.prototype.forEach.call(gs, function (g) {
+      var shape = null;
+      Array.prototype.forEach.call(g.children, function (c) {
+        if (!shape && !/wl-mark-(tag|text)/.test(c.getAttribute('class') || '')) shape = c;
+      });
+      if (!shape) return;
+      var r = shape.getBoundingClientRect();
+      boxes.push({ t: r.top, l: r.left, w: r.width, h: r.height });
+    });
+    return boxes;
+  }
+  /* Name a ring by the region it was drawn for. Containment is the obvious test and it is wrong: the
+     ring round the stage is a big circle, and the row of numbers under the stage — and the stage's own
+     header — both have their centre inside it, so every ring reads as "the stage". A ring is drawn
+     round its region with a little padding, so the honest test is which region's centre and size it
+     is closest to; the stage's ring is nowhere near as tall as the header's. */
+  function ownerOf(box) {
+    var best = null, bestScore = Infinity;
+    NAMED.forEach(function (name) {
+      var r = MARKS && MARKS.at ? MARKS.at(name) : null;
+      if (!r || !(r.width || r.height)) return;
+      var dx = (box.l + box.w / 2) - (r.left + r.width / 2);
+      var dy = (box.t + box.h / 2) - (r.top + r.height / 2);
+      var score = Math.sqrt(dx * dx + dy * dy) +
+        0.35 * (Math.abs(box.w - r.width) + Math.abs(box.h - r.height));
+      if (score < bestScore) { bestScore = score; best = name; }
+    });
+    return bestScore <= 48 ? best : null;
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading ||
+        !w.StudioGuideDrive || !w.StudioGuide || !w.StudioGuideMarks || !w.StudioGuideTopics) {
+      if (tries < 60) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+
+    /* `?step=<topic>/<step>` runs another step through the same harness, which is how a step that
+       hangs is told apart from a harness that hangs. */
+    var want = (/[?&]step=([^&]+)/.exec(location.search) || [, 'basics/b2'])[1].split('/');
+    var topic = null;
+    [w.StudioGuideTopics, w.StudioGuideLessons, w.StudioGuideRefs].forEach(function (p) {
+      (p || []).forEach(function (t) { if (t.id === want[0]) topic = t; });
+    });
+    var step = topic && (topic.steps || []).filter(function (s) { return s.id === want[1]; })[0];
+    if (!step || !step.demo) {
+      log('RESULT FAIL: ' + want.join('/') + ' is not in the guide data');
+      return;
+    }
+    var demo = step.demo;
+
+    var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
+    MARKS = marks;
+    /* The real animator, like every other check page: handing `anim: null` looks like a shortcut but
+       takes a different path through the drive (`applyInstant`) that none of the other pages walk,
+       so a page built that way is measuring a demonstration the student never sees. */
+    var drive = w.StudioGuideDrive.create({
+      i18n: w.StudioI18n, marks: function () { return marks; }, sound: function () { return false; }
+    });
+
+    var guide = w.StudioGuide.create({
+      i18n: w.StudioI18n,
+      topics: [topic],
+      prepare: function (s, t) { return drive.prepare(s, t); },
+      explain: function (s, sync) { drive.explain(s, sync); },
+      perform: function (s, onProgress, sync) { return drive.perform(onProgress, sync); },
+      stop: function () { drive.stop(); marks.clear(); },
+      restore: function () { return drive.restore(); },
+      isActive: function () { return drive.isActive(); },
+      canRun: function () { return true; },
+      narrate: function () { seen.t0 = now(); return Promise.resolve(clock); },
+      hush: function () {},
+      voice: function () { return true; }
+    });
+
+    /* Everything is sampled continuously, geometry included. That was unaffordable on a virtual clock
+       (a bounding box on a page holding a Blockly workspace costs a layout and a paint, and virtual
+       time pays for one of those per virtual frame); this page runs in real time, where ten samples a
+       second is nothing, and sampling continuously is what lets a ring be attributed to the sentence
+       that was being read rather than to the moment the harness happened to look. */
+    /* Read what this step promises before the step starts: `?step=` points the same harness at any
+       step, and the expectations have to come from the step, not from the page. */
+    var SENTENCES = expect(demo);
+    var SCHEDULE = [];
+    for (var q = 0; q < SENTENCES; q++) SCHEDULE.push(q === 0 ? 0 : 8000 + (q - 1) * 5000);
+    var END = SCHEDULE[SCHEDULE.length - 1] + 2000;
+    function untilEnd() { return wait(Math.max(200, END - (now() - seen.t0))); }
+
+    var beat = 0;
+    var poll = setInterval(function () {
+      /* A sample that throws is a sample that never happened, and a run with no samples reads as a
+         guide that did nothing — which is the one thing this page must never claim quietly. */
+      try {
+        if (!seen.t0) return;
+        var m = mover();
+        if (m && win().WLStudio.vm.editingTarget === m) seen.editingMover = true;
+        seen.samples.push({
+          t: Math.round(now() - seen.t0),
+          x: m ? Math.round(m.x) : null,
+          info: infoValues().join(',')
+        });
+        /* The sprite's x is a number out of the VM and costs nothing; a ring is a set of bounding
+           boxes and costs a layout. Measuring rings every tick slowed the build down so much that a
+           flag pressed far too early was only a few hundred milliseconds early, which a slack of the
+           same size then forgave. Every third tick is plenty to catch a ring that is up for seconds. */
+        if (++beat % 3 === 0) snap();
+      } catch (e) {
+        seen.error = seen.error || (e && e.message);
+      }
+    }, 100);
+
+    var need = wanted(demo.scripts || []);
+    log('step ' + want.join('/') + ': ' + need + ' block(s), runs for ' + demo.run +
+        'ms after the flag, pressed at sentence ' + demo.runAt);
+
+    guide.open(topic.id, topic.steps.indexOf(step));
+    var btn = guide.el.querySelector('.wl-g-demo');
+    if (!btn) { log('RESULT FAIL: the step has no 示範 button'); return; }
+    btn.click();
+
+    /** Stop the threads once the movement has been measured. What is left to check is rings, and rings
+        need the DOM and not a moving sprite; a program left running keeps re-rendering the stage for
+        the rest of the step and can even wander back over the numbers the page just read. */
+    function halt() {
+      try { win().WLStudio.vm.runtime.stopAll(); } catch (e) { /* nothing was running */ }
+    }
+
+    /* THE SENTENCES BEGIN ON A SCHEDULE, the way a recording says them — not when the last thing
+       finished. Releasing sentence 1 as soon as the program was built was this page's first mistake:
+       it makes "the flag waits for the sentence that says 郁" and "the flag is pressed the moment the
+       program is built" the same moment, and a step that presses far too early passes cleanly. Four
+       and a half seconds a sentence is slower than these sentences really are, and that is the point:
+       there has to be room for the press to be early in, and to be caught. */
+    var built = null, ran = null;
+    release(0);
+    SCHEDULE.forEach(function (ms, i) {
+      if (i) setTimeout(function () { release(i); }, ms);
+    });
+
+    until(function () { return blocks() >= need; }).then(function (got) {
+      built = got;
+      log('  the program reached the canvas: ' + (got ? 'yes — ' + blocks() + ' of ' + need +
+          ' block(s)' : 'NO — only ' + blocks() + ' of ' + need) + ' at ' + at() + 'ms');
+      return until(running);
+    }).then(function (got) {
+      ran = got;
+      log('  the flag was pressed: ' + (got ? 'yes, at ' + at() + 'ms' : 'NO — the program never ran'));
+      setTimeout(halt, 1600);       // well into a two-second glide: x has to have changed by now
+      return untilEnd();
+    }).then(function () {
+      clearInterval(poll);
+      finish(built, ran);
+    });
+
+    function finish(built, ran) {
+      /* Take the editor off the page before saying anything. Under --virtual-time-budget the clock
+         only advances while something is drawing, and scratch's render loop never stops: leaving the
+         frame in place makes the runner pay for every virtual second after the last block, which is
+         minutes of software rendering spent measuring nothing. */
+      try { frame().parentNode.removeChild(frame()); } catch (e) { /* already gone */ }
+
+      var s = seen.samples;
+      if (seen.error) log('  the sampler threw: ' + seen.error);
+      if (!s.length) { log('RESULT FAIL: nothing was measured'); return; }
+
+      var xs = s.map(function (p) { return p.x; }).filter(function (v) { return v !== null; });
+      var x0 = xs.length ? xs[0] : 0;
+      var span = 0;
+      xs.forEach(function (v) { if (Math.abs(v - x0) > span) span = Math.abs(v - x0); });
+      var firstMove = null;
+      s.forEach(function (p) {
+        if (firstMove === null && p.x !== null && Math.abs(p.x - x0) >= 4) firstMove = p.t;
+      });
+
+      /* sentence i is open from the moment it was released until the next one was */
+      function window_(i) {
+        var from = seen.at[i] == null ? 0 : seen.at[i];
+        var to = i + 1 < SENTENCES && seen.at[i + 1] != null ? seen.at[i + 1] : 1e9;
+        return { from: from, to: to };
+      }
+      /* a sentence passes if any control it names was ringed while it was being read */
+      function ringAt(i) {
+        var win_ = window_(i), want = EXPECTED[i] || [];
+        if (!want.length) return true;
+        return seen.rings.some(function (p) {
+          if (p.t < win_.from || p.t >= win_.to) return false;
+          return p.on.some(function (n) { return want.indexOf(n) >= 0; });
+        });
+      }
+      var rings = [];
+      for (var i = 0; i < SENTENCES; i++) rings.push(ringAt(i));
+
+      /* the numbers under the stage: only meaningful while the moving sprite is the one being
+         edited, which is whose x the row shows */
+      var infos = s.map(function (p) { return p.info; }).filter(function (v) { return v; });
+      var infoMoved = false;
+      if (seen.editingMover && infos.length) {
+        var first = infos[0];
+        infoMoved = infos.some(function (v) { return v !== first; });
+      }
+
+      log('  sentences began at: ' + seen.at.join(', ') + 'ms');
+      log('  x went from ' + x0 + ' to ' + xs[xs.length - 1] + ' (span ' + span + ')');
+      var runCue = demo.runAt == null ? 0 : demo.runAt;
+      log('  the sprite first moved at ' + (firstMove === null ? 'never' : firstMove + 'ms') +
+          '; sentence ' + runCue + ' (the one that waits for the flag) began at ' +
+          seen.at[runCue] + 'ms');
+      log('  the row under the stage read: ' +
+          (infos.length ? infos[0] + ' … ' + infos[infos.length - 1] : 'nothing') +
+          (seen.editingMover ? '' : ' (the moving sprite was not the one being edited — not checked)'));
+
+      var movedOk = span >= 60;
+      /* One sample's worth of slack, and not a millisecond more. A slack of four hundred milliseconds
+         forgave a flag pressed three hundred milliseconds early, which is to say it forgave exactly
+         the fault this page exists to catch. */
+      var lateOk = firstMove !== null && firstMove >= seen.at[runCue] - 150;
+      log('  the sprite really moved: ' + (movedOk ? 'yes' : 'NO — it stood at ' + x0 + ' the whole time'));
+      log('  it waited for the sentence the flag waits for: ' + (lateOk ? 'yes' : 'NO — at ' +
+          (firstMove === null ? 'never' : firstMove + 'ms, before sentence ' + runCue)));
+      for (var j = 0; j < SENTENCES; j++) {
+        log('  sentence ' + j + ' ringed ' + (EXPECTED[j] || []).join(' or ') + ': ' +
+            (rings[j] ? 'yes' : 'NO'));
+      }
+      /* Consecutive samples that name the same controls are one span, not forty: the log is read by a
+         person deciding whether a ring was up for a sentence or flickered past. */
+      var spans = [];
+      seen.rings.forEach(function (p) {
+        var key = p.on.join(' ') || '—';
+        var last = spans[spans.length - 1];
+        if (last && last.key === key) last.to = p.t;
+        else spans.push({ key: key, from: p.t, to: p.t });
+      });
+      log('  rings: ' + spans.map(function (p) {
+        return (p.from === p.to ? p.from + 'ms' : p.from + '–' + p.to + 'ms') + '[' + p.key + ']';
+      }).join(' '));
+      log('  the numbers under the stage changed: ' + (infoMoved ? 'yes' : 'NO'));
+
+      var ok = !!built && !!ran && movedOk && lateOk && rings.every(function (r) { return r; }) &&
+        (!seen.editingMover || infoMoved);
+      log(ok ? 'RESULT PASS' : 'RESULT FAIL');
+    }
+  }());
+}());
+</script>
+</body>
+</html>

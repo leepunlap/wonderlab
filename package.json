@@ -15,6 +15,7 @@
     "check:pace": "node tools/check_pace.mjs",
     "check": "node tools/check_guide.mjs && node tools/check_claims.mjs && node tools/check_marks.mjs && node tools/check_pace.mjs",
     "check:pages": "node tools/check_pages.mjs",
+    "check:walk": "node tools/check_walk.mjs",
     "audit:lessons": "node tools/audit_lessons.mjs",
     "build:voice": "node tools/build_voice.mjs",
     "build": "node tools/build.mjs",
