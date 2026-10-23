@@ -114,22 +114,37 @@ function seconds(stamp) {
 }
 
 /**
- * Edge's own subtitle splitter can drop the last character of a line — a closing quote, usually,
- * which is exactly the sort of thing a student notices. Its timings are still the only honest ones
- * available, so the text is put back rather than the cue thrown away: if what it produced is a
- * prefix of what was asked for, the missing tail goes on the last line.
+ * Edge's own subtitle splitter can drop a character — a closing quote, usually, and sometimes the
+ * opening one. Its timings are still the only honest ones available, so the text is put back
+ * rather than the cue thrown away: if what it produced is the line minus its head or its tail, the
+ * missing piece goes back where it was.
+ *
+ * This runs over the cues of a clip baked earlier too, not only over the ones just spoken: the
+ * audio does not change when the text of a subtitle is corrected, so the correction must not wait
+ * for the next bake.
  */
 function repair(cues, text) {
   const norm = (s) => String(s).replace(/\s+/g, '');
-  if (!cues.length) return [{ t: 0, d: 0, s: String(text).trim() }];
-  const joined = norm(cues.map((c) => c.s).join(''));
   const want = norm(text);
-  if (joined === want) return cues;
-  if (joined.length < want.length && want.indexOf(joined) === 0) {
-    const missing = want.length - joined.length;
-    if (missing <= 12) {
-      cues[cues.length - 1].s = (cues[cues.length - 1].s + String(text).trim().slice(-missing)).trim();
+  if (!cues.length) return [{ t: 0, d: 0, s: String(text).trim() }];
+  /* The cues are slices of the line, in order. A slice that lost its first characters is not found
+     where it should be: the characters that were dropped go back on it, so the sentence shown is the
+     sentence written. */
+  let at = 0;
+  cues.forEach((c) => {
+    const s = norm(c.s);
+    if (!s) return;
+    const p = want.indexOf(s, at);
+    if (p < 0) return;                      // not in the line at all: leave it alone
+    if (p > at && p - at <= 12) {
+      c.s = (want.slice(at, p) + c.s).trim();
     }
+    at = p + s.length;
+  });
+  /* and the tail the last cue lost */
+  if (at < want.length && want.length - at <= 12) {
+    const last = cues[cues.length - 1];
+    last.s = (last.s + want.slice(at)).trim();
   }
   return cues;
 }
@@ -168,6 +183,7 @@ async function main() {
 
   const jobs = [];
   const spoken = {};
+  const spokenOf = {};   // "key|locale" -> the line, so a reused clip's cues can be corrected
   Object.keys(LOCALES).forEach((locale) => {
     const dict = dictionary(locale);
     const keys = narratedKeys(dict);
@@ -176,6 +192,7 @@ async function main() {
     keys.forEach((key) => {
       const text = String(dict[key] || '').trim();
       spoken[locale][key] = text;
+      spokenOf[key + '|' + locale] = text;
       if (!text) return;
       const slow = pace[key + '|' + locale];
       const rate = slow == null ? LOCALES[locale].rate : pct(slow);
@@ -247,6 +264,10 @@ async function main() {
     if (!before[id] || !before[id].file || !fs.existsSync(path.join(OUT, before[id].file))) return;
     // a manifest from before rates were recorded: the file was baked at the base rate
     clips[id] = { rate: BASE_RATE, ...before[id] };
+    /* the audio is unchanged, but the sentences it is shown as have to be the words on the card:
+       a line the voice speaks differently cannot be highlighted sentence by sentence */
+    const said = spokenOf[id];
+    if (said && clips[id].cues && clips[id].cues.length) clips[id].cues = repair(clips[id].cues, said);
   });
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
 

@@ -47,7 +47,8 @@ const PAGES = [
      The arithmetic that decides whether a step fits its narration is tools/check_pace.mjs, in
      npm run check; this page answers "is the shape right". */
   { file: '_pace-check.html', out: 'wl-pace-out', what: '示範趕得上旁白的時間', size: '800,600' },
-  { file: '_voice-sheet.html', out: 'wl-voice-out', what: '每句旁白 都有錄音' }
+  { file: '_voice-sheet.html', out: 'wl-voice-out', what: '每句旁白 都有錄音' },
+  { file: '_karaoke-check.html', out: 'wl-karaoke-out', what: '旁白嘅句子 喺步驟卡上面逐句亮' }
 ];
 
 const CHROME = [

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — are the words shown where they are written?
+
+  The guide used to say a step and, at the same time, write the same sentence again over the bottom
+  of the stage. Two copies of one sentence, and one of them laid across the very thing being
+  described. The words are already in the step card, so the card is where the sentence is lit as it
+  is spoken, and the strip over the stage is a fallback for a host with nowhere else to put them.
+
+  This page proves three things on the real page:
+    the card is split into the sentences the voice is speaking — the same words, not a paraphrase
+    exactly one of them is lit at a time, and the lit one moves as the voice moves
+    no strip over the stage is ever created: the sentence is shown once, not twice
+
+  The voice here is the browser's own, not the baked clips: a clip plays in real time, and a page
+  read on a virtual clock would find the narration over before the first poll. The stub speaks one
+  sentence at a time and says when it is done, so the order the sentences arrive in is the order
+  under test. What the baked clips carry is the same cue track, checked by tools/check_guide.mjs.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-karaoke-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>karaoke check</title>
+<style>html,body{margin:0}iframe{width:100%;height:78vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-karaoke-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-karaoke-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+
+  var TOPIC = 'basics';
+  var STEP = 'b1';
+
+  var guide = null;
+  var seen = { lit: [], max: 0, strips: 0, spans: 0, said: '' };
+
+  function spans() {
+    if (!guide) return [];
+    return Array.prototype.slice.call(guide.el.querySelectorAll('.wl-g-say'));
+  }
+  function lit() {
+    return spans().filter(function (s) { return /(^|\s)is-said(\s|$)/.test(s.className); });
+  }
+  function strips() { return doc().querySelectorAll('.wl-sub').length; }
+  /* the body on its own: the card holds the heading too, and the heading is not the copy */
+  function bodySpans() {
+    if (!guide) return [];
+    return Array.prototype.slice.call(guide.el.querySelectorAll('.wl-g-cbody .wl-g-say'));
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading || !w.StudioGuideDrive || !w.StudioGuide ||
+        !w.StudioGuideVoice) {
+      if (tries < 80) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+    run();
+  }());
+
+  function run() {
+    var w = win();
+
+    /* The browser's voice, stubbed: one sentence at a time, each announced when it is done. */
+    var stub = {
+      speak: function (u) { setTimeout(function () { if (u.onend) u.onend(); }, 300); },
+      cancel: function () {},
+      getVoices: function () { return []; },
+      addEventListener: function () {}
+    };
+    try { Object.defineProperty(w, 'speechSynthesis', { value: stub, configurable: true }); } catch (e) { }
+    w.SpeechSynthesisUtterance = function (text) { this.text = text; };
+
+    var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
+    var drive = w.StudioGuideDrive.create({
+      i18n: w.StudioI18n, marks: function () { return marks; }, sound: function () { return false; }
+    });
+    /* a base that is not there: no baked clip, so the voice speaks through the browser — which is
+       the path a line with no recording takes anyway */
+    var voice = w.StudioGuideVoice.create({ i18n: w.StudioI18n, base: 'assets/voice-none/' });
+
+    guide = w.StudioGuide.create({
+      i18n: w.StudioI18n,
+      topics: (w.StudioGuideLessons || []).concat(w.StudioGuideRefs || [], w.StudioGuideTopics || []),
+      prepare: function (s, t) { return drive.prepare(s, t); },
+      explain: function (s, sync) { drive.explain(s, sync); },
+      perform: function (s, onProgress, sync) { return drive.perform(onProgress, sync); },
+      stop: function () { drive.stop(); marks.clear(); },
+      restore: function () { return drive.restore(); },
+      isActive: function () { return drive.isActive(); },
+      canRun: function () { return true; },
+      narrate: function (keys, opts) { return voice.narrate(keys, opts); },
+      hush: function () { voice.stop(); },
+      voice: function () { return true; }
+    });
+
+    var shelf = (w.StudioGuideLessons || []).concat(w.StudioGuideRefs || [], w.StudioGuideTopics || []);
+    var topic = shelf.filter(function (t) { return t.id === TOPIC; })[0];
+    var at = topic ? topic.steps.map(function (s) { return s.id; }).indexOf(STEP) : -1;
+    if (!topic || at < 0) { log('RESULT FAIL: no step ' + TOPIC + '/' + STEP); return; }
+
+    guide.open(TOPIC, at);
+    var btn = guide.el.querySelector('.wl-g-demo');
+    if (!btn) { log('RESULT FAIL: ' + TOPIC + '/' + STEP + ' has no 示範 button'); return; }
+
+    /* the copy as the guide writes it, to compare the card against */
+    var copy = String(w.StudioI18n.t('guide.' + TOPIC + '.' + STEP + '.body') || '');
+    var flat = function (s) { return String(s).replace(/\s+/g, ''); };
+
+    btn.click();
+
+    var poll = setInterval(function () {
+      /* the card is repainted when the step ends, so what the card held is remembered while it
+         is there: the sentences and what they say */
+      var body = bodySpans();
+      if (body.length > seen.spans) {
+        seen.spans = body.length;
+        seen.said = body.map(function (s) { return s.textContent; }).join('');
+      }
+      var l = lit();
+      if (l.length > seen.max) seen.max = l.length;
+      var st = strips();
+      if (st > seen.strips) seen.strips = st;
+      if (l.length) {
+        var index = spans().indexOf(l[0]);
+        if (seen.lit.indexOf(index) < 0) seen.lit.push(index);
+      }
+      /* the step is over when the button is live again: the guide keeps it disabled while it runs.
+         The button is looked up again each time — the guide repaints the card when the step starts,
+         so the one that was clicked is no longer the one in the page. */
+      var live = guide.el.querySelector('.wl-g-demo');
+      if (live && !live.disabled && seen.lit.length) {
+        clearInterval(poll);
+        finish(copy, flat);
+      }
+    }, 100);
+
+    function finish(copy, flat) {
+      var problems = [];
+      if (seen.spans < 2) problems.push('the card was not split into sentences (' + seen.spans + ')');
+      if (flat(seen.said) !== flat(copy)) problems.push('the card says something else than the copy');
+      if (seen.max > 1) problems.push('more than one sentence was lit at a time (' + seen.max + ')');
+      if (seen.lit.length < 2) problems.push('the lit sentence never moved (' + seen.lit.length + ' seen)');
+      if (seen.strips) problems.push('a strip over the stage was created (' + seen.strips + ')');
+      log('  sentences in the card: ' + seen.spans);
+      log('  sentences lit, in order: ' + seen.lit.join(', '));
+      log('  strips over the stage: ' + seen.strips);
+      if (problems.length) {
+        problems.forEach(function (p) { log('  FAIL ' + p); });
+        log('RESULT FAIL');
+        return;
+      }
+      log('RESULT PASS');
+    }
+  }
+}());
+</script>
+</body>
+</html>

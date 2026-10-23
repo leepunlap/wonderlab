@@ -195,13 +195,27 @@ for (const [id] of LOCALES) {
   let sentences = 0, steps = 0;
   for (const t of topics) {
     for (const s of t.steps || []) {
-      const clip = VOICE.clips[`guide.${t.id}.${s.id}.body|${id}`];
-      if (!clip) { bad.push(`${t.id}/${s.id}: no clip`); continue; }
-      const cues = (clip.cues || []).slice().sort((a, b) => a.t - b.t);
-      if (!cues.length) { bad.push(`${t.id}/${s.id}: one long unreachable sentence`); continue; }
-      steps++;
-      sentences += cues.length;
-      if (cues[0].t >= clip.ms) bad.push(`${t.id}/${s.id}: first sentence starts after the clip ends`);
+      /* The heading is spoken too, and it is spoken as sentences of its own: the card shows the
+         sentence being said, so the sentences have to be the ones the card is made of. */
+      for (const part of ['title', 'body']) {
+        const key = `guide.${t.id}.${s.id}.${part}`;
+        const clip = VOICE.clips[`${key}|${id}`];
+        if (!clip) { bad.push(`${t.id}/${s.id}: no clip for the ${part}`); continue; }
+        const cues = (clip.cues || []).slice().sort((a, b) => a.t - b.t);
+        if (!cues.length) { bad.push(`${t.id}/${s.id}: one long unreachable sentence`); continue; }
+        if (part === 'body') {
+          steps++;
+          sentences += cues.length;
+          if (cues[0].t >= clip.ms) bad.push(`${t.id}/${s.id}: first sentence starts after the clip ends`);
+        }
+        /* the sentences the voice speaks and the line on the card have to be the same words: the
+           card is split along them, and a line the voice says differently cannot be highlighted */
+        const said = cues.map((c) => c.s || '').join('').replace(/\s+/g, '');
+        const line = String((dicts[id] || {})[key] || '').trim().replace(/\s+/g, '');
+        if (said !== line) {
+          bad.push(`${t.id}/${s.id} ${part}: the voice's sentences do not add up to the line`);
+        }
+      }
     }
   }
   check(`${id}: every step's body is spoken in sentences the picture can follow`, bad.length === 0,
