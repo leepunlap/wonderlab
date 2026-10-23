@@ -53,7 +53,8 @@ const VOICE = JSON.parse(readFileSync(join(SRC, 'assets/voice/manifest.json'), '
    that table by hand — a name the table does not have is a mark that is never drawn, which is why the
    check exists. */
 const REGIONS = new Set(['flag', 'stage', 'sprites', 'palette', 'flyout', 'flyout:first', 'workspace', 'toolbar',
-  'addSprite', 'addBackdrop', 'library', 'stop', 'stageSize', 'stageHeader', 'tabs', 'spriteInfo', 'chatTabs']);
+  'addSprite', 'addBackdrop', 'library', 'stop', 'stageSize', 'stageHeader', 'tabs', 'spriteInfo',
+  'spriteX', 'spriteY', 'chatTabs']);
 const SHAPES = new Set(['square', 'circle']);
 const KINDS = new Set(['lesson', 'ref', 'basic']);
 /* The library is outside this repo, so a missing file is a skip, not a failure: what it guards is

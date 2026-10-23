@@ -75,6 +75,10 @@ const VOCAB = {
   addSprite: /加角色|新增角色|add a sprite|add sprite|貓仔圖案|猫仔图案/i,
   addBackdrop: /背景庫|背景库|backdrop library|揀背景|选背景|choose a backdrop|加背景/i,
   spriteInfo: /\bx\b|\by\b|座標|坐标|position numbers/i,
+  /* the two boxes themselves, not the row they sit in: the sentence that says "x and y" is talking
+     about two specific little boxes, and a ring round the whole row does not say which two */
+  spriteX: /\bx\b|座標|坐标|position numbers/i,
+  spriteY: /\by\b|座標|坐标|position numbers/i,
   /* 分頁, not 造型: 「揀啱造型」 in a lesson about costumes is a costume, not the Costumes tab, and a
      rule that cannot tell the two apart fires on every lesson that mentions a costume. */
   tabs: /分頁|分页|costumes? tab|sounds? tab|\btabs?\b/i,
@@ -223,6 +227,19 @@ for (const t of topics) {
             failures++;
             bad.push(`  ${t.id}/${s.id} [${locale}] cue ${cue} — says “${clamp(text)}”, which acts on ${acted.join('/')}, but the ring is on ${keys.join('+')}`);
           }
+        }
+
+        /* RULE 4 — a ring on one of the two little boxes has to be on a sentence that names it.
+           The x and y boxes are the smallest things the guide rings, and the row they sit in is too
+           wide for the ring to say which of the two it means: a ring on the x box under a sentence
+           about the y points at the wrong number. This is the rule that was missing when the copy
+           said "x and y" and the ring was round the whole row, and the student was left looking for
+           two boxes nobody had shown them. */
+        for (const k of keys) {
+          if (k !== 'spriteX' && k !== 'spriteY') continue;
+          if (VOCAB[k].test(clean)) continue;
+          failures++;
+          bad.push(`  ${t.id}/${s.id} [${locale}] cue ${cue} — the ring is on ${k}, but the sentence says “${clamp(text)}”`);
         }
       }
     }
