@@ -172,8 +172,19 @@ export function buildCost(scripts) {
     top += c.top; nested += c.nested;
     sprites.add(s.sprite || '');
   });
+  if (!top && !nested) return 0;
   const switches = Math.max(0, sprites.size - 1);
   return Math.min(14000, 400 + top * 850 + nested * 480 + switches * 700);
+}
+
+/** The state each script ends in: a step may list one script twice, the second grown. */
+export function lastState(scripts) {
+  const out = [];
+  (scripts || []).forEach((s) => {
+    const i = out.findIndex((o) => o.sprite === s.sprite && o.id === s.id);
+    if (i >= 0) out[i] = s; else out.push(s);
+  });
+  return out;
 }
 
 /**
@@ -200,15 +211,39 @@ export function slotsOf(step) {
     });
   }
   if (scripts.length) {
-    const b = buildCost(scripts) + COST.settle.base;
-    slots.push({ what: 'build ' + scripts.length + ' script(s)', base: b, floor: b, gate: beat++ });
+    /* A script can be listed twice, the second grown, and perform() builds one group per `cue`:
+       the copy gets its blocks sentence by sentence instead of all at once. So does the model —
+       one slot per group, each waiting for the sentence it belongs to, and each costing only the
+       blocks that are new (the grown entry restates the whole stack, the hand drags the rest). */
+    const groups = new Map();
+    scripts.forEach((s) => {
+      const c = Math.max(0, (s && s.cue) | 0);
+      if (!groups.has(c)) groups.set(c, []);
+      groups.get(c).push(s);
+    });
+    const order = [...groups.keys()].sort((a, b) => a - b);
+    let have = [];
+    order.forEach((c) => {
+      const g = groups.get(c);
+      const was = buildCost(have);
+      have = lastState(have.concat(g));
+      const b = Math.max(0, buildCost(have) - was) + COST.settle.base;
+      /* perform() spends a beat per group, on the sentence it names or on the next free one. */
+      beat = Math.max(c, beat);
+      slots.push({ what: 'build ' + g.length + ' script(s)', base: b, floor: b, gate: beat++ });
+    });
   }
   /* `run` is the payoff, not an explanation: the program is meant to be watched after the last
      word has landed, so it is on the timeline but not in the demand. The walk to the flag is the
      opposite — it is the last thing the lesson has to show — so it stays in the demand. */
   if (d.run) {
-    slots.push({ what: 'walk to the flag', base: COST.flag.base, floor: COST.flag.floor, gate: beat });
-    slots.push({ what: 'run the program', base: d.run, floor: d.run, gate: beat++, run: true });
+    /* `runAt`: the press belongs to the sentence that names it. When the blocks were built under
+       that same sentence the press does not wait again — it happens, so the model gives it no gate
+       of its own and it starts when the last block lands. */
+    const gate = d.runAt == null ? beat : (d.runAt < beat ? null : d.runAt);
+    slots.push({ what: 'walk to the flag', base: COST.flag.base, floor: COST.flag.floor, gate: gate });
+    slots.push({ what: 'run the program', base: d.run, floor: d.run, gate: gate, run: true });
+    beat = Math.max(beat + 1, d.runAt == null ? 0 : d.runAt + 1);
   }
   (d.keys || []).forEach((k) => {
     slots.push({ what: 'press ' + k, base: COST.key.base, floor: COST.key.floor, gate: beat++ });

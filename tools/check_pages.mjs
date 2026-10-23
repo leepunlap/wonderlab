@@ -31,7 +31,13 @@ const PAGES = [
   { file: '_library-check.html', out: 'wl-lib-out', what: '角色庫 的縮圖' },
   { file: '_import-check.html', out: 'wl-import-out', what: '指着加號、走進角色庫' },
   { file: '_sync-check.html', out: 'wl-sync-out', what: '畫面跟着旁白的句子走' },
-  { file: '_pace-check.html', out: 'wl-pace-out', what: '示範趕得上旁白的時間' },
+  { file: '_grow-check.html', out: 'wl-grow-out', what: '程式跟住句子一齊長' },
+  /* 800x600, the size it was written for: this is the one page that measures milliseconds, and a
+     headless browser measures them on a virtual clock that the software renderer inflates with every
+     frame it draws — at 1440x900 the same step reads 42s slower, which is SwiftShader, not pacing.
+     The arithmetic that decides whether a step fits its narration is tools/check_pace.mjs, in
+     npm run check; this page answers "is the shape right". */
+  { file: '_pace-check.html', out: 'wl-pace-out', what: '示範趕得上旁白的時間', size: '800,600' },
   { file: '_voice-sheet.html', out: 'wl-voice-out', what: '每句旁白 都有錄音' }
 ];
 
@@ -49,12 +55,18 @@ function die(msg) {
 
 if (!CHROME) die('找不到 Chrome：把路徑加進 tools/check_pages.mjs 的 CHROME。');
 
-async function dump(file) {
+async function dump(file, size) {
   const url = `http://127.0.0.1:${PORT}/${file}`;
   /* No --disable-gpu: the editor refuses to draw without WebGL and puts a dialog over the gui, which
      then swallows the clicks these checks are made of. SwiftShader is the software renderer. */
+  /* --no-proxy-server: a shell that exports HTTP_PROXY makes Chrome send 127.0.0.1 to the proxy, and
+     the page then never loads — which reads exactly like "the editor never booted". The studio is
+     local; nothing here needs to leave the machine.
+     --window-size: headless defaults to 800x600, narrower than the editor's own minimum layout, and
+     at that width the add-sprite button is off the right edge — a step about pressing it then has
+     nothing to point at, which is a window too small, not a guide that is wrong. */
   const { stdout } = await run(CHROME, [
-    '--headless=new', '--no-sandbox', '--noproxy-server',
+    '--headless=new', '--no-sandbox', '--no-proxy-server', '--window-size=' + (size || '1440,900'),
     '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--virtual-time-budget=900000', '--dump-dom', url
   ], { maxBuffer: 64 * 1024 * 1024 });
@@ -66,7 +78,7 @@ async function dump(file) {
   for (const p of PAGES) {
     let html;
     try {
-      html = await dump(p.file);
+      html = await dump(p.file, p.size);
     } catch (e) {
       console.error(`✗ ${p.what} — 開不到 ${p.file}（伺服器在 ${PORT} 嗎？）: ${e.message}`);
       failed++;

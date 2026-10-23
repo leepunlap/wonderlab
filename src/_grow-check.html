@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does the program grow while the copy is asking for it?
+
+  The first step of the Tutorial reads "the pointer drags two blocks out of the palette … add three
+  more blocks, press the green flag". It used to stack all five in one go, under the first sentence:
+  the picture was finished ten seconds early and the student watched a completed program while being
+  told it was still being built — the hand sat still and the voice talked over nothing.
+
+  The fix is that a step may list the same script twice, the second grown, each entry carrying the
+  sentence it waits for (`cue`). This page checks that on the real page.
+
+  HOW IT CAN BE CHECKED WITHOUT A CLOCK
+  The obvious test — "sentence two is at 12s, so the five blocks must appear after 12s" — needs a
+  clock the browser does not give you: headless Chrome runs on virtual time, so timers fire at once
+  and every millisecond measured is meaningless. Instead the test *holds the narration back*: the
+  clock only reaches a sentence when this page releases it, and what is checked is the order things
+  happen in, which no clock can distort.
+
+    1. sentence 0 released   → nothing is built (the blocks area is ringed, and that is all)
+    2. sentence 1 released   → two blocks appear, and stay two — this is the defect
+    3. sentence 2 released   → the other three appear, and the green flag is pressed
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages
+  Read #wl-grow-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>grow check</title>
+<style>html,body{margin:0}iframe{width:100%;height:78vh;border:0}pre{margin:0;padding:8px;font:12px/1.5 monospace;white-space:pre-wrap}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-grow-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-grow-out');
+  function log(s) { out.textContent += '\n' + s; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frame() { return document.getElementById('app'); }
+  function win() { return frame().contentWindow; }
+  function doc() { return frame().contentDocument; }
+
+  /* The narration this test hands over. `released` is the last sentence the demonstration is
+     allowed to have heard; nothing here depends on when a sentence would really have been spoken. */
+  var released = -1, waiters = [];
+  function release(i) {
+    if (i > released) released = i;
+    var keep = [];
+    waiters.forEach(function (w) { if (w.i <= released) w.res(true); else keep.push(w); });
+    waiters = keep;
+  }
+  var clock = {
+    spoken: true,
+    cues: [{ t: 0, text: 'zero' }, { t: 1, text: 'one' }, { t: 2, text: 'two' }, { t: 3, text: 'three' }],
+    ended: new Promise(function () {}),      // the test ends the step, not the clock
+    at: function (i) {
+      if (i <= released) return Promise.resolve(true);
+      return new Promise(function (res) { waiters.push({ i: i, res: res }); });
+    }
+  };
+
+  var seen = { blocks: 0, ring: null, run: null };
+
+  /** Blocks on the canvas right now, in the VM rather than in the DOM: the DOM is the animation. */
+  function blocks() {
+    try {
+      var p = win().WLStudio.ops().snapshot(win().WLStudio.vm).program;
+      var holders = [p.stage];
+      Object.keys(p.sprites || {}).forEach(function (k) { holders.push(p.sprites[k]); });
+      var n = 0;
+      holders.forEach(function (h) {
+        if (!h || !h.scripts) return;
+        Object.keys(h.scripts).forEach(function (id) { n += (h.scripts[id] || []).length; });
+      });
+      return n;
+    } catch (e) { return -1; }
+  }
+
+  /** The program is running: the green flag has been pressed. */
+  function running() {
+    try { return win().WLStudio.vm.runtime.threads.length > 0; } catch (e) { return false; }
+  }
+
+  /** Wait until `ok()` is true. Virtual time makes short of long, so the caps are generous. */
+  function until(ok, ms) {
+    var left = ms || 200000;
+    return new Promise(function (res) {
+      (function poll() {
+        if (ok()) return res(true);
+        if (left <= 0) return res(false);
+        left -= 40;
+        setTimeout(poll, 40);
+      }());
+    });
+  }
+
+  var tries = 0;
+  (function boot() {
+    tries++;
+    var w = win(), S = w && w.WLStudio;
+    var loading = S && typeof S.isLoading === 'function' ? S.isLoading() : false;
+    if (!S || !S.vm || !S.vm.runtime.targets.length || loading || !w.StudioGuideDrive || !w.StudioGuide) {
+      if (tries < 60) return setTimeout(boot, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+
+    var topic = (w.StudioGuideTopics || []).filter(function (t) { return t.id === 'basics'; })[0];
+    var step = topic && (topic.steps || []).filter(function (s) { return s.id === 'b1'; })[0];
+    if (!step || !step.demo || !(step.demo.scripts || []).length) {
+      log('RESULT FAIL: basics/b1 is not in the guide data');
+      return;
+    }
+    /* the step has to grow for this test to mean anything */
+    var cues = {};
+    (step.demo.scripts || []).forEach(function (s) { cues[(s && s.cue) || 0] = (s.blocks || []).length; });
+    var grew = Object.keys(cues).length > 1;
+
+    var marks = w.StudioGuideMarks.create({ i18n: w.StudioI18n });
+    var drive = w.StudioGuideDrive.create({
+      i18n: w.StudioI18n, marks: function () { return marks; }, sound: function () { return false; }
+    });
+
+    var guide = w.StudioGuide.create({
+      i18n: w.StudioI18n,
+      topics: [topic],
+      prepare: function (s, t) { return drive.prepare(s, t); },
+      explain: function (s, sync) { drive.explain(s, sync); },
+      perform: function (s, onProgress, sync) { return drive.perform(onProgress, sync); },
+      stop: function () { drive.stop(); marks.clear(); },
+      restore: function () { return drive.restore(); },
+      isActive: function () { return drive.isActive(); },
+      canRun: function () { return true; },
+      narrate: function () { return Promise.resolve(clock); },
+      hush: function () {},
+      voice: function () { return true; }
+    });
+
+    log('the step builds ' + (step.demo.scripts || []).map(function (s) {
+      return (s.blocks || []).length + ' block(s) on sentence ' + ((s && s.cue) || 0);
+    }).join(', then ') + (grew ? '' : ' — NOT GROWN'));
+
+    guide.open('basics', topic.steps.indexOf(step));
+    var btn = guide.el.querySelector('.wl-g-demo');
+    if (!btn) { log('RESULT FAIL: the step has no 示範 button'); return; }
+    btn.click();
+
+    var silent = null, two = null, stayed = null, five = null, ran = null;
+
+    /* 1 — the first sentence names the blocks area, and no block is dragged yet */
+    release(0);
+    until(function () { return doc().querySelectorAll('.wl-mark.is-on').length > 0; }, 40000)
+      .then(function (rung) {
+        seen.ring = !!rung;
+        return until(function () { return blocks() > 0; }, 30000);
+      })
+      .then(function (built) {
+        silent = !built;
+        log('  after sentence 0: ' + blocks() + ' block(s)' + (seen.ring ? ', the blocks area is ringed' : ', no ring'));
+
+        /* 2 — the sentence that asks for two gets two, and only two */
+        release(1);
+        return until(function () { return blocks() >= 2; }, 200000);
+      })
+      .then(function (got) {
+        two = got && blocks() === 2;
+        log('  after sentence 1: ' + blocks() + ' block(s)');
+        /* the defect was five here: give the hand every chance to run ahead of the words */
+        return wait(20000).then(function () { return blocks(); });
+      })
+      .then(function (n) {
+        stayed = n === 2;
+        log('  20s later, still on sentence 1: ' + n + ' block(s)');
+
+        /* 3 — the sentence that asks for three more gets them, and the flag is pressed on it */
+        release(2);
+        return until(function () { return blocks() >= 5; }, 200000);
+      })
+      .then(function (got) {
+        five = got;
+        log('  after sentence 2: ' + blocks() + ' block(s)');
+        return until(running, 200000);
+      })
+      .then(function (got) {
+        ran = got;
+        log('  the program ran on sentence 2: ' + (ran ? 'yes' : 'no'));
+        log('  blocks at the end: ' + blocks());
+        finish();
+      });
+
+    function finish() {
+      log('  sentence 0 built nothing: ' + (silent ? 'yes' : 'NO — ' + blocks() + ' block(s) appeared early'));
+      log('  sentence 1 built exactly two: ' + (two ? 'yes' : 'NO — ' + blocks()));
+      log('  the stack stayed at two until sentence 2: ' + (stayed ? 'yes' : 'NO — it went to ' + blocks()));
+      log('  sentence 2 built the other three: ' + (five ? 'yes' : 'NO — ' + blocks() + ' block(s)'));
+      log('  the flag was pressed, not saved for later: ' + (ran ? 'yes' : 'NO — the program never ran'));
+
+      log(silent && two && stayed && five && ran && grew && seen.ring ? 'RESULT PASS' : 'RESULT FAIL');
+    }
+  }());
+}());
+</script>
+</body>
+</html>

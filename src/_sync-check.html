@@ -176,7 +176,10 @@
       log('  the baked clips give the body ' + (planInfo.ready ? planInfo.body + ' sentence(s), first at ' +
           planInfo.at + 'ms' : 'no timeline') + (planInfo.ok ? ' — usable' : ' — UNUSABLE'));
 
-      var ringOk = seen.ringAt !== null && seen.ringAt >= CUE0 - 120 && seen.ringAt <= CUE0 + 600;
+      /* the ring is drawn when the hand has arrived, and the walk across the screen to the plus is
+         about 600ms of its own: what is being tested is that it lands on sentence 0 — not before the
+         sentence, and not after the plus has already been pressed */
+      var ringOk = seen.ringAt !== null && seen.ringAt >= CUE0 - 120 && seen.ringAt <= CUE0 + 1200;
       /* the plus must come after the sentence that names it, and long before the last word */
       var plusOk = !!plus && plus.t >= CUE0 - 60 && plus.t <= CUE0 + 2200;
       /* the walk follows the library opening, not the sentence that names the actors: present tense

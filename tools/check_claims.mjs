@@ -66,10 +66,24 @@ function ops(blocks, into) {
 }
 const hasOp = (list, p) => list.some((o) => o === p || o.indexOf(p) === 0);
 
+/**
+ * The state each script ends in: a step may list one script twice, the second entry being the same
+ * stack grown on a later sentence (`cue`). Counting both would count the shared blocks twice, and
+ * the copy's "two blocks, then three more" would be held against seven.
+ */
+function lastState(scripts) {
+  const out = [];
+  (scripts || []).forEach((s) => {
+    const i = out.findIndex((o) => o.sprite === s.sprite && o.id === s.id);
+    if (i >= 0) out[i] = s; else out.push(s);
+  });
+  return out;
+}
+
 function facts(demo) {
   const f = { blocks: 0, ops: [], sprites: 0, runs: false, stops: false, movesteps: null };
   if (!demo) return f;
-  (demo.scripts || []).forEach((s) => {
+  lastState(demo.scripts).forEach((s) => {
     const list = ops(s.blocks);
     f.blocks += list.length;
     list.forEach((o) => f.ops.push(o));
