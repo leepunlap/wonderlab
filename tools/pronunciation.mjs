@@ -21,6 +21,13 @@ export const MISREAD = [
     locales: ['zh-Hant', 'zh-Hans'],
     fix: { 'zh-Hant': '重複', 'zh-Hans': '重复' },
     note: 'read as 重 (heavy) 做; 重複/重复 is read correctly and is the word the guide already uses for the loop'
+  },
+  {
+    word: '撳',
+    locales: ['zh-Hant'],
+    fix: { 'zh-Hant': '按' },
+    note: 'the Cantonese for press (gam6); the voice reads the character as Mandarin and the sentence ' +
+          'comes out sounding like a misprint. 按 is what the rest of the copy already says for the same act'
   }
 ];
 
