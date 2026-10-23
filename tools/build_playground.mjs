@@ -29,10 +29,12 @@ const log = (...a) => console.log('[playground-build]', ...a);
 
 /* The gate. A guide whose sentence disagrees with its own demonstration — "the pointer drags two
    blocks out" over a stack of five — builds perfectly and ships, and the person who finds it is a
-   teacher looking at the screen. So the three content checks run before anything is copied; they
-   take about two seconds, and SKIP_CHECKS=1 is there for the day one of them is wrong. */
+   teacher looking at the screen. So is a guide whose ring is on the stage while the voice is naming
+   the blocks and the green flag, which is the same mistake one layer out: the words and the picture
+   are one thing, and both are checked before anything is copied. SKIP_CHECKS=1 is there for the day
+   one of them is wrong. */
 if (!process.env.SKIP_CHECKS) {
-  for (const tool of ['check_guide.mjs', 'check_claims.mjs', 'check_pace.mjs']) {
+  for (const tool of ['check_guide.mjs', 'check_claims.mjs', 'check_marks.mjs', 'check_pace.mjs']) {
     try {
       execFileSync(process.execPath, [path.join(ROOT, 'tools', tool)], { stdio: 'pipe' });
       log('check ok  ' + tool);
