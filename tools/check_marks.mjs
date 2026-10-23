@@ -75,7 +75,9 @@ const VOCAB = {
   addSprite: /加角色|新增角色|add a sprite|add sprite|貓仔圖案|猫仔图案/i,
   addBackdrop: /背景庫|背景库|backdrop library|揀背景|选背景|choose a backdrop|加背景/i,
   spriteInfo: /\bx\b|\by\b|座標|坐标|position numbers/i,
-  tabs: /造型|聲音分頁|声音分页|costumes? tab|sounds? tab|程式同造型|分頁|分页/i,
+  /* 分頁, not 造型: 「揀啱造型」 in a lesson about costumes is a costume, not the Costumes tab, and a
+     rule that cannot tell the two apart fires on every lesson that mentions a costume. */
+  tabs: /分頁|分页|costumes? tab|sounds? tab|\btabs?\b/i,
   stageSize: /縮細|缩小|放大舞台|stage size|全螢幕|全屏/i,
   stageHeader: /舞台上方|舞台頂|stage header|上面嗰排|上面那排/i,
   library: /角色庫|角色库|背景庫|背景库|library/i,
@@ -103,7 +105,12 @@ const ACT_NEAR = 3;   // the verb has to hold the control: 「撳綠旗」 yes, 
    stage-size toggle are one row above the stage. */
 const FAMILY = {
   palette: 'blocks', flyout: 'blocks',
-  flag: 'header', stop: 'header', stageHeader: 'header', stageSize: 'header'
+  flag: 'header', stop: 'header', stageHeader: 'header', stageSize: 'header',
+  /* The list, the button at its corner and the library behind it are one act: "press the cat icon
+     and pick one from the library" is answered by a ring on any of the three, and a sentence can
+     name the list and the library in the same breath. */
+  sprites: 'casting', addSprite: 'casting', library: 'casting',
+  addBackdrop: 'backdrop'
 };
 const familyOf = (k) => FAMILY[k] || k;
 
@@ -141,6 +148,38 @@ function sentences(topic, step, locale) {
   return body.split(/(?<=[。；;！!？?])/).map((s) => s.trim()).filter(Boolean);
 }
 
+/**
+ * The controls the guide can ring or press *by name*. Deliberately shorter than VOCAB above: a
+ * sentence about blocks says 積木 and 拖 in every other line, and demanding a ring every time would
+ * drown the real failures. These are the six things a student is told to touch and then goes looking
+ * for — and the ones that have shipped wrong (x/y ringed while the words said "top-left", a step
+ * telling the reader to press 「加角色」 with the ring a sentence early).
+ */
+const TARGET = {
+  flag: VOCAB.flag,
+  stop: VOCAB.stop,
+  addSprite: VOCAB.addSprite,
+  addBackdrop: VOCAB.addBackdrop,
+  tabs: VOCAB.tabs,
+  stageSize: VOCAB.stageSize
+};
+
+/** `sprite:@pico` is a press inside the sprite list; `tab:1` inside the tab row. */
+function tapKey(at) {
+  const s = String(at || '');
+  if (s.indexOf('sprite:') === 0) return 'sprites';
+  if (s.indexOf('tab:') === 0) return 'tabs';
+  if (s.indexOf('chat:') === 0) return 'chatTabs';
+  if (s.indexOf('stageSize:') === 0) return 'stageSize';
+  if (s.indexOf('cat:') === 0) return 'palette';
+  if (s.indexOf('menu:') === 0) return 'toolbar';
+  return s;
+}
+
+/* "pressing it will not do anything" — the claim is the absence of an effect, so the picture is
+   allowed to be the absence of a press. Same wording as check_claims' NEGATED. */
+const NOTHING = /(?:唔|不|未|沒|没)[會会動动郁]|不會動|不会动|won'?t (?:move|do)|does(?:n'?t| not) (?:move|run)|nothing happens/i;
+
 const clamp = (line) => (line.length > 42 ? line.slice(0, 42) + '…' : line);
 
 let failures = 0, marks = 0, groups = 0;
@@ -173,6 +212,7 @@ for (const t of topics) {
         }
         const keys = group.map((m) => anchorKey(m.at));
         const clean = plain(text);
+        if (NOTHING.test(clean)) continue;      // "pressing it will not do anything" owes no press
         const controls = Object.keys(VOCAB).filter((k) => VOCAB[k].test(clean));
 
         /* the rule — a sentence that tells the reader to touch something rings that something */
@@ -189,7 +229,49 @@ for (const t of topics) {
   }
 }
 
+/**
+ * RULE 3 — a sentence that tells the reader to touch a named control is answered at that sentence,
+ * by a ring on it or by the press itself.
+ *
+ * This is the rule that was missing when the Tutorial rang the whole stage during "top-left you see
+ * x and y" and when it said 「撳右上角嗰個「加角色」掣」 with the ring drawn a sentence earlier: the
+ * ring existed, it was simply in the wrong beat, and rule 2 could not see it because rule 2 only
+ * looks at the cues that already have a ring.
+ *
+ * A mark is not the only honest answer — a step that opens the sprite picker at the sentence which
+ * names the button has already shown it — so a `taps` entry at the same cue counts too.
+ */
+let late = 0;
+for (const t of topics) {
+  for (const s of (t.steps || [])) {
+    const demo = s.demo || {};
+    const said = ((demo.annotate) || []).filter((m) => m && (m.when || 'say') === 'say');
+    const pressed = demo.taps || [];
+    for (const [locale] of LOCALES) {
+      const lines = sentences(t, s, locale);
+      lines.forEach((text, cue) => {
+        const clean = plain(text);
+        /* 「撳綠旗都未會郁」 names a press whose only outcome is nothing. A step shows that by
+           building and stopping, not by pressing — check_claims holds the same line — so a negated
+           sentence is not owed a press. */
+        if (NOTHING.test(clean)) return;
+        const acted = Object.keys(TARGET).filter((k) => near(clean, new RegExp(TARGET[k].source, 'gi')));
+        if (!acted.length) return;
+        const want = new Set(acted.map(familyOf));
+        const ringed = said.some((m) => Math.max(0, m.cue | 0) === cue &&
+          want.has(familyOf(anchorKey(m.at))));
+        const tapped = pressed.some((o) => Math.max(0, (o && o.cue) | 0) === cue &&
+          want.has(familyOf(tapKey(o.at))));
+        if (ringed || tapped) return;
+        late++;
+        bad.push(`  ${t.id}/${s.id} [${locale}] cue ${cue} — says “${clamp(text)}”, which acts on ${acted.join('/')}, but nothing happens there at that sentence`);
+      });
+    }
+  }
+}
+
 console.log(`[marks] ${marks} mark(s) across ${groups} sentence group(s), read in ${LOCALES.length} languages`);
+if (late) failures += late;
 if (failures) {
   console.log(bad.join('\n'));
   console.log(`\n[marks] FAIL — ${failures} ring(s) pointing away from what is being said`);

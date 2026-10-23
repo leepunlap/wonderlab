@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<!--
+  Wonder Lab Studio — does the guide point at things that are actually on the screen?
+
+  Two faults keep coming back, and both are invisible in the data:
+
+  1. A REGION KEY THAT NO LONGER EXISTS. `stageSize` meant `stage-size-toggle-group`, which is stock
+     scratch-gui; this build renders three plain buttons in a `stage-size-row`, so the selector matched
+     nothing and 「撳縮細試下」 was a step with no press in it. Nothing failed: a tap whose target is
+     missing is skipped on purpose (a missed tap says a little less, a wrong click breaks the step).
+
+  2. A PLACE THE COPY NAMES THAT THE RING IS NOT ON. The Tutorial said 「舞台左上角有兩個數（x 同 y）」
+     while x and y sit in the row UNDER the stage, and said the add-sprite button was at the top-right
+     of the sprite list when it is at the bottom-right. A corner is a claim about a rectangle, so this
+     page measures the rectangle: when a sentence names a corner of the stage, the ring drawn for that
+     sentence has to be inside the stage it names.
+
+  Run it:
+      WL_LIBRARY=<lab-library> python3 server/studio_server.py --port 8920
+      npm run check:pages            (or open /_region-check.html)
+  Read #wl-region-out; the last line is RESULT PASS or RESULT FAIL.
+
+  Copyright (C) 2026 IITS (工信學堂（香港）). Licensed under the GNU Affero General Public License v3.0 only.
+-->
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>region check</title>
+<style>html,body{margin:0}iframe{width:100%;height:82vh;border:0}pre{margin:0;padding:8px;font:13px/1.5 monospace}</style>
+</head>
+<body>
+<iframe id="app" src="index.html"></iframe>
+<pre id="wl-region-out">START</pre>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('wl-region-out');
+  function log(s) { out.textContent += '\n' + s; }
+
+  /* Targets that only exist while a step is running (a field inside a block that is being dragged in,
+     a sprite the step adds, the library once it is open) are not checked here: this page asks whether
+     the constant furniture of the editor is where the guide thinks it is. */
+  /* `[...]` is a raw selector for something that exists only while the step runs — the File menu is
+     ringed while it is open, and it is not open at boot. */
+  var STATE_ONLY = /^(field:|sprite:|library|\[)/;
+
+  /* "舞台左上角", "top-left of the stage", "角色區右下角" — every one of those is a claim about which
+     SIDE of something a control is on, so it is checked as one: the words 上/下 and 左/右 against the
+     measured side of the ringed control. Exact corners are not checked, because a sentence that says
+     「角色區右下角個加號」 is talking about the sprite list's corner and not the stage's, and a rule
+     that cannot tell those apart fails on the truth. This is the rule that would have caught x and y
+     being described as the stage's top-left while they sit in the row underneath it. */
+  /* Only a place word ATTACHED TO THE STAGE is measured against the stage. 「清單上面會見到佢嘅資料」
+     is about the row above the sprite list and is true where it stands; 「舞台左上角」 is about the
+     stage, and that is the one that was wrong. */
+  var WHERE = /舞台\s*(左上角|右上角|左下角|右下角|上方|上面|下方|下面|左邊|右邊)|(?:top-left|top-right|bottom-left|bottom-right|above|below)\s+(?:the\s+)?stage|stage[’']?s\s+(top-left|top-right|bottom-left|bottom-right)/i;
+  var WORD = {
+    '左上角': { h: 'left', v: 'up' }, '右上角': { h: 'right', v: 'up' },
+    '左下角': { h: 'left', v: 'down' }, '右下角': { h: 'right', v: 'down' },
+    '上方': { v: 'up' }, '上面': { v: 'up' },
+    '下方': { v: 'down' }, '下面': { v: 'down' }, '底下': { v: 'down' },
+    '左邊': { h: 'left' }, '左面': { h: 'left' }, '右邊': { h: 'right' }, '右面': { h: 'right' },
+    'top-left': { h: 'left', v: 'up' }, 'top-right': { h: 'right', v: 'up' },
+    'bottom-left': { h: 'left', v: 'down' }, 'bottom-right': { h: 'right', v: 'down' },
+    'above': { v: 'up' }, 'below': { v: 'down' }, 'under': { v: 'down' }, 'underneath': { v: 'down' },
+    'left of': { h: 'left' }, 'right of': { h: 'right' }
+  };
+
+  var MAP = ['stage', 'stageHeader', 'flag', 'stop', 'stageSize', 'spriteInfo', 'sprites',
+    'addSprite', 'addBackdrop', 'tabs', 'palette', 'workspace', 'toolbar', 'chatTabs'];
+
+  var tries = 0;
+  (function tick() {
+    tries++;
+    var win = document.getElementById('app').contentWindow;
+    var S = win && win.WLStudio, vm = S && S.vm;
+    if (!vm || !vm.runtime || !vm.runtime.targets.length) {
+      if (tries < 60) return setTimeout(tick, 500);
+      log('RESULT FAIL: the editor never booted');
+      return;
+    }
+    var marks = null, drive = null;
+    try { marks = win.StudioGuideMarks && win.StudioGuideMarks.create({}); } catch (e) { log('marks: ' + e.message); }
+    try { drive = win.StudioGuideDrive && win.StudioGuideDrive.create({}); } catch (e) { log('drive: ' + e.message); }
+    if (!marks || !drive) { log('RESULT FAIL: the guide modules did not load'); return; }
+
+    var topics = [].concat(win.StudioGuideLessons || [], win.StudioGuideRefs || [], win.StudioGuideTopics || []);
+    if (!topics.length) { log('RESULT FAIL: the guide data did not load'); return; }
+
+    /* the subtitle on screen at each beat, which is what the reader is being told */
+    fetch('assets/voice/manifest.json').then(function (r) { return r.json(); }).then(function (V) {
+      var clips = V.clips || V;
+      var box = function (at) { try { return marks.at(at); } catch (e) { return null; } };
+
+      /* ---------- 1. every ring and every press lands on something ---------- */
+      var missing = {}, missingN = 0;
+      var rings = {};
+      topics.forEach(function (t) {
+        (t.steps || []).forEach(function (st) {
+          (((st && st.demo) || {}).annotate || []).forEach(function (m) {
+            var at = m && m.at;
+            if (!at || STATE_ONLY.test(String(at)) || rings[at]) return;
+            rings[at] = 1;
+            if (!box(at)) { missing[at] = 1; missingN++; log('  NO SUCH TARGET (ring, ' + t.id + '/' + st.id + '): ' + at); }
+          });
+        });
+      });
+      topics.forEach(function (t) {
+        (t.steps || []).forEach(function (st) {
+          (((st && st.demo) || {}).taps || []).forEach(function (o) {
+            var at = o && o.at;
+            if (!at || STATE_ONLY.test(String(at))) return;
+            if (rings['tap:' + at]) return;
+            rings['tap:' + at] = 1;
+            if (!drive.resolve(at)) { missingN++; log('  NO SUCH TARGET (press, ' + t.id + '/' + st.id + '): ' + at); }
+          });
+        });
+      });
+      log(missingN ? missingN + ' target(s) the guide names are not on the screen'
+        : 'every ring and every press finds its control (' + Object.keys(rings).length + ' targets)');
+
+      /* ---------- 2. where the furniture actually sits ---------- */
+      var st0 = box('stage');
+      function side(r) {
+        if (!r || !st0) return '?';
+        if (r.bottom <= st0.top) return 'above';
+        if (r.top >= st0.bottom) return 'below';
+        if (r.left >= st0.right) return 'right';
+        if (r.right <= st0.left) return 'left';
+        return 'inside';
+      }
+      var map = MAP.map(function (k) { var r = box(k); return k + '=' + (r ? side(r) : 'none'); });
+      log('map: ' + map.join(' '));
+
+      /* ---------- 3. a named corner is a measured corner ---------- */
+      var corners = 0, cornerBad = 0;
+      topics.forEach(function (t) {
+        (t.steps || []).forEach(function (st) {
+          var list = (((st && st.demo) || {}).annotate || []).filter(function (m) { return m && (m.when || 'say') === 'say'; });
+          if (!list.length) return;
+          var clip = clips['guide.' + t.id + '.' + st.id + '.body|zh-Hant'];
+          var cues = (clip && clip.cues) || [];
+          list.forEach(function (m) {
+            var text = String(((cues[Math.max(0, m.cue | 0)] || {}).s) || '');
+            if (!text) return;
+            var r = box(m.at);
+            if (!r) return;                                    // already reported above
+            var at = side(r);                                   // above | below | left | right | inside
+            var vert = at === 'above' ? 'up' : at === 'below' ? 'down' : null;
+            var horiz = at === 'left' ? 'left' : at === 'right' ? 'right' : null;
+            var hit = WHERE.exec(text);
+            if (!hit) return;
+            var said = WORD[hit[1] || (hit[2] || hit[3] || '').toLowerCase()];
+            if (!said || (!said.v && !said.h)) return;
+            corners++;
+            var wrong = (said.v && vert && said.v !== vert) || (said.h && horiz && said.h !== horiz);
+            if (!wrong) return;
+            cornerBad++;
+            log('  PLACE: ' + t.id + '/' + st.id + ' says 「' + String(text).slice(0, 30) +
+              '…」 — the ring is on ' + m.at + ', which is ' + at + ' the stage');
+          });
+        });
+      });
+      log(cornerBad ? cornerBad + ' of ' + corners + ' place word(s) contradict where the ring is'
+        : (corners ? 'all ' + corners + ' place word(s) agree with where the ring is drawn' : 'no place words to check'));
+
+      log(cornerBad || missingN ? 'RESULT FAIL' : 'RESULT PASS');
+    });
+  })();
+}());
+</script>
+</body>
+</html>

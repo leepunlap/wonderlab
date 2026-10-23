@@ -45,13 +45,26 @@
     return { id: parts[0], fmt: parts[1], name: item.name };
   }
 
-  /** Load it the way an <img> in the picker would. */
-  function loads(url) {
+  /** Load it the way an <img> in the picker would.
+   *
+   *  Retried, because one failed fetch is not the same as a broken thumbnail: the dev server is a
+   *  single Python process and eight parallel SVG requests occasionally get dropped, which showed up
+   *  as a check that passed or failed depending on the machine's mood. A missing file fails every
+   *  attempt; a busy server fails one. */
+  function loadOnce(url) {
     return new Promise(function (done) {
       var img = new Image();
       img.onload = function () { done(img.naturalWidth > 0 && img.naturalHeight > 0); };
       img.onerror = function () { done(false); };
       img.src = url;
+    });
+  }
+  function loads(url) {
+    return loadOnce(url).then(function (ok) {
+      if (ok) return true;
+      return new Promise(function (r) { setTimeout(r, 120); })
+        .then(function () { return loadOnce(url); })
+        .then(function (again) { return again; });
     });
   }
 
