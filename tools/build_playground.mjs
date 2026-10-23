@@ -16,6 +16,7 @@
 // @scratch/scratch-gui 15.2.0 bundle with the same publicPath rewrite build.mjs makes, its run-time
 // chunks / static files / default project, and the licences.
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -25,6 +26,23 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src'), GUI = path.join(ROOT, 'node_modules', '@scratch', 'scratch-gui');
 const DIST = path.join(ROOT, 'dist-playground'), BUILD = path.join(ROOT, 'build-playground');
 const log = (...a) => console.log('[playground-build]', ...a);
+
+/* The gate. A guide whose sentence disagrees with its own demonstration — "the pointer drags two
+   blocks out" over a stack of five — builds perfectly and ships, and the person who finds it is a
+   teacher looking at the screen. So the three content checks run before anything is copied; they
+   take about two seconds, and SKIP_CHECKS=1 is there for the day one of them is wrong. */
+if (!process.env.SKIP_CHECKS) {
+  for (const tool of ['check_guide.mjs', 'check_claims.mjs', 'check_pace.mjs']) {
+    try {
+      execFileSync(process.execPath, [path.join(ROOT, 'tools', tool)], { stdio: 'pipe' });
+      log('check ok  ' + tool);
+    } catch (e) {
+      process.stderr.write(String(e.stdout || '') + String(e.stderr || ''));
+      throw new Error(`refusing to build: ${tool} failed (SKIP_CHECKS=1 overrides)`);
+    }
+  }
+}
+
 const rm = p => fs.rmSync(p, { recursive: true, force: true });
 const mkdir = p => fs.mkdirSync(p, { recursive: true });
 function copy(src, dst) { mkdir(path.dirname(dst)); fs.copyFileSync(src, dst); }
