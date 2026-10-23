@@ -44,12 +44,20 @@
     el.hidden = false;
   }
 
-  /** Show a tool only when it can do something. */
+  /**
+   * Show a tool only when it can do something.
+   *
+   * The lesson page sets these from across the frame (上一步 once there is something to undo, the
+   * AI 學伴 button when it wants the drawer, and a turn in flight which disables both), so the
+   * state is kept: each call adds to the last rather than replacing it.
+   */
+  var toolState = { undo: false, chat: false, busy: false };
   function setTools(opt) {
     opt = opt || {};
+    Object.keys(opt).forEach(function (k) { toolState[k] = opt[k]; });
     var u = $('wl-tool-undo'), c = $('wl-tool-chat');
-    if (u) u.disabled = !opt.undo;
-    if (c) c.hidden = !opt.chat;
+    if (u) u.disabled = !toolState.undo || !!toolState.busy;
+    if (c) c.hidden = !toolState.chat;
   }
 
   /** The lock panes: two bars over the editor and the stage, plus body.wl-locked. */
@@ -65,6 +73,17 @@
     cfg = cfg || {};
     var S = null, booted = null, ctrlHeld = false;
 
+    /**
+     * The four things the lesson page listens for (lab.js's onStudio): change (save), run (the
+     * 助教 appears after a hand run), undo (上一步) and chat (open the AI pane).
+     *
+     * They are the page's business, not the frame's, so they go out through the onEvent callback
+     * the page handed to boot() — the same way studio-lab.js did it. lab-frame.html's
+     * parent.postMessage is not heard by anything; it was left in as a guess and never answered.
+     */
+    var onEvent = null;
+    function emit(type, data) { try { if (onEvent) onEvent(type, data || null); } catch (e) {} }
+
     /** Build the shell once; later boots reload the lesson into it. */
     function shell() {
       if (!S) {
@@ -79,13 +98,22 @@
             busy: function () {}
           },
           onLoaded: function (s) { setTools({ undo: false, chat: !!cfg.chat }); },
-          onRun: function () {}
+          onRun: function () { emit('run', { what: 'start' }); },
+          onProjectChanged: function () { emit('change'); }
         });
         // Keep the shell's own boot. lab-frame.html replaces WLStudio.boot with the lesson-facing one
         // below, and if the binder then called `S.boot` it would call itself - which is exactly what
         // it did the first time, and the editor simply never came up.
         S._shellBoot = S.boot;
         root.WLStudio = S;
+        /* The lesson page calls these three on WLStudio. studio-lab.js answered them; the split
+           left the calls with nowhere to land, so a page that said 「上一步 可以用了」 was writing
+           to a method that did not exist. They belong here because the buttons are this page's. */
+        S.setTools = function (opt) {
+          opt = opt || {};
+          setTools({ undo: !!opt.undo, chat: !!(opt.drawer || opt.chat), busy: !!opt.busy });
+        };
+        S.toolNote = toolNote;
       }
       return S;
     }
@@ -98,6 +126,7 @@
      */
     function boot(c) {
       c = c || {};
+      if (typeof c.onEvent === 'function') onEvent = c.onEvent;
       var s = shell();
       if (!root.LessonPage) {
         toast('lesson-page.js 未載入：無法建立課程');
@@ -114,19 +143,25 @@
       }
       booted = true;
       return s._shellBoot({ project: project, api: c.api, library: false }).then(function () {
-        // a program to open on top of the lesson's project (the page restores one from the last turn)
-        if (c.program) return s.loadProgram ? s.loadProgram(c.program) : Promise.resolve();
-        // the tools the lesson page asked for
+        /* The buttons are wired before a program is restored, not after: a lesson reopened onto the
+           student's last program used to return early and leave 上一步 and AI 學伴 dead. */
         var undo = $('wl-tool-undo');
         if (undo) undo.addEventListener('click', function () {
+          /* 上一步 is the lesson page's when there is a page: it holds the project from before the
+             turn and says so in the conversation. The shell's own version history is the fallback
+             for a frame with nobody listening. */
+          if (onEvent) { emit('undo'); return; }
           var v = s.undo();
           if (v) s.restoreVersion(v, '回到 AI 上一次改動之前');
         });
         var chat = $('wl-tool-chat');
         if (chat) chat.addEventListener('click', function () {
+          if (onEvent) { emit('chat'); return; }
           if (cfg.onChat) cfg.onChat(s);
         });
         setTools({ undo: false, chat: !!cfg.chat });
+        // a program to open on top of the lesson's project (the page restores one from the last turn)
+        if (c.program) return s.loadProgram(c.program).then(function () { return s; });
         return s;
       });
     }
