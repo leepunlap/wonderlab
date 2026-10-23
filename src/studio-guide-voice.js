@@ -85,9 +85,33 @@
       return sub;
     }
 
+    function stageEl() {
+      return cfg.anchor ? cfg.anchor() : doc.querySelector('[class*="stage-wrapper_stage-wrapper"]');
+    }
+
     function stageRect() {
-      var a = cfg.anchor ? cfg.anchor() : doc.querySelector('[class*="stage-wrapper_stage-wrapper"]');
+      var a = stageEl();
       return a ? a.getBoundingClientRect() : null;
+    }
+
+    var ro = null, watched = null;
+    /**
+     * The stage is resized by things that are not window resizes: opening the pane beside it takes
+     * 360px off its width. A strip measured before that keeps the old width and hangs over the edge
+     * of the stage it is meant to sit inside, so the stage itself is what is watched.
+     */
+    function watch(el) {
+      if (!el || !root.ResizeObserver) return;
+      if (!ro) {
+        try { ro = new root.ResizeObserver(function () { if (sub && !sub.hidden) place(); }); }
+        catch (e) { ro = null; return; }
+      }
+      if (watched === el) return;
+      try {
+        if (watched) ro.unobserve(watched);
+        ro.observe(el);
+        watched = el;
+      } catch (e) { /* a browser without unobserve still gets the window resize */ }
     }
 
     /** Over the bottom of the stage, because that is the thing being narrated. */
@@ -106,6 +130,7 @@
       s.style.width = Math.round(r.width - 20) + 'px';
       s.style.maxWidth = 'none';
       s.style.bottom = Math.round(root.innerHeight - r.bottom + 10) + 'px';
+      watch(stageEl());
     }
 
     function cue(text) {
