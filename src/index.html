@@ -125,6 +125,9 @@
     /* A demonstration is a place you are, not a layer over your work: going back to the conversation
        gives the canvas back, so the AI never edits a stage the student did not build. */
     onTab: function (from, to) {
+      /* which tab the student was on: a refresh used to open the conversation, and a student who
+         had left the guide open on a chapter came back to a chat window with no guide in it */
+      try { localStorage.setItem('wl.chat.tab', to); } catch (e) { /* private mode */ }
       // the voice belongs to the tab it is explaining, not to the pane
       if (voice) voice.stop();
       if (from === 'guide' && to === 'chat' && drive && drive.isActive()) {
@@ -262,6 +265,13 @@
     voice: function (on) { return voice.enabled(on); }
   });
   chat.addView('guide', guide.el);
+
+  /* The tab the student was on, put back: a refresh used to open the conversation, so a student who
+     had left the guide open on a chapter came back to a chat window with no guide in it. */
+  try {
+    var lastTab = localStorage.getItem('wl.chat.tab');
+    if (lastTab === 'guide') chat.show('guide');
+  } catch (e) { /* private mode: the tab is simply the first one */ }
 
   function showCtx() {
     /* The language subscription can fire before the editor has booted (boot() runs after this is

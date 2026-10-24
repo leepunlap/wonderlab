@@ -206,6 +206,52 @@
     S.enabled = on;
 
     var vm = null, store = null, ops = null, trace = null, assist = null, app = null, bootResolve = null;
+    /* ---------- the tab the student was on ----------
+       The editor has three tabs — 程式 / 造型 / 音效 — and a refresh used to open the first one
+       whatever the student was doing: a costume half-finished was closed by the reload that followed
+       it. Upstream keeps the tab in the store, so the tab is read from there and written back to
+       there, with upstream's own action, so a scratch-gui that renames it costs one line here and
+       not a rewrite.
+
+       The restore cannot be a single dispatch: upstream sends the editor back to 程式 whenever a
+       project arrives (project-fetcher-hoc), so a tab restored before that would be undone by the
+       load itself. So the tab is put back whenever the store comes to 程式 while the student has
+       not chosen a tab themselves — and the moment the tab is where the student left it, the
+       remembering starts properly. */
+    var TAB_KEY = 'wl.editor.tab';
+    var lastTab = -1;
+    var savedTab = 0;         // the tab the student had, read at boot
+    var studentChose = false; // the student picked a tab themselves: theirs it is
+    function currentTab() {
+      if (!store) return 0;
+      var st = store.getState();
+      var g = st && st.scratchGui;
+      return (g && g.editorTab ? g.editorTab.activeTabIndex : 0) | 0;
+    }
+    function readTab() {
+      try {
+        var v = parseInt(root.localStorage.getItem(TAB_KEY), 10);
+        if (v === 1 || v === 2) savedTab = v;
+      } catch (e) { /* private mode: the editor still works, it just forgets */ }
+      /* A click on the editor's own tab strip is the student choosing, and nothing may undo it. */
+      try {
+        root.document.addEventListener('click', function (e) {
+          var t = e.target && e.target.closest ? e.target.closest('[role="tab"]') : null;
+          if (!t || !t.parentNode) return;
+          if (/react-tabs__tab-list/.test(String(t.parentNode.className || ''))) studentChose = true;
+        }, true);
+      } catch (e) { }
+    }
+    function onStoreChange() {
+      if (!store) return;
+      var v = currentTab();
+      /* While the tab is still being put back, what the store says is not the student's: upstream's
+         own reset would overwrite what was remembered, so nothing is written until it is settled. */
+      if (savedTab && !studentChose && v === 0) return;
+      if (v === lastTab) return;          // the store moves on every block; only the tab matters
+      lastTab = v;
+      try { root.localStorage.setItem(TAB_KEY, String(v)); } catch (e) { }
+    }
     var loading = true, applying = false;
 
     function $(id) { return root.document.getElementById(id); }
@@ -257,6 +303,8 @@
           return { storage: madeStorage };
         });
         store = state.store;
+        readTab();
+        store.subscribe(onStoreChange);
         /* The object the editor asks for asset URLs. Exposed because "where does this costume come
            from" is a question the driver, the lesson page and _library-check.html all end up asking,
            and the answer must be the one the picker's thumbnails use or it is not the same answer. */
@@ -419,6 +467,14 @@
           S.readyAt = (root.performance && performance.now()) || 0;
           root.document.documentElement.setAttribute('data-wl-ready', '1');
         }
+        /* Put the student's tab back once the editor has settled. Upstream sends the editor back
+           to 程式 whenever a project arrives (project-fetcher-hoc), so a tab put back before that
+           would be undone by the load itself; and a click on the tab strip in the meantime is the
+           student choosing, which nothing undoes. */
+        if (savedTab) setTimeout(function () {
+          if (studentChose) return;
+          try { store.dispatch({ type: 'scratch-gui/navigation/ACTIVATE_TAB', activeTabIndex: savedTab }); } catch (e) { }
+        }, 1200);
         if (bootResolve) { bootResolve(S); bootResolve = null; }
         if (cfg.onLoaded) cfg.onLoaded(S);
         if (cfg.onReady) cfg.onReady(S);
